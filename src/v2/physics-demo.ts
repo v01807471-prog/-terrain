@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Terrain } from '../engine/terrain/Terrain.js';
-import { createDemoBlueprint } from '../engine/blueprint/demo.js';
+import { createDefaultTerrainGraph, compileTerrainGraph } from '../engine/blueprint/graph.js';
 import { TerrainRenderer } from '../engine/renderer/TerrainRenderer.js';
 import { PhysicsWorld } from '../engine/physics/PhysicsWorld.js';
 import { FixedStepLoop } from '../engine/physics/FixedStepLoop.js';
@@ -103,7 +103,10 @@ sun.shadow.camera.bottom = -55;
 scene.add(sun);
 
 const LOD0_CELL_SIZE = 1;
-const blueprint = createDemoBlueprint(17);
+const blueprintGraph = createDefaultTerrainGraph(17);
+const blueprint = compileTerrainGraph(blueprintGraph);
+scene.background = new THREE.Color(blueprint.fogColor);
+scene.fog = new THREE.Fog(blueprint.fogColor, blueprint.fogNear, blueprint.fogFar);
 const terrain = new Terrain(blueprint.heightAt, {
   seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
 });
