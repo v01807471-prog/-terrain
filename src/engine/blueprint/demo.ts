@@ -52,7 +52,7 @@ export function createDemoBlueprint(seed = 17): TerrainBlueprint {
       return sum / max(norm, 0.0001);
     }
     float terrainHeight(vec2 p) {
-      vec2 seedOffset = vec2(" + seedOffsetX + ", " + seedOffsetZ + ");
+      vec2 seedOffset = vec2(${seedOffsetX}, ${seedOffsetZ});
       float warpX = fbm(p * 0.0024 + seedOffset, 3) * 38.0;
       float warpZ = fbm(p * 0.0024 + vec2(41.0, -23.0) + seedOffset, 3) * 38.0;
       vec2 q = p + vec2(warpX, warpZ);
