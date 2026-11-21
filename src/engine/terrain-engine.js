@@ -5,6 +5,8 @@ import { waterVertex, waterFragTemplate } from "./shaders/water.js";
 import { makeTexture, createMacroTexture, createDetailTexture } from "./textures/procedural.js";
 import { F, oc, lin, NODE_TYPES } from "./graph/nodes.js";
 import { compileGraph, previewGraph } from "./graph/compiler.js";
+import { QUALITY_PRESETS } from "./config/quality.js";
+import { f32ToB64, b64ToF32 } from "./persistence/float32.js";
 
 (async()=>{
 try{
@@ -55,13 +57,8 @@ let showGrid=false;
 let showTriangles=false;
 
 // КАЧЕСТВО (меняется во вкладке "Качество", сохраняется в браузере)
-const PRESETS={
- low:{cell:.5,area:256,grid:64,dist:1500,tex:128,aniso:1,scale:.75,detailSize:1.5,detailStr:.5,filter:"smooth"},
- medium:{cell:.25,area:256,grid:96,dist:4000,tex:256,aniso:4,scale:1,detailSize:1.5,detailStr:.55,filter:"smooth"},
- high:{cell:.25,area:256,grid:128,dist:6000,tex:256,aniso:16,scale:1.6,detailSize:1.5,detailStr:.55,filter:"smooth"},
- ultra:{cell:.25,area:256,grid:256,dist:8000,tex:512,aniso:16,scale:1.6,detailSize:1.5,detailStr:.55,filter:"smooth"}
-};
-const Q={...PRESETS.medium};
+
+const Q={...QUALITY_PRESETS.medium};
 try{
  const saved=JSON.parse(localStorage.getItem("terrainQ")||"{}");
  for(const k in Q)if(k in saved&&typeof saved[k]===typeof Q[k])Q[k]=saved[k];
@@ -2173,7 +2170,7 @@ qEl("qDetailStr").oninput=e=>{Q.detailStr=Number(e.target.value);applyQ("detailS
 
 document.querySelectorAll("[data-preset]").forEach(b=>{
  b.onclick=()=>{
-  Object.assign(Q,PRESETS[b.dataset.preset]);
+  Object.assign(Q,QUALITY_PRESETS[b.dataset.preset]);
   if(deltaArea!==Q.area)resetDelta(Q.area);
   buildClipmap();
   rebuildTextures();
@@ -2187,18 +2184,6 @@ syncQUI();
 
 // IMPORT / EXPORT
 
-function f32ToB64(arr){
- const u=new Uint8Array(arr.buffer,arr.byteOffset,arr.byteLength);
- let str="";
- for(let i=0;i<u.length;i+=32768)str+=String.fromCharCode.apply(null,u.subarray(i,i+32768));
- return btoa(str);
-}
-
-function b64ToF32(b){
- const str=atob(b),u=new Uint8Array(str.length);
- for(let i=0;i<str.length;i++)u[i]=str.charCodeAt(i);
- return new Float32Array(u.buffer);
-}
 
 document.getElementById("exportWorld").onclick=()=>{
 
