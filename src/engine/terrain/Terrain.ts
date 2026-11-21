@@ -1,5 +1,5 @@
 import { compileGraph } from '../graph/compiler.js';
-import { originalBaseHeight } from '../math/noise.js';
+import { fbmXZ } from '../math/noise.js';
 import { TerrainEditStore } from './TerrainEditStore.js';
 import type { TerrainChange, TerrainConfig, TerrainSample, Vector3Like } from './types.js';
 
@@ -13,6 +13,16 @@ const DEFAULT_CONFIG: TerrainConfig = {
   normalSampleDistance: 0.5
 };
 
+function createDefaultHeight(seed: number): HeightFunction {
+  const sx = seed * 12.9898;
+  const sz = seed * 78.233;
+  return (x, z) =>
+    6 +
+    fbmXZ(x * 0.0048 + sx, z * 0.0048 + sz, 4) * 42 +
+    fbmXZ(x * 0.018 + 31 + sx, z * 0.018 - 17 + sz, 4) * 12 +
+    fbmXZ(x * 0.065 - 13 + sx, z * 0.065 + 42 + sz, 4) * 1.8;
+}
+
 /** Процедурный источник истины о высоте мира; не зависит от камеры и Renderer. */
 export class Terrain {
   readonly edits: TerrainEditStore;
@@ -21,9 +31,9 @@ export class Terrain {
   private readonly listeners = new Set<TerrainListener>();
   private version = 0;
 
-  constructor(baseHeight: HeightFunction = originalBaseHeight, config: Partial<TerrainConfig> = {}) {
-    this.baseHeight = baseHeight;
+  constructor(baseHeight?: HeightFunction, config: Partial<TerrainConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.baseHeight = baseHeight ?? createDefaultHeight(this.config.seed);
     this.edits = new TerrainEditStore(this.config.editCellSize, this.config.editChunkSize);
   }
 
@@ -64,7 +74,8 @@ export class Terrain {
   }
 
   sampleSurface(x: number, z: number): TerrainSample {
-    return { height: this.getHeight(x, z), normal: this.getNormal(x, z), slope: this.getSlope(x, z) };
+    const normal = this.getNormal(x, z);
+    return { height: this.getHeight(x, z), normal, slope: 1 - normal.y };
   }
 
   applyEdit(x: number, z: number, radius: number, amount: number, softness = 0.65): TerrainChange {
