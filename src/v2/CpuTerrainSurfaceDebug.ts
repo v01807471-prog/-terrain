@@ -74,7 +74,8 @@ export class CpuTerrainSurfaceDebug {
         const worldX = originX + x * this.cellSize;
         const worldZ = originZ + z * this.cellSize;
         this.positions[index] = x * this.cellSize;
-        this.positions[index + 1] = this.terrain.getHeight(worldX, worldZ) + 0.035;
+        // Keep the CPU surface at its true height; polygon offset is only a draw-order aid.
+        this.positions[index + 1] = this.terrain.getHeight(worldX, worldZ);
         this.positions[index + 2] = z * this.cellSize;
       }
     }
