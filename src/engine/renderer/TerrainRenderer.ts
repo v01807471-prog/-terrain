@@ -176,7 +176,7 @@ export class TerrainRenderer {
         uWireColor: { value: new THREE.Color().setHSL(0.48 + level * 0.075, 0.88, 0.62) }
       };
       const material = new THREE.ShaderMaterial({
-        uniforms: { ...common, uWireLift: { value: 0 } }, vertexShader, fragmentShader: terrainFragmentShader,
+        uniforms: { ...common, uWireLift: { value: 0 } }, vertexShader, fragmentShader: terrainFragmentShader.replace('__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;'),
         glslVersion: THREE.GLSL3, side: THREE.FrontSide
       });
       const wireMaterial = new THREE.ShaderMaterial({
