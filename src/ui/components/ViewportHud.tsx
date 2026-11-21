@@ -1,0 +1,1 @@
+export default function ViewportHud(){return <div className="viewport-hud"><div className="viewport-label"><i className="live-dot"/> PERSPECTIVE · LIT</div><div className="viewport-help">LMB sculpt · RMB look · WASD move · Shift faster</div><div className="viewport-coordinates">WORLD SPACE <b>0.00 / 0.00 / 0.00</b></div></div>}
