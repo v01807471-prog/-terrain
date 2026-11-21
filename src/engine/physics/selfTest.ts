@@ -27,5 +27,25 @@ export function runTerrainPhysicsSelfTests(): { passed: string[] } {
   assert(Number.isFinite(ball.position.y) && Number.isFinite(ball.velocity.y), 'состояние сферы остаётся конечным');
   assert(ball.position.y >= ball.radius - 0.015, 'сфера не проваливается сквозь плоский Terrain');
   assert(ball.grounded, 'сфера распознаёт контакт с Terrain');
+
+  const pairWorld = new PhysicsWorld(terrain);
+  const left = pairWorld.addSphere({
+    id: 'pair-left', position: { x: -0.24, y: 5, z: 0 }, radius: 0.25,
+    mass: 1, restitution: 0.2, velocity: { x: 1, y: 0, z: 0 }
+  });
+  const right = pairWorld.addSphere({
+    id: 'pair-right', position: { x: 0.24, y: 5, z: 0 }, radius: 0.25,
+    mass: 1, restitution: 0.2, velocity: { x: -1, y: 0, z: 0 }
+  });
+  pairWorld.step(1 / 60);
+  const pairDistance = Math.hypot(
+    right.position.x - left.position.x,
+    right.position.y - left.position.y,
+    right.position.z - left.position.z
+  );
+  assert(pairDistance >= left.radius + right.radius - 0.005, 'две сферы не остаются взаимно проникшими');
+  assert(left.velocity.x < right.velocity.x, 'импульс меняет относительные скорости сталкивающихся сфер');
+  assert(Math.abs(left.mass * left.velocity.x + right.mass * right.velocity.x) < 0.02,
+    'столкновение сфер сохраняет линейный импульс по оси контакта');
   return { passed };
 }
