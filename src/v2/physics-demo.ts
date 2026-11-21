@@ -4,6 +4,7 @@ import { createDemoBlueprint } from '../engine/blueprint/demo.js';
 import { TerrainRenderer } from '../engine/renderer/TerrainRenderer.js';
 import { PhysicsWorld } from '../engine/physics/PhysicsWorld.js';
 import { FixedStepLoop } from '../engine/physics/FixedStepLoop.js';
+import { CpuTerrainSurfaceDebug } from './CpuTerrainSurfaceDebug.js';
 import './physics-demo.css';
 
 const root = document.querySelector<HTMLDivElement>('#physics-v2-root');
@@ -38,6 +39,7 @@ root.innerHTML = `
           <button class="pv2-button" id="pv2-camera">◎ Камера за героем</button>
           <label class="pv2-toggle"><input id="pv2-wire" type="checkbox"> Сетка рельефа по уровням LOD</label>
           <label class="pv2-toggle"><input id="pv2-physics-debug" type="checkbox"> Контакты физики героя</label>
+          <label class="pv2-toggle"><input id="pv2-cpu-surface" type="checkbox"> CPU-поверхность столкновений</label>
         </div>
         <p class="pv2-note">Сетка — диагностическое наложение линий на рельеф, а не отдельная земляная плоскость. Шар добавляется отдельно для проверки физики.</p>
       </section>
@@ -107,6 +109,7 @@ const terrain = new Terrain(blueprint.heightAt, {
 const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
   levels: 8, gridSize: 96, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
 });
+const cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
 
 const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1, terrainCellSize: LOD0_CELL_SIZE });
 const loop = new FixedStepLoop(world, 1 / 60, 10, 0.1);
@@ -355,6 +358,11 @@ document.querySelector('#pv2-pause')!.addEventListener('click', () => { paused =
 document.querySelector('#pv2-drop')!.addEventListener('click', () => createSphere(player.x + 3, player.z + 3, 12));
 document.querySelector<HTMLInputElement>('#pv2-wire')!.addEventListener('change', (event) =>
   terrainRenderer.setWireframe((event.currentTarget as HTMLInputElement).checked));
+document.querySelector<HTMLInputElement>('#pv2-cpu-surface')!.addEventListener('change', (event) => {
+  const enabled = (event.currentTarget as HTMLInputElement).checked;
+  cpuSurfaceDebug.setVisible(enabled);
+  if (enabled) cpuSurfaceDebug.update(player.x, player.z);
+});
 document.querySelector<HTMLInputElement>('#pv2-physics-debug')!.addEventListener('change', (event) => {
   physicsDebug.visible = (event.currentTarget as HTMLInputElement).checked;
   if (physicsDebug.visible) updatePhysicsDebug();
@@ -391,6 +399,7 @@ function animate(now: number): void {
     fpsFrames = 0; fpsElapsed = 0;
   }
   updatePlayer(delta);
+  if (cpuSurfaceDebug.group.visible) cpuSurfaceDebug.update(player.x, player.z);
   if (!paused) {
     const result = loop.advance(delta);
     totalSteps += result.steps;
@@ -412,5 +421,5 @@ resetPlayer();
 updateFollowCamera();
 requestAnimationFrame(animate);
 window.addEventListener('beforeunload', () => {
-  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose();
+  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); cpuSurfaceDebug.dispose();
 });
