@@ -1,58 +1,58 @@
-# Terrain Editor — engineering roadmap
+# Редактор рельефа Terrain — план развития
 
-The goal is a powerful, extensible terrain authoring tool. Work in small vertical slices; preserve existing behavior and keep the build green.
+Цель проекта — создать мощный расширяемый инструмент для создания и редактирования ландшафтов. Разрабатываем небольшими законченными этапами, сохраняем существующие возможности и поддерживаем успешную сборку.
 
-## Phase 0 — Foundation
-- [x] Move to Vite and strict TypeScript project configuration.
-- [x] Extract HTML, CSS and the existing Three.js engine into separate files.
-- [x] Keep the existing terrain editor features working during the migration.
-- [ ] Add automated smoke tests and CI build/typecheck.
-- [ ] Establish formatting and lint rules.
+## Этап 0 — Основа проекта
+- [x] Перейти на Vite и строгую конфигурацию TypeScript.
+- [x] Разделить HTML, CSS и существующий движок Three.js на отдельные файлы.
+- [x] Сохранить возможности редактора во время переноса.
+- [ ] Добавить автоматические проверки основных сценариев и CI для сборки и проверки типов.
+- [ ] Настроить единый стиль форматирования и правила статического анализа.
 
-## Phase 1 — Typed engine architecture
-- [ ] Replace the legacy IIFE with an explicit `TerrainApplication` lifecycle (init, update, resize, dispose).
-- [ ] Split renderer, scene, camera, input, world and UI into independent modules.
-- [ ] Introduce typed configuration, event bus and dependency boundaries.
-- [ ] Remove direct DOM lookups from terrain algorithms; use typed UI adapters.
-- [ ] Add unit tests for deterministic terrain algorithms.
+## Этап 1 — Архитектура типизированного движка
+- [ ] Заменить legacy IIFE явным жизненным циклом TerrainApplication (init, update, resize, dispose).
+- [ ] Разделить renderer, scene, camera, input, world и UI на независимые модули.
+- [ ] Ввести типизированную конфигурацию, шину событий и чёткие границы зависимостей.
+- [ ] Убрать прямые обращения к DOM из алгоритмов рельефа; использовать типизированные адаптеры UI.
+- [ ] Добавить модульные тесты для детерминированных алгоритмов генерации рельефа.
 
-## Phase 2 — Terrain data and editing
-- [ ] Create a canonical heightfield data model with configurable resolution and world scale.
-- [ ] Separate brush algorithms: raise/lower, flatten, smooth, slope, noise, terrace, ramp and plateau.
-- [ ] Add pressure/tilt-ready brush input, falloff curves, symmetry and stroke interpolation.
-- [ ] Make undo/redo transactional, bounded and serializable.
-- [ ] Support non-destructive layers, masks, blending and per-layer visibility/locking.
-- [ ] Add selection, region editing and transform tools.
+## Этап 2 — Данные рельефа и редактирование
+- [ ] Создать единую модель heightfield с настраиваемым разрешением и масштабом мира.
+- [ ] Разделить алгоритмы кистей: raise/lower, flatten, smooth, slope, noise, terrace, ramp и plateau.
+- [ ] Добавить поддержку давления/наклона пера, кривых затухания, симметрии и интерполяции мазков.
+- [ ] Сделать undo/redo транзакционными, ограниченными по памяти и сериализуемыми.
+- [ ] Добавить неразрушающие слои, маски, смешивание, видимость и блокировку слоёв.
+- [ ] Добавить выделение областей и инструменты трансформации.
 
-## Phase 3 — Procedural generation
-- [ ] Build a typed node graph with validation, cycle detection and deterministic seeds.
-- [ ] Add noise families (Perlin/Simplex/Worley), domain warping and fractal composition.
-- [ ] Add erosion: hydraulic, thermal, talus and sediment transport.
-- [ ] Add rivers, watersheds, coastlines, biomes and spline-based roads.
-- [ ] Support reusable graph presets and custom nodes.
+## Этап 3 — Процедурная генерация
+- [ ] Создать типизированный граф узлов с проверкой данных, обнаружением циклов и детерминированными seed.
+- [ ] Добавить семейства шума (Perlin/Simplex/Worley), domain warping и фрактальную композицию.
+- [ ] Добавить эрозию: гидравлическую, термическую, осыпание и перенос осадков.
+- [ ] Добавить реки, водосборы, береговые линии, биомы и дороги на основе сплайнов.
+- [ ] Поддержать повторно используемые шаблоны графов и пользовательские узлы.
 
-## Phase 4 — Rendering and performance
-- [ ] Keep clipmap/LOD rendering while isolating GPU resources and shaders.
-- [ ] Add adaptive LOD, frustum/occlusion culling and GPU profiling.
-- [ ] Add material layers, splat maps, triplanar mapping and texture painting.
-- [ ] Add water, atmosphere, vegetation scattering and lighting presets.
-- [ ] Move expensive generation and erosion jobs to Web Workers/GPU compute where appropriate.
+## Этап 4 — Рендеринг и производительность
+- [ ] Сохранить clipmap/LOD-рендеринг, изолировав GPU-ресурсы и шейдеры.
+- [ ] Добавить адаптивный LOD, отсечение по видимости и GPU-профилирование.
+- [ ] Добавить слои материалов, splat maps, triplanar mapping и рисование текстур.
+- [ ] Развить воду, атмосферу, распределение растительности и пресеты освещения.
+- [ ] Перенести тяжёлую генерацию и эрозию в Web Workers/GPU compute там, где это оправдано измерениями.
 
-## Phase 5 — Import, export and production workflow
-- [ ] Versioned project format with migrations and autosave.
-- [ ] Import/export PNG, RAW, 16/32-bit heightmaps and tiled terrain.
-- [ ] Export meshes and textures to glTF/GLB and common game-engine workflows.
-- [ ] Add asset library, presets, project settings and recovery snapshots.
-- [ ] Add keyboard shortcut manager, command palette and contextual tool help.
+## Этап 5 — Импорт, экспорт и рабочий процесс
+- [ ] Версионируемый формат проекта с миграциями и автосохранением.
+- [ ] Импорт/экспорт PNG, RAW, heightmap 16/32-bit и тайловых ландшафтов.
+- [ ] Экспорт сеток и текстур в glTF/GLB и форматы игровых движков.
+- [ ] Библиотека ресурсов, пресеты, настройки проекта и резервные снимки для восстановления.
+- [ ] Менеджер горячих клавиш, command palette и контекстная справка инструментов.
 
-## Phase 6 — Reliability and extensibility
-- [ ] Plugin API for tools, generators, importers and exporters.
-- [ ] Public typed API and stable extension points.
-- [ ] Performance budgets, regression fixtures and large-world stress tests.
-- [ ] Accessibility, localization and responsive editor layout.
+## Этап 6 — Надёжность и расширяемость
+- [ ] API плагинов для инструментов, генераторов, импортёров и экспортёров.
+- [ ] Публичный типизированный API и стабильные точки расширения.
+- [ ] Бюджеты производительности, тестовые эталоны регрессий и нагрузочные тесты больших миров.
+- [ ] Доступность интерфейса, локализация и адаптивная компоновка редактора.
 
-## Definition of done
-- Strict TypeScript checks pass; no new untyped code in the legacy engine.
-- Existing editing, graph, import/export and camera workflows remain functional.
-- New algorithms have deterministic tests and documented performance characteristics.
-- Large projects remain responsive and can be saved/reopened without data loss.
+## Критерии готовности
+- Строгая проверка TypeScript проходит; новый нетипизированный код в legacy-движке не добавляется.
+- Существующие сценарии редактирования, графа, импорта/экспорта и камеры продолжают работать.
+- Новые алгоритмы покрыты детерминированными тестами; их характеристики производительности задокументированы.
+- Большие проекты остаются отзывчивыми и сохраняются/открываются без потери данных.
