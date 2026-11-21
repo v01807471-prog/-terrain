@@ -135,12 +135,17 @@ scene.add(playerMesh);
 
 // Диагностика опоры капсулы: зелёные точки — высота земли,
 // вертикальные отрезки — зазор до нижней поверхности капсулы.
-const playerSupportSamples: Array<[number, number]> = [
-  [0, 0], [0.72 * playerRadius, 0], [-0.72 * playerRadius, 0],
-  [0, 0.72 * playerRadius], [0, -0.72 * playerRadius],
-  [0.5 * playerRadius, 0.5 * playerRadius], [-0.5 * playerRadius, 0.5 * playerRadius],
-  [0.5 * playerRadius, -0.5 * playerRadius], [-0.5 * playerRadius, -0.5 * playerRadius]
-];
+// Плотная выборка нижней полусферы: центр + два кольца по 16 точек.
+const playerSupportSamples: Array<[number, number]> = [[0, 0]];
+for (const radial of [0.45, 0.88]) {
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    playerSupportSamples.push([
+      Math.cos(angle) * playerRadius * radial,
+      Math.sin(angle) * playerRadius * radial
+    ]);
+  }
+}
 const physicsDebug = new THREE.Group();
 physicsDebug.visible = false;
 const contactLinePositions = new Float32Array(playerSupportSamples.length * 2 * 3);
@@ -193,13 +198,8 @@ let playerAccumulator = 0;
 // Для каждой точки вычисляем высоту, при которой капсула уже касается поверхности.
 function getPlayerSupportHeight(x: number, z: number): number {
   const r = playerRadius;
-  const samples: Array<[number, number]> = [
-    [0, 0], [0.72 * r, 0], [-0.72 * r, 0], [0, 0.72 * r], [0, -0.72 * r],
-    [0.5 * r, 0.5 * r], [-0.5 * r, 0.5 * r],
-    [0.5 * r, -0.5 * r], [-0.5 * r, -0.5 * r]
-  ];
   let support = -Infinity;
-  for (const [ox, oz] of samples) {
+  for (const [ox, oz] of playerSupportSamples) {
     const radialSq = ox * ox + oz * oz;
     if (radialSq >= r * r) continue;
     const ground = terrain.getGroundHeight(x + ox, z + oz, LOD0_CELL_SIZE);
