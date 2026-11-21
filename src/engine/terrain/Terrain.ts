@@ -61,6 +61,46 @@ export class Terrain {
     return this.baseHeight(x, z) + this.edits.sample(x, z);
   }
 
+  /**
+   * Samples the exact triangle surface used by the LOD0 render grid.
+   * Triangle diagonal is B-C, matching TerrainRenderer geometry indices.
+   */
+  sampleGround(x: number, z: number, cellSize = 1): TerrainSample {
+    if (!(cellSize > 0)) throw new Error('cellSize должен быть положительным');
+    const gx = x / cellSize;
+    const gz = z / cellSize;
+    const ix = Math.floor(gx);
+    const iz = Math.floor(gz);
+    const fx = gx - ix;
+    const fz = gz - iz;
+    const x0 = ix * cellSize;
+    const z0 = iz * cellSize;
+    const hA = this.getHeight(x0, z0);
+    const hB = this.getHeight(x0 + cellSize, z0);
+    const hC = this.getHeight(x0, z0 + cellSize);
+    const hD = this.getHeight(x0 + cellSize, z0 + cellSize);
+
+    let height: number;
+    let dx: number;
+    let dz: number;
+    if (fx + fz <= 1) {
+      height = hA + (hB - hA) * fx + (hC - hA) * fz;
+      dx = (hB - hA) / cellSize;
+      dz = (hC - hA) / cellSize;
+    } else {
+      height = hD + (hC - hD) * (1 - fx) + (hB - hD) * (1 - fz);
+      dx = (hD - hC) / cellSize;
+      dz = (hD - hB) / cellSize;
+    }
+    const length = Math.hypot(dx, 1, dz);
+    const normal = { x: -dx / length, y: 1 / length, z: -dz / length };
+    return { height, normal, slope: 1 - normal.y };
+  }
+
+  getGroundHeight(x: number, z: number, cellSize = 1): number {
+    return this.sampleGround(x, z, cellSize).height;
+  }
+
   getNormal(x: number, z: number): Vector3Like {
     const e = this.config.normalSampleDistance;
     const dx = (this.getHeight(x + e, z) - this.getHeight(x - e, z)) / (2 * e);
