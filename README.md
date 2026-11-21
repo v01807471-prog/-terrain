@@ -24,7 +24,9 @@ npm run build
 ## Architecture (migration in progress)
 
 - `src/main.tsx` — React application bootstrap and engine loading.
-- `src/ui/App.tsx` — React editor shell: tool rail, viewport HUD, inspector and status bar.
+- `src/ui/App.tsx` — React workspace composition.
+- `src/ui/components/` — focused TopBar, ToolRail, ViewportHud, Inspector and StatusBar components.
+- `src/ui/types.ts` — editor tool and panel contracts.
 - `src/ui/bridge.ts` — temporary compatibility bridge to existing engine actions while controls are migrated.
 - `src/styles/workspace.css` — editor workspace layout and visual system.
 - `src/engine/terrain-engine.js` — original runtime, retained temporarily to preserve sculpting, undo/redo, graph, asset, water, quality and heightmap workflows.
