@@ -81,11 +81,13 @@ export class PhysicsWorld {
       if (radialSq >= r * r) continue;
       const x = body.position.x + dx;
       const z = body.position.z + dz;
-      const surfaceY = this.terrain.getHeight(x, z);
+      // Collision samples the same piecewise-planar LOD0 triangles as the visible mesh.
+      const surface = this.terrain.sampleGround(x, z, 1);
+      const surfaceY = surface.height;
       const sphereBottom = body.position.y - Math.sqrt(r * r - radialSq);
       const verticalPenetration = surfaceY - sphereBottom;
       if (verticalPenetration <= 0) continue;
-      const normal = this.terrain.getNormal(x, z);
+      const normal = surface.normal;
       const penetration = verticalPenetration / Math.max(0.2, normal.y);
       if (!deepest || penetration > deepest.penetration) {
         deepest = {
