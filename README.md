@@ -1,57 +1,57 @@
-# Terrain Editor
+# Редактор рельефа Terrain
 
-A browser-based 3D terrain editor built with React, TypeScript, Vite and Three.js. The rendering core uses a GPU clipmap terrain, procedural GLSL materials, and a CPU height-delta field for sculpt edits.
+Браузерный 3D-редактор рельефа на React, TypeScript, Vite и Three.js. Для рендеринга используется GPU clipmap, процедурные GLSL-материалы и CPU height-delta field для изменений рельефа кистями.
 
-## Requirements
+## Требования
 
-- Node.js 20.19+ or 22.12+
+- Node.js 20.19+ или 22.12+
 - npm
 
-## Development
+## Запуск для разработки
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Quality checks
+## Проверки качества
 
 ```bash
 npm run typecheck
 npm run build
 ```
 
-## Architecture (migration in progress)
+## Архитектура (перенос ещё продолжается)
 
-- `src/main.tsx` — React application bootstrap and engine loading.
-- `src/ui/App.tsx` — React workspace composition.
-- `src/ui/components/` — focused TopBar, ToolRail, ViewportHud, Inspector and StatusBar components.
-- `src/ui/types.ts` — editor tool and panel contracts.
-- `src/ui/bridge.ts` — temporary compatibility bridge to existing engine actions while controls are migrated.
-- `src/styles/workspace.css` — editor workspace layout and visual system.
-- `src/engine/terrain-engine.js` — original runtime, retained temporarily to preserve sculpting, undo/redo, graph, asset, water, quality and heightmap workflows.
-- `src/engine/math/noise.ts` — deterministic CPU noise and graph sampling functions.
-- `src/engine/shaders/*.glsl` — standalone terrain vertex/fragment, wireframe, water and shared noise shader sources. TypeScript wrappers import them with Vite `?raw`; the shader text is bundled at build time (no runtime fetch).
-- `src/engine/textures/procedural.ts` — procedural macro and detail texture generation.
-- `src/engine/graph/nodes.ts` and `src/engine/graph/compiler.ts` — node definitions, CPU evaluation, GLSL compilation and graph previews.
-- `src/engine/config/quality.ts` — quality presets.
-- `src/engine/persistence/float32.ts` — Float32 heightfield serialization helpers.
-- `src/types/terrain.ts` — shared domain contracts.
+- `src/main.tsx` — запуск React-приложения и загрузка движка.
+- `src/ui/App.tsx` — композиция рабочего пространства редактора.
+- `src/ui/components/` — отдельные компоненты TopBar, ToolRail, ViewportHud, Inspector и StatusBar.
+- `src/ui/types.ts` — контракты инструментов и панелей редактора.
+- `src/ui/bridge.ts` — временный мост совместимости со старым движком на время переноса элементов управления.
+- `src/styles/workspace.css` — компоновка рабочего пространства и визуальная система редактора.
+- `src/engine/terrain-engine.js` — исходный runtime, временно сохранённый для работы кистей, undo/redo, графа, ресурсов, воды, настроек качества и сценариев с heightmap.
+- `src/engine/math/noise.ts` — детерминированный CPU-шум и функции вычисления графа.
+- `src/engine/shaders/*.glsl` — отдельные исходники terrain vertex/fragment, wireframe, water и общего noise shader. TypeScript-обёртки импортируют их через Vite `?raw`; текст шейдеров включается в сборку (запросов к сети во время работы нет).
+- `src/engine/textures/procedural.ts` — генерация процедурных макро- и детальных текстур.
+- `src/engine/graph/nodes.ts` и `src/engine/graph/compiler.ts` — определения узлов, CPU-вычисление, компиляция GLSL и предпросмотр графа.
+- `src/engine/config/quality.ts` — пресеты качества.
+- `src/engine/persistence/float32.ts` — вспомогательные функции сериализации heightfield в Float32.
+- `src/types/terrain.ts` — общие доменные типы.
 
-The React workspace is now the primary application chrome. Vite's built-in `?raw` loader imports standalone `.glsl` files as source strings; a third-party GLSL plugin is not required for this workflow. Existing engine controls are bridged rather than duplicated, so the original terrain runtime remains the source of truth during migration. The large runtime file is not considered finished: the next extraction targets are graph compilation/nodes, sculpt history and brush operations, heightmap persistence, clipmap lifecycle, and renderer orchestration.
+React workspace теперь является основной оболочкой приложения. Встроенный механизм Vite `?raw` загружает отдельные файлы `.glsl` как исходные строки; сторонний GLSL-плагин для этого не нужен. Управление существующим движком подключено через bridge, а не продублировано, поэтому во время миграции источником истины остаётся исходный runtime. Большой файл движка ещё не приведён к целевой архитектуре: следующие кандидаты на разделение — компиляция/узлы графа, история мазков и операции кистей, хранение heightmap, жизненный цикл clipmap и координация renderer.
 
-## GitHub Pages deployment
+## Публикация через GitHub Pages
 
-`.github/workflows/pages.yml` builds the Vite app and deploys `dist/` to GitHub Pages whenever `main` is updated. The deployment uses the repository-name base path, so project Pages URLs resolve correctly. In repository Settings → Pages, select **GitHub Actions** as the build and deployment source. The site is publicly accessible. GitHub Pages supports private source repositories only on eligible paid plans; on GitHub Free the repository must be public to use Pages.
+Файл `.github/workflows/pages.yml` собирает Vite-приложение и публикует каталог `dist/` в GitHub Pages при каждом обновлении ветки `main`. При сборке учитывается базовый путь с именем репозитория. В настройках репозитория Settings → Pages выберите **GitHub Actions** в качестве источника сборки и публикации. Опубликованный сайт доступен публично. GitHub Pages для приватных исходных репозиториев доступен только на подходящих платных тарифах; на GitHub Free исходный репозиторий должен быть публичным.
 
-## Engineering priorities
+## Приоритеты разработки
 
-1. Preserve current editing and graph behavior while moving responsibilities into small typed modules.
-2. Keep terrain height evaluation deterministic and consistent between CPU and GPU.
-3. Optimize shader instruction count, texture bandwidth, LOD transitions and render resolution with measurable profiling.
-4. Build a flexible editor UX with dockable panels, contextual inspectors, keyboard shortcuts and node-graph workflows.
-5. Add regression fixtures for heightmaps, brush operations, graph compilation and shader variants before replacing legacy systems.
+1. Сохранять текущие возможности редактирования и графа, постепенно перенося обязанности в небольшие типизированные модули.
+2. Поддерживать одинаковые детерминированные вычисления высот на CPU и GPU.
+3. Оптимизировать количество инструкций шейдеров, пропускную способность текстур, переходы LOD и разрешение рендеринга на основе измерений профилировщика.
+4. Создать гибкий интерфейс редактора с изменяемыми панелями, контекстными инспекторами, горячими клавишами и графом узлов.
+5. Добавлять регрессионные тестовые данные для heightmap, кистей, компиляции графа и вариантов шейдеров до замены старых подсистем.
 
-## Roadmap
+## План развития
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) and [GitHub issue #1](https://github.com/v01807471-prog/-terrain/issues/1).
+См. [docs/ROADMAP.md](docs/ROADMAP.md) и [задачу GitHub №1](https://github.com/v01807471-prog/-terrain/issues/1).
