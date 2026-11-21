@@ -6,7 +6,8 @@ const DEFAULT_CONFIG: PhysicsConfig = {
   fixedDelta: 1 / 60,
   maxSubSteps: 8,
   maxFrameDelta: 0.1,
-  positionCorrection: 0.8
+  positionCorrection: 0.8,
+  terrainCellSize: 1
 };
 
 const add = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -82,7 +83,7 @@ export class PhysicsWorld {
       const x = body.position.x + dx;
       const z = body.position.z + dz;
       // Collision samples the same piecewise-planar LOD0 triangles as the visible mesh.
-      const surface = this.terrain.sampleGround(x, z, 1);
+      const surface = this.terrain.sampleGround(x, z, this.config.terrainCellSize);
       const surfaceY = surface.height;
       const sphereBottom = body.position.y - Math.sqrt(r * r - radialSq);
       const verticalPenetration = surfaceY - sphereBottom;
