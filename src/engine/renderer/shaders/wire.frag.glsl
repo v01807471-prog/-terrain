@@ -5,7 +5,6 @@ uniform float uCut;
 uniform float uOuter;
 varying vec3 vWorld;
 void main() {
-  if (!gl_FrontFacing) discard;
   float d=max(max(abs(vWorld.x-uCamera.x),abs(vWorld.z-uCamera.y)),uAltitude);
   if(d<uCut || d>=uOuter) discard;
   gl_FragColor=vec4(0.04,0.09,0.07,0.42);
