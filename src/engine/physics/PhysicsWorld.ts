@@ -66,11 +66,43 @@ export class PhysicsWorld {
   step(dt = this.config.fixedDelta): void {
     const bodies = [...this.bodies.values()];
     for (const body of bodies) this.stepSphere(body, dt);
-    // Несколько проходов стабилизируют цепочки и стопки сфер.
+    // Broadphase: проверяем только тела в соседних пространственных ячейках.
+    // Для каждой пары выполняется узкая проверка не более одного раза за проход.
     for (let iteration = 0; iteration < 4; iteration++) {
-      for (let i = 0; i < bodies.length; i++) {
-        for (let j = i + 1; j < bodies.length; j++) {
-          this.resolveSphereContact(bodies[i], bodies[j]);
+      this.resolveSphereContactsBroadphase(bodies);
+    }
+  }
+
+  private resolveSphereContactsBroadphase(bodies: SphereBody[]): void {
+    if (bodies.length < 2) return;
+    let cellSize = 0;
+    for (const body of bodies) cellSize = Math.max(cellSize, body.radius * 2);
+    cellSize = Math.max(cellSize, 0.001);
+
+    const buckets = new Map<string, number[]>();
+    const cellOf = (value: number): number => Math.floor(value / cellSize);
+    const keyOf = (x: number, y: number, z: number): string => `${x},${y},${z}`;
+
+    for (let i = 0; i < bodies.length; i++) {
+      const p = bodies[i].position;
+      const key = keyOf(cellOf(p.x), cellOf(p.y), cellOf(p.z));
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(i);
+      else buckets.set(key, [i]);
+    }
+
+    for (let i = 0; i < bodies.length; i++) {
+      const p = bodies[i].position;
+      const cx = cellOf(p.x), cy = cellOf(p.y), cz = cellOf(p.z);
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const bucket = buckets.get(keyOf(cx + dx, cy + dy, cz + dz));
+            if (!bucket) continue;
+            for (const j of bucket) {
+              if (j > i) this.resolveSphereContact(bodies[i], bodies[j]);
+            }
+          }
         }
       }
     }
