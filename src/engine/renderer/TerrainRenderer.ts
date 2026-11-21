@@ -171,7 +171,9 @@ export class TerrainRenderer {
         uFogColor: this.uniforms.uFogColor,
         uFogNear: this.uniforms.uFogNear,
         uFogFar: this.uniforms.uFogFar,
-        uBaseColor: { value: new THREE.Color(blueprint.terrainColor) }
+        uBaseColor: { value: new THREE.Color(blueprint.terrainColor) },
+        // Контрастный цвет для каждого LOD, чтобы было видно границы уровней.
+        uWireColor: { value: new THREE.Color().setHSL(0.48 + level * 0.075, 0.88, 0.62) }
       };
       const material = new THREE.ShaderMaterial({
         uniforms: common, vertexShader, fragmentShader: terrainFragmentShader,
