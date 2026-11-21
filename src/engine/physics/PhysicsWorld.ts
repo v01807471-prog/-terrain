@@ -98,38 +98,55 @@ export class PhysicsWorld {
     return deepest;
   }
 
-  private resolveTerrainContact(body: SphereBody, contact: TerrainCollision): void {
+  private resolveTerrainContact(body: SphereBody, contact: TerrainCollision, dt: number): void {
     const n = normalize(contact.normal);
     body.position = add(body.position, scale(n, contact.penetration * this.config.positionCorrection));
-    const arm = sub(contact.point, body.position);
+
+    // Для сферы радиус-вектор контакта направлен от центра к поверхности.
+    // Не вычисляем его из уже скорректированной позиции: это давало нестабильный рычаг.
+    const arm = scale(n, -body.radius);
     const contactVelocity = add(body.velocity, cross(body.angularVelocity, arm));
     const normalSpeed = dot(contactVelocity, n);
-    if (normalSpeed >= 0) return;
 
-    // Для однородного шара I = 2/5 m r².
     const inverseMass = 1 / body.mass;
     const inverseInertia = 2.5 / (body.mass * body.radius * body.radius);
-    const armCrossNormal = cross(arm, n);
-    const rotationalTerm = dot(cross(scale(armCrossNormal, inverseInertia), arm), n);
-    const denominator = inverseMass + rotationalTerm;
-    const impulseMagnitude = -(1 + body.restitution) * normalSpeed / Math.max(denominator, 1e-8);
-    const impulse = scale(n, impulseMagnitude);
-    body.velocity = add(body.velocity, scale(impulse, inverseMass));
-    body.angularVelocity = add(body.angularVelocity, scale(cross(arm, impulse), inverseInertia));
+    let normalImpulseMagnitude = 0;
+
+    // Обычный импульс отскока — только если тело движется внутрь поверхности.
+    if (normalSpeed < 0) {
+      const armCrossNormal = cross(arm, n);
+      const rotationalTerm = dot(cross(scale(armCrossNormal, inverseInertia), arm), n);
+      const denominator = inverseMass + rotationalTerm;
+      normalImpulseMagnitude = -(1 + body.restitution) * normalSpeed / Math.max(denominator, 1e-8);
+      const impulse = scale(n, normalImpulseMagnitude);
+      body.velocity = add(body.velocity, scale(impulse, inverseMass));
+      body.angularVelocity = add(body.angularVelocity, scale(cross(arm, impulse), inverseInertia));
+    }
+
+    // Даже когда нормальная скорость уже равна нулю, опора продолжает
+    // прижимать шар к склону. Используем её импульс для ограничения трения.
+    const gravityIntoSurface = Math.max(0, -dot(this.config.gravity, n));
+    const supportImpulse = Math.max(
+      normalImpulseMagnitude,
+      body.mass * gravityIntoSurface * dt
+    );
 
     const afterNormal = add(body.velocity, cross(body.angularVelocity, arm));
     const tangentVelocity = sub(afterNormal, scale(n, dot(afterNormal, n)));
     const tangentSpeed = length(tangentVelocity);
-    if (tangentSpeed > 1e-6) {
+    if (tangentSpeed > 1e-7 && body.friction > 0 && supportImpulse > 0) {
       const tangent = scale(tangentVelocity, 1 / tangentSpeed);
       const tangentArm = cross(arm, tangent);
-      const tangentDenominator = inverseMass + dot(cross(scale(tangentArm, inverseInertia), arm), tangent);
-      const desired = tangentSpeed / Math.max(tangentDenominator, 1e-8);
-      const frictionImpulse = Math.min(desired, body.friction * impulseMagnitude);
+      const rotationalTerm = dot(cross(scale(tangentArm, inverseInertia), arm), tangent);
+      const denominator = inverseMass + rotationalTerm;
+      const desiredImpulse = tangentSpeed / Math.max(denominator, 1e-8);
+      const frictionImpulse = Math.min(desiredImpulse, body.friction * supportImpulse);
       const frictionVector = scale(tangent, -frictionImpulse);
       body.velocity = add(body.velocity, scale(frictionVector, inverseMass));
       body.angularVelocity = add(body.angularVelocity, scale(cross(arm, frictionVector), inverseInertia));
     }
+
+    // Сам геометрический контакт считается grounded, даже если импульс не нужен.
     body.grounded = true;
   }
 
@@ -146,7 +163,7 @@ export class PhysicsWorld {
     for (let i = 0; i < subSteps; i++) {
       body.position = add(body.position, scale(body.velocity, subDt));
       const contact = this.findTerrainContact(body);
-      if (contact) this.resolveTerrainContact(body, contact);
+      if (contact) this.resolveTerrainContact(body, contact, subDt);
     }
 
     body.velocity = scale(body.velocity, Math.max(0, 1 - body.linearDamping * dt));
