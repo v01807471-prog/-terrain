@@ -1,6 +1,6 @@
 # Terrain Editor
 
-A browser-based 3D terrain editor built with Vite, TypeScript and Three.js.
+A browser-based 3D terrain editor built with React, TypeScript, Vite and Three.js. The rendering core uses a GPU clipmap terrain, procedural GLSL materials, and a CPU height-delta field for sculpt edits.
 
 ## Requirements
 
@@ -21,15 +21,28 @@ npm run typecheck
 npm run build
 ```
 
-## Current architecture
+## Architecture (migration in progress)
 
-- `src/main.ts` — typed application entry point.
-- `src/styles/main.css` — application styles extracted from the original HTML.
-- `src/engine/terrain-engine.js` — preserved original Three.js terrain engine, isolated as a migration boundary.
-- `src/types/terrain.ts` — shared domain contracts for the typed modules.
+- `src/main.tsx` — React application bootstrap and engine loading.
+- `src/ui/App.tsx` — React editor shell: tool rail, viewport HUD, inspector and status bar.
+- `src/ui/bridge.ts` — temporary compatibility bridge to existing engine actions while controls are migrated.
+- `src/styles/workspace.css` — editor workspace layout and visual system.
+- `src/engine/terrain-engine.js` — original runtime, retained temporarily to preserve sculpting, undo/redo, graph, asset, water, quality and heightmap workflows.
+- `src/engine/math/noise.ts` — deterministic CPU noise and graph sampling functions.
+- `src/engine/shaders/*.ts` — terrain, water and shared GLSL templates.
+- `src/engine/textures/procedural.ts` — procedural macro and detail texture generation.
+- `src/types/terrain.ts` — shared domain contracts.
 
-The original engine is intentionally preserved first to avoid losing existing features. Its migration into small, strictly typed modules is tracked in the project roadmap and GitHub issue. Do not add new features to the legacy engine; implement them in typed modules and migrate existing systems incrementally.
+The React workspace is now the primary application chrome. Existing engine controls are bridged rather than duplicated, so the original terrain runtime remains the source of truth during migration. The large runtime file is not considered finished: the next extraction targets are graph compilation/nodes, sculpt history and brush operations, heightmap persistence, clipmap lifecycle, and renderer orchestration.
+
+## Engineering priorities
+
+1. Preserve current editing and graph behavior while moving responsibilities into small typed modules.
+2. Keep terrain height evaluation deterministic and consistent between CPU and GPU.
+3. Optimize shader instruction count, texture bandwidth, LOD transitions and render resolution with measurable profiling.
+4. Build a flexible editor UX with dockable panels, contextual inspectors, keyboard shortcuts and node-graph workflows.
+5. Add regression fixtures for heightmaps, brush operations, graph compilation and shader variants before replacing legacy systems.
 
 ## Roadmap
 
-See [docs/ROADMAP.md](docs/ROADMAP.md).
+See [docs/ROADMAP.md](docs/ROADMAP.md) and [GitHub issue #1](https://github.com/v01807471-prog/-terrain/issues/1).
