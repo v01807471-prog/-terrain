@@ -4,7 +4,7 @@ import { terrainVertexTemplate, terrainFragmentTemplate, wireFragmentShader } fr
 import { waterVertex, waterFragTemplate } from "./shaders/water.js";
 import { createMacroTexture, createDetailTexture } from "./textures/procedural.js";
 import { F, oc, lin, NODE_TYPES } from "./graph/nodes.js";
-import { compileGraph } from "./graph/compiler.js";
+import { compileGraph, previewGraph } from "./graph/compiler.js";
 
 (async()=>{
 try{
@@ -180,45 +180,7 @@ const uniforms={
 
 
 
-function previewGraph(G,cx,cz,win,N,tex){
- const seed=Number(G.seed)||0;
- const sx=ns=>(seed*12.9898+(+ns||0)*47.3)%512;
- const sz=ns=>(seed*78.233+(+ns||0)*21.7)%512;
- const hn=G.nodes.find(n=>n.type==="out_height");
- if(!hn)throw new Error("нет высоты");
- const hf=buildCpu(planGraph(G,hn,"cpu"),sx,sz);
- const steps=planGraph(G,G.nodes,"pv");
- const vals=new Array(steps.length),a=[0,0,0];
- const store=steps.map(st=>({c:st.T.o==="c",data:new Float32Array(N*N*(st.T.o==="c"?3:1)),min:1e30,max:-1e30}));
- const H=new Float32Array(N*N);
- const px=win/N,c={x:0,z:0,h:0,s:0,sx,sz,tex};
- for(let j=0;j<N;j++){
-  for(let i=0;i<N;i++){
-   const x=cx-win/2+(i+.5)*px,z=cz-win/2+(j+.5)*px,e=1.5;
-   const h=hf(x,z),gx=(hf(x+e,z)-h)/e,gz=(hf(x,z+e)-h)/e;
-   c.x=x;c.z=z;c.h=h;c.s=1-1/Math.sqrt(1+gx*gx+gz*gz);
-   H[j*N+i]=h;
-   for(let si=0;si<steps.length;si++){
-    const st=steps[si];
-    for(let k=0;k<st.inp.length;k++){
-     const q=st.inp[k];
-     let v=q.s!==undefined?vals[q.s]:q.w==="x"?x:q.w==="z"?z:q.k;
-     if(st.T.i[k][1]==="c"&&typeof v==="number")v=[v,v,v];
-     a[k]=v;
-    }
-    const f=st.T.pv||st.T.j;
-    const v=f?f(a,st.p,c):0;
-    vals[si]=v;
-    const sd=store[si],o=j*N+i;
-    if(sd.c){sd.data[o*3]=v[0];sd.data[o*3+1]=v[1];sd.data[o*3+2]=v[2];}
-    else{sd.data[o]=v;if(v<sd.min)sd.min=v;if(v>sd.max)sd.max=v;}
-   }
-  }
- }
- const map=new Map();
- steps.forEach((st,i)=>map.set(st.id,store[i]));
- return {N,H,px,map};
-}
+
 
 // [тип,x,y,параметры,значения входов,связи {вход:номер узла в списке (с 1)}]
 function G(seed,list){
