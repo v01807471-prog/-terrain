@@ -2,7 +2,7 @@
 export function f32ToB64(arr){
  const u=new Uint8Array(arr.buffer,arr.byteOffset,arr.byteLength);
  let str="";
- for(let i=0;i<u.length;i+=32768)str+=String.fromCharCode.apply(null,u.subarray(i,i+32768));
+ for(let i=0;i<u.length;i+=32768)str+=String.fromCharCode(...u.subarray(i,i+32768));
  return btoa(str);
 }
 
