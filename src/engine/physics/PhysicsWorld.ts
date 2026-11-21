@@ -44,9 +44,9 @@ export class PhysicsWorld {
       id: options.id,
       position: { ...options.position },
       previousPosition: { ...options.position },
-      velocity: { x: 0, y: 0, z: 0 },
-      angularVelocity: { x: 0, y: 0, z: 0 },
-      orientation: { x: 0, y: 0, z: 0, w: 1 },
+      velocity: options.velocity ? { ...options.velocity } : { x: 0, y: 0, z: 0 },
+      angularVelocity: options.angularVelocity ? { ...options.angularVelocity } : { x: 0, y: 0, z: 0 },
+      orientation: options.orientation ? { ...options.orientation } : { x: 0, y: 0, z: 0, w: 1 },
       radius: options.radius,
       mass: options.mass && options.mass > 0 ? options.mass : 1,
       restitution: Math.max(0, Math.min(1, options.restitution ?? 0.12)),
@@ -137,8 +137,6 @@ export class PhysicsWorld {
       }
     }
 
-    a.grounded = a.grounded || false;
-    b.grounded = b.grounded || false;
   }
 
   private findTerrainContact(body: SphereBody): TerrainCollision | null {
