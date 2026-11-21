@@ -177,11 +177,11 @@ export class TerrainRenderer {
       };
       const material = new THREE.ShaderMaterial({
         uniforms: { ...common, uWireLift: { value: 0 } }, vertexShader, fragmentShader: terrainFragmentShader,
-        side: THREE.FrontSide
+        glslVersion: THREE.GLSL3, side: THREE.FrontSide
       });
       const wireMaterial = new THREE.ShaderMaterial({
         uniforms: { ...common, uWireLift: { value: 0.025 } }, vertexShader, fragmentShader: wireFragmentShader,
-        transparent: true, depthWrite: false, side: THREE.FrontSide,
+        glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, side: THREE.FrontSide,
         polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
       });
       const tiles: Array<{ mesh: THREE.Mesh; wire: THREE.LineSegments; ox: number; oz: number }> = [];
