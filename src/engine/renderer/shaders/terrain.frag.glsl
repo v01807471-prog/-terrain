@@ -6,9 +6,10 @@ uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
 uniform vec3 uBaseColor;
-varying vec3 vWorld;
-varying vec3 vNormal;
-varying float vDistance;
+in vec3 vWorld;
+in vec3 vNormal;
+in float vDistance;
+out vec4 terrainFragColor;
 void main() {
   if (!gl_FrontFacing) discard;
   vec2 delta = abs(vWorld.xz-uCamera);
@@ -21,5 +22,5 @@ void main() {
   vec3 color = uBaseColor*(0.55+diffuse*0.8)*(1.0-slope*0.24);
   float distanceToCamera = length(vWorld-vec3(uCamera.x,0.0,uCamera.y));
   color = mix(color,uFogColor,smoothstep(uFogNear,uFogFar,distanceToCamera));
-  gl_FragColor = vec4(color,1.0);
+  terrainFragColor = vec4(color,1.0);
 }
