@@ -1,7 +1,7 @@
 /** Procedural albedo and micro-detail textures used by the terrain material. */
 import { hashPixel, tfbm } from '../math/noise.js';
 type Three = typeof import('three');
-function makeTexture(THREE:Three,size:number,fill:(u:number,v:number,x:number,y:number)=>number[],srgb:boolean,filter:string,anisotropy:number,maxAnisotropy:number){
+export function makeTexture(THREE:Three,size:number,fill:(u:number,v:number,x:number,y:number)=>number[],srgb:boolean,filter:string,anisotropy:number,maxAnisotropy:number){
  const data=new Uint8Array(size*size*4);
  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
   const c=fill(x/size,y/size,x,y),i=(y*size+x)*4;
