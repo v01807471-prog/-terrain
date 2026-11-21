@@ -65,7 +65,7 @@ root.innerHTML = `
       </section>
       <section class="pv2-panel">
         <h2>Новый рельеф</h2>
-        <p class="pv2-note">Seeded value-noise, несколько октав fBm, domain warping, ridged noise и долинные формы. Линейного бесконечного уклона больше нет. CPU-функция и GLSL-формула собраны из одинаковых математических операций.</p>
+        <p class="pv2-note">Seeded gradient Perlin noise, несколько октав fBm, domain warping, ridged noise и долинные формы. Линейного бесконечного уклона больше нет. CPU-функция и GLSL-формула собраны из одинаковых математических операций.</p>
         <p class="pv2-footer">Отсечение тайлов выполняется по пирамиде видимости активной камеры. Обратные грани поверхности отсекаются материалом FrontSide и проверкой gl_FrontFacing.</p>
       </section>
     </aside>
@@ -118,7 +118,7 @@ let totalSteps = 0;
 const playerRadius = 0.48;
 const playerHeight = 1.35;
 const player = {
-  x: 0, z: 0, y: terrain.getHeight(0, 0) + playerHeight * 0.5 + playerRadius,
+  x: 0, z: 0, y: terrain.getGroundHeight(0, 0, 1) + playerHeight * 0.5 + playerRadius,
   vx: 0, vy: 0, vz: 0, yaw: 0, grounded: true
 };
 const playerMesh = new THREE.Mesh(
@@ -138,7 +138,7 @@ const keys = new Set<string>();
 
 function placePlayerAt(x: number, z: number): void {
   player.x = x; player.z = z;
-  player.y = terrain.getHeight(x, z) + playerHeight * 0.5 + playerRadius;
+  player.y = terrain.getGroundHeight(x, z, 1) + playerHeight * 0.5 + playerRadius;
   player.vx = 0; player.vy = 0; player.vz = 0;
   player.grounded = true;
 }
@@ -173,7 +173,7 @@ function updatePlayer(dt: number): void {
   player.x += player.vx * dt;
   player.z += player.vz * dt;
   player.y += player.vy * dt;
-  const ground = terrain.getHeight(player.x, player.z) + playerHeight * 0.5 + playerRadius;
+  const ground = terrain.getGroundHeight(player.x, player.z, 1) + playerHeight * 0.5 + playerRadius;
   if (player.y <= ground) {
     player.y = ground;
     player.vy = 0;
@@ -224,7 +224,7 @@ window.addEventListener('blur', () => keys.clear());
 
 function createSphere(x: number, z: number, lift = 8): void {
   const id = `sphere-${nextId++}`, radius = 1.15;
-  const y = terrain.getHeight(x, z) + radius + lift;
+  const y = terrain.getGroundHeight(x, z, 1) + radius + lift;
   const body = world.addSphere({
     id, position: { x, y, z }, radius, mass: 1,
     friction, restitution, linearDamping: 0.008, angularDamping: 0.015
