@@ -33,7 +33,7 @@ function planGraph(G:any,root:any,stage:string){
 
 function emitGL(steps:any[],stage:string,sx:any,sz:any,assets:string[]){
  const ctx={X:stage==="vs"?"p.x":"pw.x",Z:stage==="vs"?"p.y":"pw.y",sx,sz,slot:name=>{let i=assets.indexOf(name);if(i<0){if(assets.length>=8)throw new Error("Максимум 8 разных текстур-ассетов в графе");i=assets.push(name)-1;}return i;}};
- const lines=[];
+ const lines:string[]=[];
  for(const st of steps){
   const a=st.inp.map(q=>q.id!==undefined?(q.f2c?`vec3(g${q.id})`:`g${q.id}`):q.w?(q.w==="x"?ctx.X:ctx.Z):(q.col?`vec3(${F(q.k)})`:F(q.k)));
   lines.push(`${st.T.o==="c"?"vec3":"float"} g${st.id}=${st.T.e(a,st.p,ctx)};`);
@@ -58,7 +58,7 @@ function buildCpu(steps:any[],sx:any,sz:any){
 }
 
 function paramsOf(n:any){
- const p={};
+ const p:any={};
  for(const [k,d] of NODE_TYPES[n.type].p)p[k]=n.p&&n.p[k]!=null?n.p[k]:d;
  return p;
 }
@@ -74,7 +74,7 @@ function inputValues(G:any,n:any,sx:any,sz:any){
  return out;
 }
 
-export export function compileGraph(G:any):any{
+export function compileGraph(G:any):any{
  const seed=Number(G.seed)||0;
  const sx=ns=>(seed*12.9898+(+ns||0)*47.3)%512;
  const sz=ns=>(seed*78.233+(+ns||0)*21.7)%512;
