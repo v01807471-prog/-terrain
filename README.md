@@ -31,6 +31,7 @@ npm run build
 - `src/engine/math/noise.ts` — deterministic CPU noise and graph sampling functions.
 - `src/engine/shaders/*.ts` — terrain, water and shared GLSL templates.
 - `src/engine/textures/procedural.ts` — procedural macro and detail texture generation.
+- `src/engine/graph/nodes.ts` and `src/engine/graph/compiler.ts` — node definitions, CPU evaluation, GLSL compilation and graph previews.
 - `src/types/terrain.ts` — shared domain contracts.
 
 The React workspace is now the primary application chrome. Existing engine controls are bridged rather than duplicated, so the original terrain runtime remains the source of truth during migration. The large runtime file is not considered finished: the next extraction targets are graph compilation/nodes, sculpt history and brush operations, heightmap persistence, clipmap lifecycle, and renderer orchestration.
