@@ -2,7 +2,7 @@ import { hash2, smooth01, noise2, fbm, originalBaseHeight, hashPixel, tnoise, tf
 import { NOISE_GLSL } from "./shaders/noise.glsl.js";
 import { terrainVertexTemplate, terrainFragmentTemplate, wireFragmentShader } from "./shaders/terrain.js";
 import { waterVertex, waterFragTemplate } from "./shaders/water.js";
-import { createMacroTexture, createDetailTexture } from "./textures/procedural.js";
+import { makeTexture, createMacroTexture, createDetailTexture } from "./textures/procedural.js";
 import { F, oc, lin, NODE_TYPES } from "./graph/nodes.js";
 import { compileGraph, previewGraph } from "./graph/compiler.js";
 
@@ -342,7 +342,7 @@ const BUILTIN_ASSETS=[
 ];
 
 for(const [id,name,fill] of BUILTIN_ASSETS){
- const tex=makeTex(256,fill,true);
+ const tex=makeTexture(THREE,256,fill,true,Q.filter,Q.aniso,renderer.capabilities.getMaxAnisotropy());
  const c=document.createElement("canvas");
  c.width=c.height=256;
  const cx=c.getContext("2d"),img=cx.createImageData(256,256);
