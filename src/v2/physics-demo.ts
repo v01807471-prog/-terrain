@@ -36,7 +36,8 @@ root.innerHTML = `
           <button class="pv2-button" id="pv2-drop">↓ Уронить шар</button>
           <button class="pv2-button" id="pv2-pause">Ⅱ Пауза физики</button>
           <button class="pv2-button" id="pv2-camera">◎ Камера за героем</button>
-          <label class="pv2-toggle"><input id="pv2-wire" type="checkbox"> Показать сетку поверхности</label>
+          <label class="pv2-toggle"><input id="pv2-wire" type="checkbox"> Сетка рельефа по уровням LOD</label>
+          <label class="pv2-toggle"><input id="pv2-physics-debug" type="checkbox"> Контакты физики героя</label>
         </div>
         <p class="pv2-note">Сетка — диагностическое наложение линий на рельеф, а не отдельная земляная плоскость. Шар добавляется отдельно для проверки физики.</p>
       </section>
@@ -128,6 +129,50 @@ const playerMesh = new THREE.Mesh(
 );
 playerMesh.castShadow = true;
 scene.add(playerMesh);
+
+// Диагностика опоры капсулы: зелёные точки — высота земли,
+// вертикальные отрезки — зазор до нижней поверхности капсулы.
+const playerSupportSamples: Array<[number, number]> = [
+  [0, 0], [0.72 * playerRadius, 0], [-0.72 * playerRadius, 0],
+  [0, 0.72 * playerRadius], [0, -0.72 * playerRadius],
+  [0.5 * playerRadius, 0.5 * playerRadius], [-0.5 * playerRadius, 0.5 * playerRadius],
+  [0.5 * playerRadius, -0.5 * playerRadius], [-0.5 * playerRadius, -0.5 * playerRadius]
+];
+const physicsDebug = new THREE.Group();
+physicsDebug.visible = false;
+const contactLinePositions = new Float32Array(playerSupportSamples.length * 2 * 3);
+const contactLineGeometry = new THREE.BufferGeometry();
+contactLineGeometry.setAttribute('position', new THREE.BufferAttribute(contactLinePositions, 3));
+const contactLines = new THREE.LineSegments(
+  contactLineGeometry,
+  new THREE.LineBasicMaterial({ color: '#ffcf5a', transparent: true, opacity: 0.95, depthWrite: false })
+);
+physicsDebug.add(contactLines);
+const contactMarkerGeometry = new THREE.SphereGeometry(0.065, 8, 6);
+const contactMarkers = playerSupportSamples.map(() => {
+  const marker = new THREE.Mesh(contactMarkerGeometry,
+    new THREE.MeshBasicMaterial({ color: '#45f0b2', depthTest: true }));
+  physicsDebug.add(marker);
+  return marker;
+});
+scene.add(physicsDebug);
+
+function updatePhysicsDebug(): void {
+  const positions = contactLineGeometry.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < playerSupportSamples.length; i++) {
+    const [ox, oz] = playerSupportSamples[i];
+    const radialSq = ox * ox + oz * oz;
+    const x = player.x + ox, z = player.z + oz;
+    const groundY = terrain.getGroundHeight(x, z, LOD0_CELL_SIZE);
+    const lowerCap = Math.sqrt(Math.max(0, playerRadius * playerRadius - radialSq));
+    const capsuleSurfaceY = player.y - playerHalfSegment - lowerCap;
+    positions.setXYZ(i * 2, x, groundY, z);
+    positions.setXYZ(i * 2 + 1, x, capsuleSurfaceY, z);
+    contactMarkers[i].position.set(x, groundY + 0.035, z);
+  }
+  positions.needsUpdate = true;
+  contactLineGeometry.computeBoundingSphere();
+}
 
 let cameraYaw = Math.PI;
 let cameraPitch = 0.28;
@@ -225,6 +270,7 @@ function updatePlayer(frameDelta: number): void {
   }
   playerMesh.position.set(player.x, player.y, player.z);
   playerMesh.rotation.y = player.yaw;
+  if (physicsDebug.visible) updatePhysicsDebug();
 }
 function updateFollowCamera(): void {
   const horizontal = Math.cos(cameraPitch) * cameraDistance;
@@ -309,6 +355,10 @@ document.querySelector('#pv2-pause')!.addEventListener('click', () => { paused =
 document.querySelector('#pv2-drop')!.addEventListener('click', () => createSphere(player.x + 3, player.z + 3, 12));
 document.querySelector<HTMLInputElement>('#pv2-wire')!.addEventListener('change', (event) =>
   terrainRenderer.setWireframe((event.currentTarget as HTMLInputElement).checked));
+document.querySelector<HTMLInputElement>('#pv2-physics-debug')!.addEventListener('change', (event) => {
+  physicsDebug.visible = (event.currentTarget as HTMLInputElement).checked;
+  if (physicsDebug.visible) updatePhysicsDebug();
+});
 document.querySelector('#pv2-camera')!.addEventListener('click', () => {
   cameraYaw = player.yaw + Math.PI; cameraPitch = 0.28; cameraDistance = 7.5;
 });
