@@ -156,8 +156,8 @@ function updatePlayer(dt: number): void {
   let targetX = 0, targetZ = 0;
   if (inputLength > 0) {
     const f = forwardInput / inputLength, s = sideInput / inputLength;
-    const forwardX = Math.sin(player.yaw), forwardZ = Math.cos(player.yaw);
-    const rightX = Math.cos(player.yaw), rightZ = -Math.sin(player.yaw);
+    const forwardX = -Math.sin(cameraYaw), forwardZ = -Math.cos(cameraYaw);
+    const rightX = Math.cos(cameraYaw), rightZ = -Math.sin(cameraYaw);
     targetX = (forwardX * f + rightX * s) * 7.5;
     targetZ = (forwardZ * f + rightZ * s) * 7.5;
     player.yaw = Math.atan2(targetX, targetZ);
