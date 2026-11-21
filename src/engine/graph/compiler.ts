@@ -1,8 +1,8 @@
 /** CPU and GLSL graph compilation shared by terrain rendering and previews. */
 import { F, lin, NODE_TYPES } from './nodes.js';
-function planGraph(G,root,stage){
- const roots=Array.isArray(root)?root:[root];
- const byId=new Map(G.nodes.map(n=>[n.id,n])),state=new Map(),steps=[],idx=new Map();
+function planGraph(G:any,root:any,stage:string){
+ const roots:any[]=Array.isArray(root)?root:[root];
+ const byId=new Map<any,any>(G.nodes.map((n:any)=>[n.id,n])),state=new Map<any,number>(),steps:any[]=[],idx=new Map<any,number>();
  const visit=id=>{
   if(state.get(id)===2)return;
   if(state.get(id)===1)throw new Error("Цикл в графе");
@@ -21,7 +21,7 @@ function planGraph(G,root,stage){
    if(def===null)return {w:name};
    return {k:n.d&&n.d[name]!=null?Number(n.d[name]):def,col:ty==="c"};
   });
-  const p={};
+  const p:any={};
   for(const [k,d] of T.p)p[k]=n.p&&n.p[k]!=null?n.p[k]:d;
   idx.set(id,steps.length);
   steps.push({id,T,inp,p});
@@ -31,7 +31,7 @@ function planGraph(G,root,stage){
  return steps;
 }
 
-function emitGL(steps,stage,sx,sz,assets){
+function emitGL(steps:any[],stage:string,sx:any,sz:any,assets:string[]){
  const ctx={X:stage==="vs"?"p.x":"pw.x",Z:stage==="vs"?"p.y":"pw.y",sx,sz,slot:name=>{let i=assets.indexOf(name);if(i<0){if(assets.length>=8)throw new Error("Максимум 8 разных текстур-ассетов в графе");i=assets.push(name)-1;}return i;}};
  const lines=[];
  for(const st of steps){
@@ -41,7 +41,7 @@ function emitGL(steps,stage,sx,sz,assets){
  return {code:lines.join("\n"),ret:"g"+steps[steps.length-1].id};
 }
 
-function buildCpu(steps,sx,sz){
+function buildCpu(steps:any[],sx:any,sz:any){
  const vals=new Float64Array(steps.length),a=[0,0,0],c={x:0,z:0,sx,sz};
  return (x,z)=>{
   c.x=x;c.z=z;
@@ -57,15 +57,15 @@ function buildCpu(steps,sx,sz){
  };
 }
 
-function paramsOf(n){
+function paramsOf(n:any){
  const p={};
  for(const [k,d] of NODE_TYPES[n.type].p)p[k]=n.p&&n.p[k]!=null?n.p[k]:d;
  return p;
 }
 
 // Значения входов узла-приёмника (океан/туман): считаются один раз, в точке (0,0).
-function inputValues(G,n,sx,sz){
- const out={};
+function inputValues(G:any,n:any,sx:any,sz:any){
+ const out:any={};
  for(const [name,ty,def] of NODE_TYPES[n.type].i){
   const src=n.in&&n.in[name];
   const root=src!=null?G.nodes.find(m=>m.id===src):null;
@@ -74,7 +74,7 @@ function inputValues(G,n,sx,sz){
  return out;
 }
 
-export function compileGraph(G){
+export export function compileGraph(G:any):any{
  const seed=Number(G.seed)||0;
  const sx=ns=>(seed*12.9898+(+ns||0)*47.3)%512;
  const sz=ns=>(seed*78.233+(+ns||0)*21.7)%512;
@@ -88,7 +88,7 @@ export function compileGraph(G){
   const cv=emitGL(planGraph(G,cn,"fs"),"fs",sx,sz,assets);
   glColor=cv.code+"\nvec3 base="+cv.ret+";";
  }
- let water=null,fog=null;
+ let water:any=null,fog:any=null;
  const wn=G.nodes.find(n=>n.type==="out_water"),fn=G.nodes.find(n=>n.type==="out_fog");
  if(wn){
   const v=inputValues(G,wn,sx,sz),p=paramsOf(wn);
@@ -104,7 +104,7 @@ export function compileGraph(G){
 // Предпросмотр: все узлы считаются на CPU в сетке N×N вокруг (cx,cz); цвет — приближённо.
 
 
-export function previewGraph(G,cx,cz,win,N,tex){
+export function previewGraph(G:any,cx:number,cz:number,win:number,N:number,tex:any):any{
  const seed=Number(G.seed)||0;
  const sx=ns=>(seed*12.9898+(+ns||0)*47.3)%512;
  const sz=ns=>(seed*78.233+(+ns||0)*21.7)%512;
@@ -112,8 +112,8 @@ export function previewGraph(G,cx,cz,win,N,tex){
  if(!hn)throw new Error("нет высоты");
  const hf=buildCpu(planGraph(G,hn,"cpu"),sx,sz);
  const steps=planGraph(G,G.nodes,"pv");
- const vals=new Array(steps.length),a=[0,0,0];
- const store=steps.map(st=>({c:st.T.o==="c",data:new Float32Array(N*N*(st.T.o==="c"?3:1)),min:1e30,max:-1e30}));
+ const vals:any[]=new Array(steps.length),a:any[]=[0,0,0];
+ const store:any[]=steps.map((st:any)=>({c:st.T.o==="c",data:new Float32Array(N*N*(st.T.o==="c"?3:1)),min:1e30,max:-1e30}));
  const H=new Float32Array(N*N);
  const px=win/N,c={x:0,z:0,h:0,s:0,sx,sz,tex};
  for(let j=0;j<N;j++){
@@ -139,7 +139,7 @@ export function previewGraph(G,cx,cz,win,N,tex){
    }
   }
  }
- const map=new Map();
+ const map=new Map<any,any>();
  steps.forEach((st,i)=>map.set(st.id,store[i]));
  return {N,H,px,map};
 }
