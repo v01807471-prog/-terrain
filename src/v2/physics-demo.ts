@@ -118,7 +118,7 @@ let totalSteps = 0;
 const playerRadius = 0.48;
 const playerHeight = 1.35;
 const player = {
-  x: 0, z: 0, y: terrain.getHeight(0, 0) + playerHeight + playerRadius,
+  x: 0, z: 0, y: terrain.getHeight(0, 0) + playerHeight * 0.5 + playerRadius,
   vx: 0, vy: 0, vz: 0, yaw: 0, grounded: true
 };
 const playerMesh = new THREE.Mesh(
@@ -138,7 +138,7 @@ const keys = new Set<string>();
 
 function placePlayerAt(x: number, z: number): void {
   player.x = x; player.z = z;
-  player.y = terrain.getHeight(x, z) + playerHeight + playerRadius;
+  player.y = terrain.getHeight(x, z) + playerHeight * 0.5 + playerRadius;
   player.vx = 0; player.vy = 0; player.vz = 0;
   player.grounded = true;
 }
@@ -173,7 +173,7 @@ function updatePlayer(dt: number): void {
   player.x += player.vx * dt;
   player.z += player.vz * dt;
   player.y += player.vy * dt;
-  const ground = terrain.getHeight(player.x, player.z) + playerHeight + playerRadius;
+  const ground = terrain.getHeight(player.x, player.z) + playerHeight * 0.5 + playerRadius;
   if (player.y <= ground) {
     player.y = ground;
     player.vy = 0;
