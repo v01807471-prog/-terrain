@@ -90,7 +90,7 @@ export class TerrainRenderer {
     this.frustum.setFromProjectionMatrix(this.projectionView);
 
     const cx = cameraPosition.x, cz = cameraPosition.z;
-    const groundY = this.terrain.getHeight(cx, cz);
+    const groundY = this.terrain.getGroundHeight(cx, cz, this.baseCellSize);
     const altitude = Math.max(0, cameraPosition.y - groundY - 4);
     this.uniforms.uCamera.value.set(cx, cz);
     this.uniforms.uAltitude.value = altitude;
@@ -159,7 +159,8 @@ export class TerrainRenderer {
       const step = this.baseCellSize * 2 ** level;
       const half = halfGrid * this.baseCellSize * 2 ** level;
       const outer = half - 2 * step;
-      const cut = level > 0 ? halfGrid * this.baseCellSize * 2 ** (level - 1) - step / 2 : 0;
+      // Exactly the previous level's morph boundary, as in the legacy clipmap.
+      const cut = level > 0 ? halfGrid * this.baseCellSize * 2 ** (level - 1) - step : 0;
       const common = {
         uCamera: this.uniforms.uCamera,
         uAltitude: this.uniforms.uAltitude,
