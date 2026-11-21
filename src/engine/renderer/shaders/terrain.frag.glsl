@@ -10,16 +10,26 @@ in vec3 vWorld;
 in vec3 vNormal;
 in float vDistance;
 out vec4 terrainFragColor;
+// Inputs expected by the legacy Blueprint color-node compiler.
+vec2 pw = vec2(0.0);
+float vHeight = 0.0;
+float slopeV = 0.0;
+vec3 grassColor = vec3(0.18, 0.34, 0.12);
+vec3 rockColor = vec3(0.34, 0.32, 0.29);
 void main() {
   if (!gl_FrontFacing) discard;
   vec2 delta = abs(vWorld.xz-uCamera);
   float d = max(max(delta.x,delta.y),uAltitude);
   if (d < uCut) discard;
   vec3 n = normalize(vNormal);
+  pw = vWorld.xz;
+  vHeight = vWorld.y;
+  slopeV = 1.0 - clamp(n.y, 0.0, 1.0);
+  __TERRAIN_COLOR_GRAPH__
   vec3 lightDir = normalize(vec3(-0.45,0.78,0.42));
   float diffuse = max(dot(n,lightDir),0.0);
   float slope = 1.0-clamp(n.y,0.0,1.0);
-  vec3 color = uBaseColor*(0.55+diffuse*0.8)*(1.0-slope*0.24);
+  vec3 color = base*(0.55+diffuse*0.8)*(1.0-slope*0.24);
   float distanceToCamera = length(vWorld-vec3(uCamera.x,0.0,uCamera.y));
   color = mix(color,uFogColor,smoothstep(uFogNear,uFogFar,distanceToCamera));
   terrainFragColor = vec4(color,1.0);
