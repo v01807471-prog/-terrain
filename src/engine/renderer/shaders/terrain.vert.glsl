@@ -31,7 +31,7 @@ void main() {
   float hx = terrainHeight(p+vec2(e,0.0));
   float hz = terrainHeight(p+vec2(0.0,e));
   vNormal = normalize(vec3(-(hx-h0)/e, 1.0, -(hz-h0)/e));
-  vWorld = vec3(p.x,h,p.y);
+  vWorld = vec3(p.x,h + 0.025,p.y);
   vDistance = d;
   gl_Position = projectionMatrix*viewMatrix*vec4(vWorld,1.0);
 }
