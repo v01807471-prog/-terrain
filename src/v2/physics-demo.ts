@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Terrain } from '../engine/terrain/Terrain.js';
 import { createDemoBlueprint } from '../engine/blueprint/demo.js';
 import { TerrainRenderer } from '../engine/renderer/TerrainRenderer.js';
@@ -15,45 +14,45 @@ root.innerHTML = `
     <section class="pv2-main">
       <header class="pv2-header">
         <div>
-          <div class="pv2-eyebrow">TERRAIN ENGINE · EXPERIMENTAL BRANCH</div>
-          <h1 class="pv2-title">Физика V2</h1>
-          <p class="pv2-subtitle">Отдельная песочница нового физического слоя. Смотри, как сфера падает, касается процедурного рельефа, катится по склону и реагирует на трение.</p>
+          <div class="pv2-eyebrow">TERRAIN ENGINE · V2 PLAYGROUND</div>
+          <h1 class="pv2-title">Исследование рельефа V2</h1>
+          <p class="pv2-subtitle">Управляй персонажем на процедурном ландшафте. Камера следует за героем, а Clipmap перестраивает детализацию вокруг активной камеры.</p>
         </div>
         <span class="pv2-status">● LEGACY НЕ ИЗМЕНЁН</span>
       </header>
       <div class="pv2-viewport" id="pv2-viewport">
         <div class="pv2-overlay">
-          <span class="pv2-chip">Симуляция: <b id="pv2-state">запущена</b></span>
-          <span class="pv2-chip">Физика: <b>60 шагов/с</b></span>
+          <span class="pv2-chip">Режим: <b id="pv2-state">исследование</b></span>
+          <span class="pv2-chip">Управление: <b>WASD + мышь</b></span>
         </div>
-        <div class="pv2-hint">ЛКМ — вращать · ПКМ/средняя кнопка — перемещать · колёсико — масштаб · стрелки — двигать камеру</div>
+        <div class="pv2-hint">WASD — бег · Пробел — прыжок · Зажми ЛКМ и веди мышь — повернуть камеру · Колесо — приблизить</div>
       </div>
     </section>
     <aside class="pv2-side">
       <section class="pv2-panel">
-        <h2>Управление</h2>
+        <h2>Персонаж и сцена</h2>
         <div class="pv2-buttons">
-          <button class="pv2-button primary" id="pv2-reset">↻ Сначала</button>
-          <button class="pv2-button" id="pv2-pause">Ⅱ Пауза</button>
+          <button class="pv2-button primary" id="pv2-reset">↻ Вернуть героя</button>
           <button class="pv2-button" id="pv2-drop">↓ Уронить шар</button>
-          <button class="pv2-button" id="pv2-camera">◎ Камера</button>
-          <label class="pv2-toggle"><input id="pv2-wire" type="checkbox" checked> Показать сетку рельефа</label>
+          <button class="pv2-button" id="pv2-pause">Ⅱ Пауза физики</button>
+          <button class="pv2-button" id="pv2-camera">◎ Камера за героем</button>
+          <label class="pv2-toggle"><input id="pv2-wire" type="checkbox"> Показать сетку поверхности</label>
         </div>
-        <p class="pv2-note">«Уронить шар» создаёт ещё одну сферу над склоном. Можно наблюдать несколько тел одновременно.</p>
+        <p class="pv2-note">Сетка — диагностическое наложение линий на рельеф, а не отдельная земляная плоскость. Шар добавляется отдельно для проверки физики.</p>
       </section>
       <section class="pv2-panel">
-        <h2>Показания симуляции</h2>
+        <h2>Показания</h2>
         <div class="pv2-statgrid">
-          <div class="pv2-stat"><span>Сфер в сцене</span><b id="pv2-bodies">1</b></div>
-          <div class="pv2-stat"><span>Скорость шара</span><b id="pv2-speed">0.0 м/с</b></div>
-          <div class="pv2-stat"><span>Высота центра</span><b id="pv2-height">— м</b></div>
-          <div class="pv2-stat"><span>Контакт с землёй</span><b id="pv2-contact">нет</b></div>
+          <div class="pv2-stat"><span>Скорость героя</span><b id="pv2-player-speed">0.0 м/с</b></div>
+          <div class="pv2-stat"><span>Высота героя</span><b id="pv2-player-height">— м</b></div>
+          <div class="pv2-stat"><span>Сфер в сцене</span><b id="pv2-bodies">0</b></div>
+          <div class="pv2-stat"><span>Скорость шара</span><b id="pv2-speed">— м/с</b></div>
           <div class="pv2-stat"><span>FPS рендера</span><b id="pv2-fps">—</b></div>
-          <div class="pv2-stat"><span>Шагов физики</span><b id="pv2-steps">0</b></div>
+          <div class="pv2-stat"><span>Видимых тайлов</span><b id="pv2-tiles">—</b></div>
         </div>
       </section>
       <section class="pv2-panel">
-        <h2>Параметры тела</h2>
+        <h2>Физика шара</h2>
         <div class="pv2-control">
           <label for="pv2-friction">Трение <output id="pv2-friction-value">0.65</output></label>
           <input id="pv2-friction" type="range" min="0" max="1.5" step="0.05" value="0.65">
@@ -62,13 +61,12 @@ root.innerHTML = `
           <label for="pv2-bounce">Упругость <output id="pv2-bounce-value">0.12</output></label>
           <input id="pv2-bounce" type="range" min="0" max="0.9" step="0.03" value="0.12">
         </div>
-        <p class="pv2-note">Параметры применяются к новым сферам. Трение ограничивает скольжение в контакте, упругость задаёт отскок.</p>
+        <p class="pv2-note">Шар использует отдельный heightfield-решатель. Капсула героя пока управляется отдельным упрощённым контроллером персонажа.</p>
       </section>
       <section class="pv2-panel">
-        <h2>Что здесь проверяется</h2>
-        <div class="pv2-legend"><span><i class="pv2-dot"></i>Процедурный рельеф</span><span><i class="pv2-dot" style="background:#f4b86a"></i>Физические сферы</span></div>
-        <p class="pv2-note">Terrain вычисляет высоту по координатам. PhysicsWorld получает эти значения для контакта. FixedStepLoop отделяет стабильный шаг физики от частоты кадров.</p>
-        <p class="pv2-footer">Это ранний прототип: контакт со склоном приближён выборкой девяти точек. Полный CCD и столкновения сфер друг с другом пока не реализованы.</p>
+        <h2>Новый рельеф</h2>
+        <p class="pv2-note">Seeded value-noise, несколько октав fBm, domain warping, ridged noise и долинные формы. Линейного бесконечного уклона больше нет. CPU-функция и GLSL-формула собраны из одинаковых математических операций.</p>
+        <p class="pv2-footer">Отсечение тайлов выполняется по пирамиде видимости активной камеры. Обратные грани поверхности отсекаются материалом FrontSide и проверкой gl_FrontFacing.</p>
       </section>
     </aside>
   </main>
@@ -77,9 +75,8 @@ root.innerHTML = `
 const viewport = document.querySelector<HTMLDivElement>('#pv2-viewport')!;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#91aeb4');
-scene.fog = new THREE.Fog('#91aeb4', 65, 180);
-const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 350);
-camera.position.set(27, 25, 34);
+scene.fog = new THREE.Fog('#91aeb4', 100, 320);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 700);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7));
 renderer.shadowMap.enabled = true;
@@ -87,24 +84,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
+renderer.domElement.tabIndex = 0;
 viewport.prepend(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 4, 0);
-controls.enableDamping = true;
-controls.dampingFactor = 0.075;
-controls.enablePan = true;
-controls.screenSpacePanning = true;
-controls.rotateSpeed = 0.9;
-controls.panSpeed = 1.15;
-controls.zoomSpeed = 1.2;
-controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 3;
-controls.maxDistance = 600;
-controls.listenToKeyEvents(window);
-controls.keys = {
-  LEFT: 'ArrowLeft', UP: 'ArrowUp', RIGHT: 'ArrowRight', BOTTOM: 'ArrowDown'
-};
 
 scene.add(new THREE.HemisphereLight('#e5f5f1', '#38464a', 2.0));
 const sun = new THREE.DirectionalLight('#fff0d5', 3.1);
@@ -117,33 +98,132 @@ sun.shadow.camera.top = 55;
 sun.shadow.camera.bottom = -55;
 scene.add(sun);
 
-const blueprint = createDemoBlueprint();
+const blueprint = createDemoBlueprint(17);
 const terrain = new Terrain(blueprint.heightAt, {
   seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
 });
-const terrainRenderer = new TerrainRenderer(scene, camera, terrain, blueprint, {
-  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: 1, showWireframe: true
+const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
+  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: 1, showWireframe: false
 });
-terrainRenderer.update();
-
-const grid = new THREE.GridHelper(150, 75, '#536a67', '#536a67');
-grid.position.y = -9;
-(grid.material as THREE.Material).transparent = true;
-(grid.material as THREE.Material).opacity = 0.2;
-scene.add(grid);
 
 const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1 });
 const loop = new FixedStepLoop(world, 1 / 60, 10, 0.1);
-const meshes = new Map<string, THREE.Mesh>();
+const sphereMeshes = new Map<string, THREE.Mesh>();
 let nextId = 1;
 let paused = false;
 let friction = 0.65;
 let restitution = 0.12;
 let totalSteps = 0;
 
+const playerRadius = 0.48;
+const playerHeight = 1.35;
+const player = {
+  x: 0, z: 0, y: terrain.getHeight(0, 0) + playerHeight + playerRadius,
+  vx: 0, vy: 0, vz: 0, yaw: 0, grounded: true
+};
+const playerMesh = new THREE.Mesh(
+  new THREE.CapsuleGeometry(playerRadius, playerHeight, 6, 12),
+  new THREE.MeshStandardMaterial({ color: '#f0b66f', roughness: 0.62 })
+);
+playerMesh.castShadow = true;
+scene.add(playerMesh);
+
+let cameraYaw = Math.PI;
+let cameraPitch = 0.28;
+let cameraDistance = 7.5;
+let draggingCamera = false;
+let previousPointerX = 0;
+let previousPointerY = 0;
+const keys = new Set<string>();
+
+function placePlayerAt(x: number, z: number): void {
+  player.x = x; player.z = z;
+  player.y = terrain.getHeight(x, z) + playerHeight + playerRadius;
+  player.vx = 0; player.vy = 0; player.vz = 0;
+  player.grounded = true;
+}
+function resetPlayer(): void {
+  placePlayerAt(0, 0);
+  player.yaw = 0;
+  cameraYaw = Math.PI;
+  cameraPitch = 0.28;
+  cameraDistance = 7.5;
+}
+function updatePlayer(dt: number): void {
+  const forwardInput = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+  const sideInput = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+  const inputLength = Math.hypot(forwardInput, sideInput);
+  let targetX = 0, targetZ = 0;
+  if (inputLength > 0) {
+    const f = forwardInput / inputLength, s = sideInput / inputLength;
+    const forwardX = Math.sin(player.yaw), forwardZ = Math.cos(player.yaw);
+    const rightX = Math.cos(player.yaw), rightZ = -Math.sin(player.yaw);
+    targetX = (forwardX * f + rightX * s) * 7.5;
+    targetZ = (forwardZ * f + rightZ * s) * 7.5;
+    player.yaw = Math.atan2(targetX, targetZ);
+  }
+  const blend = 1 - Math.exp(-12 * dt);
+  player.vx += (targetX - player.vx) * blend;
+  player.vz += (targetZ - player.vz) * blend;
+  if (keys.has('Space') && player.grounded) {
+    player.vy = 6.2;
+    player.grounded = false;
+  }
+  player.vy -= 18 * dt;
+  player.x += player.vx * dt;
+  player.z += player.vz * dt;
+  player.y += player.vy * dt;
+  const ground = terrain.getHeight(player.x, player.z) + playerHeight + playerRadius;
+  if (player.y <= ground) {
+    player.y = ground;
+    player.vy = 0;
+    player.grounded = true;
+  } else {
+    player.grounded = false;
+  }
+  playerMesh.position.set(player.x, player.y, player.z);
+  playerMesh.rotation.y = player.yaw;
+}
+function updateFollowCamera(): void {
+  const horizontal = Math.cos(cameraPitch) * cameraDistance;
+  camera.position.set(
+    player.x + Math.sin(cameraYaw) * horizontal,
+    player.y + 0.25 + Math.sin(cameraPitch) * cameraDistance,
+    player.z + Math.cos(cameraYaw) * horizontal
+  );
+  camera.lookAt(player.x, player.y + 0.55, player.z);
+}
+
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+  draggingCamera = true;
+  previousPointerX = event.clientX;
+  previousPointerY = event.clientY;
+  renderer.domElement.setPointerCapture(event.pointerId);
+});
+renderer.domElement.addEventListener('pointermove', (event) => {
+  if (!draggingCamera) return;
+  const dx = event.clientX - previousPointerX, dy = event.clientY - previousPointerY;
+  previousPointerX = event.clientX; previousPointerY = event.clientY;
+  cameraYaw -= dx * 0.006;
+  cameraPitch = THREE.MathUtils.clamp(cameraPitch + dy * 0.004, -0.05, 0.85);
+});
+renderer.domElement.addEventListener('pointerup', () => { draggingCamera = false; });
+renderer.domElement.addEventListener('pointercancel', () => { draggingCamera = false; });
+renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+renderer.domElement.addEventListener('wheel', (event) => {
+  cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.008, 3.5, 18);
+  event.preventDefault();
+}, { passive: false });
+window.addEventListener('keydown', (event) => {
+  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'].includes(event.code)) event.preventDefault();
+  keys.add(event.code);
+});
+window.addEventListener('keyup', (event) => keys.delete(event.code));
+window.addEventListener('blur', () => keys.clear());
+
 function createSphere(x: number, z: number, lift = 8): void {
-  const id = `sphere-${nextId++}`;
-  const radius = 1.15;
+  const id = `sphere-${nextId++}`, radius = 1.15;
   const y = terrain.getHeight(x, z) + radius + lift;
   const body = world.addSphere({
     id, position: { x, y, z }, radius, mass: 1,
@@ -151,62 +231,44 @@ function createSphere(x: number, z: number, lift = 8): void {
   });
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(radius, 40, 28),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0.09 + (nextId % 4) * 0.035, 0.78, 0.59), roughness: 0.28, metalness: 0.12 })
+    new THREE.MeshStandardMaterial({ color: '#e9a95e', roughness: 0.28, metalness: 0.12 })
   );
   mesh.castShadow = true;
   mesh.position.set(body.position.x, body.position.y, body.position.z);
   scene.add(mesh);
-  meshes.set(id, mesh);
-  updateStats();
+  sphereMeshes.set(id, mesh);
 }
-
 function clearSpheres(): void {
-  for (const [id, mesh] of meshes) {
-    scene.remove(mesh);
-    mesh.geometry.dispose();
-    (mesh.material as THREE.Material).dispose();
-    world.removeBody(id);
+  for (const [id, mesh] of sphereMeshes) {
+    scene.remove(mesh); mesh.geometry.dispose();
+    (mesh.material as THREE.Material).dispose(); world.removeBody(id);
   }
-  meshes.clear();
+  sphereMeshes.clear();
 }
-
-function reset(): void {
-  clearSpheres();
-  nextId = 1;
-  loop.reset();
-  totalSteps = 0;
-  createSphere(-21, 0, 9);
-  paused = false;
-  setPauseLabel();
-  camera.position.set(27, 25, 34);
-  controls.target.set(0, 4, 0);
-  controls.update();
-}
-
 function setPauseLabel(): void {
-  document.querySelector('#pv2-pause')!.textContent = paused ? '▶ Продолжить' : 'Ⅱ Пауза';
-  document.querySelector('#pv2-state')!.textContent = paused ? 'пауза' : 'запущена';
+  document.querySelector('#pv2-pause')!.textContent = paused ? '▶ Продолжить физику' : 'Ⅱ Пауза физики';
+  document.querySelector('#pv2-state')!.textContent = paused ? 'пауза физики' : 'исследование';
 }
-
+function reset(): void {
+  clearSpheres(); nextId = 1; loop.reset(); totalSteps = 0;
+  resetPlayer(); paused = false; setPauseLabel();
+}
 function updateStats(): void {
+  document.querySelector('#pv2-player-speed')!.textContent = `${Math.hypot(player.vx, player.vz).toFixed(1)} м/с`;
+  document.querySelector('#pv2-player-height')!.textContent = `${player.y.toFixed(1)} м`;
   document.querySelector('#pv2-bodies')!.textContent = String(world.bodies.size);
   const body = world.bodies.values().next().value;
-  if (!body) return;
-  const speed = Math.hypot(body.velocity.x, body.velocity.y, body.velocity.z);
-  document.querySelector('#pv2-speed')!.textContent = `${speed.toFixed(1)} м/с`;
-  document.querySelector('#pv2-height')!.textContent = `${body.position.y.toFixed(1)} м`;
-  document.querySelector('#pv2-contact')!.textContent = body.grounded ? 'да' : 'нет';
-  document.querySelector('#pv2-steps')!.textContent = String(totalSteps);
+  document.querySelector('#pv2-speed')!.textContent = body
+    ? `${Math.hypot(body.velocity.x, body.velocity.y, body.velocity.z).toFixed(1)} м/с`
+    : '— м/с';
 }
-
 document.querySelector('#pv2-reset')!.addEventListener('click', reset);
 document.querySelector('#pv2-pause')!.addEventListener('click', () => { paused = !paused; setPauseLabel(); });
-document.querySelector('#pv2-drop')!.addEventListener('click', () => createSphere(-21 - Math.random() * 5, (Math.random() - 0.5) * 8, 12 + Math.random() * 7));
-document.querySelector<HTMLInputElement>('#pv2-wire')!.addEventListener('change', (event) => terrainRenderer.setWireframe((event.currentTarget as HTMLInputElement).checked));
+document.querySelector('#pv2-drop')!.addEventListener('click', () => createSphere(player.x + 3, player.z + 3, 12));
+document.querySelector<HTMLInputElement>('#pv2-wire')!.addEventListener('change', (event) =>
+  terrainRenderer.setWireframe((event.currentTarget as HTMLInputElement).checked));
 document.querySelector('#pv2-camera')!.addEventListener('click', () => {
-  camera.position.set(27, 25, 34);
-  controls.target.set(0, 4, 0);
-  controls.update();
+  cameraYaw = player.yaw + Math.PI; cameraPitch = 0.28; cameraDistance = 7.5;
 });
 const frictionInput = document.querySelector<HTMLInputElement>('#pv2-friction')!;
 const bounceInput = document.querySelector<HTMLInputElement>('#pv2-bounce')!;
@@ -220,36 +282,27 @@ bounceInput.addEventListener('input', () => {
 });
 
 function resize(): void {
-  const width = viewport.clientWidth;
-  const height = viewport.clientHeight;
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
+  const width = viewport.clientWidth, height = viewport.clientHeight;
+  camera.aspect = width / height; camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
 }
 const resizeObserver = new ResizeObserver(resize);
-resizeObserver.observe(viewport);
-resize();
+resizeObserver.observe(viewport); resize();
 
-let previousTime = performance.now();
-let fpsFrames = 0;
-let fpsElapsed = 0;
-let displayedFps = 0;
+let previousTime = performance.now(), fpsFrames = 0, fpsElapsed = 0;
 function animate(now: number): void {
   requestAnimationFrame(animate);
-  const delta = Math.min((now - previousTime) / 1000, 0.1);
-  previousTime = now;
-  fpsFrames++;
-  fpsElapsed += delta;
+  const delta = Math.min((now - previousTime) / 1000, 0.05);
+  previousTime = now; fpsFrames++; fpsElapsed += delta;
   if (fpsElapsed >= 0.5) {
-    displayedFps = Math.round(fpsFrames / fpsElapsed);
-    fpsFrames = 0;
-    fpsElapsed = 0;
-    document.querySelector('#pv2-fps')!.textContent = String(displayedFps);
+    document.querySelector('#pv2-fps')!.textContent = String(Math.round(fpsFrames / fpsElapsed));
+    fpsFrames = 0; fpsElapsed = 0;
   }
+  updatePlayer(delta);
   if (!paused) {
     const result = loop.advance(delta);
     totalSteps += result.steps;
-    for (const [id, mesh] of meshes) {
+    for (const [id, mesh] of sphereMeshes) {
       const body = world.bodies.get(id);
       if (!body) continue;
       const p = world.getInterpolatedPosition(id, result.alpha);
@@ -257,16 +310,15 @@ function animate(now: number): void {
       mesh.quaternion.set(body.orientation.x, body.orientation.y, body.orientation.z, body.orientation.w);
     }
   }
+  updateFollowCamera();
+  const culling = terrainRenderer.update(camera);
+  document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
   updateStats();
-  controls.update();
-  terrainRenderer.update();
   renderer.render(scene, camera);
 }
-createSphere(-21, 0, 9);
+resetPlayer();
+updateFollowCamera();
 requestAnimationFrame(animate);
-
 window.addEventListener('beforeunload', () => {
-  resizeObserver.disconnect();
-  renderer.dispose();
-  terrainRenderer.dispose();
+  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose();
 });
