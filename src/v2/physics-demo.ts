@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Terrain } from '../engine/terrain/Terrain.js';
+import { createDemoBlueprint } from '../engine/blueprint/demo.js';
+import { TerrainRenderer } from '../engine/renderer/TerrainRenderer.js';
 import { PhysicsWorld } from '../engine/physics/PhysicsWorld.js';
 import { FixedStepLoop } from '../engine/physics/FixedStepLoop.js';
 import './physics-demo.css';
@@ -104,37 +106,14 @@ sun.shadow.camera.top = 55;
 sun.shadow.camera.bottom = -55;
 scene.add(sun);
 
-const terrain = new Terrain((x, z) =>
-  2.5 - x * 0.19 +
-  Math.sin(z * 0.075) * 1.15 +
-  Math.sin(x * 0.055 + z * 0.035) * 0.9 +
-  Math.sin(z * 0.19 + x * 0.025) * 0.22,
-  { seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35 }
-);
-
-const terrainSize = 150;
-const segments = 180;
-const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize, segments, segments);
-terrainGeometry.rotateX(-Math.PI / 2);
-const positions = terrainGeometry.attributes.position as THREE.BufferAttribute;
-const colors: number[] = [];
-const color = new THREE.Color();
-for (let i = 0; i < positions.count; i++) {
-  const x = positions.getX(i);
-  const z = positions.getZ(i);
-  const y = terrain.getHeight(x, z);
-  positions.setY(i, y);
-  const tint = THREE.MathUtils.clamp((y + 8) / 26, 0, 1);
-  color.setHSL(0.29 - tint * 0.12, 0.34 + tint * 0.12, 0.27 + tint * 0.22);
-  colors.push(color.r, color.g, color.b);
-}
-terrainGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-terrainGeometry.computeVertexNormals();
-const ground = new THREE.Mesh(terrainGeometry, new THREE.MeshStandardMaterial({
-  vertexColors: true, roughness: 0.96, metalness: 0
-}));
-ground.receiveShadow = true;
-scene.add(ground);
+const blueprint = createDemoBlueprint();
+const terrain = new Terrain(blueprint.heightAt, {
+  seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
+});
+const terrainRenderer = new TerrainRenderer(scene, camera, terrain, blueprint, {
+  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: 1
+});
+terrainRenderer.update();
 
 const grid = new THREE.GridHelper(150, 75, '#536a67', '#536a67');
 grid.position.y = -9;
@@ -268,6 +247,7 @@ function animate(now: number): void {
   }
   updateStats();
   controls.update();
+  terrainRenderer.update();
   renderer.render(scene, camera);
 }
 createSphere(-21, 0, 9);
@@ -276,5 +256,5 @@ requestAnimationFrame(animate);
 window.addEventListener('beforeunload', () => {
   resizeObserver.disconnect();
   renderer.dispose();
-  terrainGeometry.dispose();
+  terrainRenderer.dispose();
 });
