@@ -61,7 +61,7 @@ root.innerHTML = `
           <label for="pv2-bounce">Упругость <output id="pv2-bounce-value">0.12</output></label>
           <input id="pv2-bounce" type="range" min="0" max="0.9" step="0.03" value="0.12">
         </div>
-        <p class="pv2-note">Шар использует отдельный heightfield-решатель. Капсула героя пока управляется отдельным упрощённым контроллером персонажа.</p>
+        <p class="pv2-note">Шар использует отдельный heightfield-решатель. Капсула героя использует фиксированный шаг и проверку опорной области нижней полусферы.</p>
       </section>
       <section class="pv2-panel">
         <h2>Новый рельеф</h2>
@@ -137,11 +137,36 @@ let previousPointerX = 0;
 let previousPointerY = 0;
 const keys = new Set<string>();
 
+const playerHalfSegment = playerHeight * 0.5;
+const playerFixedStep = 1 / 120;
+let playerAccumulator = 0;
+
+// Проверяем не только точку под центром, а опорную область нижней полусферы капсулы.
+// Для каждой точки вычисляем высоту, при которой капсула уже касается поверхности.
+function getPlayerSupportHeight(x: number, z: number): number {
+  const r = playerRadius;
+  const samples: Array<[number, number]> = [
+    [0, 0], [0.72 * r, 0], [-0.72 * r, 0], [0, 0.72 * r], [0, -0.72 * r],
+    [0.5 * r, 0.5 * r], [-0.5 * r, 0.5 * r],
+    [0.5 * r, -0.5 * r], [-0.5 * r, -0.5 * r]
+  ];
+  let support = -Infinity;
+  for (const [ox, oz] of samples) {
+    const radialSq = ox * ox + oz * oz;
+    if (radialSq >= r * r) continue;
+    const ground = terrain.getGroundHeight(x + ox, z + oz, LOD0_CELL_SIZE);
+    const lowerCap = Math.sqrt(Math.max(0, r * r - radialSq));
+    support = Math.max(support, ground + playerHalfSegment + lowerCap);
+  }
+  return support;
+}
+
 function placePlayerAt(x: number, z: number): void {
   player.x = x; player.z = z;
-  player.y = terrain.getGroundHeight(x, z, LOD0_CELL_SIZE) + playerHeight * 0.5 + playerRadius;
+  player.y = getPlayerSupportHeight(x, z);
   player.vx = 0; player.vy = 0; player.vz = 0;
   player.grounded = true;
+  playerAccumulator = 0;
 }
 function resetPlayer(): void {
   placePlayerAt(0, 0);
@@ -150,7 +175,9 @@ function resetPlayer(): void {
   cameraPitch = 0.28;
   cameraDistance = 7.5;
 }
-function updatePlayer(dt: number): void {
+function updatePlayer(frameDelta: number): void {
+  // Контроллер персонажа работает с фиксированным шагом, независимо от FPS.
+  playerAccumulator += Math.min(frameDelta, 0.05);
   const forwardInput = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   const sideInput = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
   const inputLength = Math.hypot(forwardInput, sideInput);
@@ -163,24 +190,38 @@ function updatePlayer(dt: number): void {
     targetZ = (forwardZ * f + rightZ * s) * 7.5;
     player.yaw = Math.atan2(targetX, targetZ);
   }
-  const blend = 1 - Math.exp(-12 * dt);
-  player.vx += (targetX - player.vx) * blend;
-  player.vz += (targetZ - player.vz) * blend;
-  if (keys.has('Space') && player.grounded) {
-    player.vy = 6.2;
-    player.grounded = false;
+
+  let steps = 0;
+  while (playerAccumulator >= playerFixedStep && steps < 8) {
+    const dt = playerFixedStep;
+    const blend = 1 - Math.exp(-12 * dt);
+    player.vx += (targetX - player.vx) * blend;
+    player.vz += (targetZ - player.vz) * blend;
+    if (keys.has('Space') && player.grounded) {
+      player.vy = 6.2;
+      player.grounded = false;
+    }
+
+    player.vy -= 18 * dt;
+    player.x += player.vx * dt;
+    player.z += player.vz * dt;
+    player.y += player.vy * dt;
+
+    const supportY = getPlayerSupportHeight(player.x, player.z);
+    if (player.y <= supportY) {
+      player.y = supportY;
+      player.vy = 0;
+      player.grounded = true;
+    } else {
+      player.grounded = false;
+    }
+    playerAccumulator -= dt;
+    steps++;
   }
-  player.vy -= 18 * dt;
-  player.x += player.vx * dt;
-  player.z += player.vz * dt;
-  player.y += player.vy * dt;
-  const ground = terrain.getGroundHeight(player.x, player.z, LOD0_CELL_SIZE) + playerHeight * 0.5 + playerRadius;
-  if (player.y <= ground) {
-    player.y = ground;
-    player.vy = 0;
-    player.grounded = true;
-  } else {
-    player.grounded = false;
+
+  // Не накапливаем большой долг симуляции после подвисания вкладки.
+  if (steps === 8 && playerAccumulator >= playerFixedStep) {
+    playerAccumulator = Math.min(playerAccumulator, playerFixedStep);
   }
   playerMesh.position.set(player.x, player.y, player.z);
   playerMesh.rotation.y = player.yaw;
