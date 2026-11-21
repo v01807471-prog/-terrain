@@ -4,9 +4,9 @@ uniform float uAltitude;
 uniform float uStep;
 uniform float uHalf;
 uniform float uWireLift;
-varying vec3 vWorld;
-varying vec3 vNormal;
-varying float vDistance;
+out vec3 vWorld;
+out vec3 vNormal;
+out float vDistance;
 __TERRAIN_HEIGHT_FUNCTION__
 void main() {
   vec4 world = modelMatrix * vec4(position, 1.0);
