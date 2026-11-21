@@ -35,6 +35,8 @@ function terrainHeightCpu(x: number, z: number, seed: number): number {
   return 3 + broad * 19 + medium * 7 + detail * 1.8 + Math.max(0, ridges) * 5 - valleys * 8;
 }
 export function createDemoBlueprint(seed = 17): TerrainBlueprint {
+  const seedOffsetX = (seed * 19.17).toFixed(4);
+  const seedOffsetZ = (seed * 7.31).toFixed(4);
   const heightAt = (x: number, z: number): number => terrainHeightCpu(x, z, seed);
   const heightFunctionGLSL = `
     float hashNoise(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -50,7 +52,7 @@ export function createDemoBlueprint(seed = 17): TerrainBlueprint {
       return sum / max(norm, 0.0001);
     }
     float terrainHeight(vec2 p) {
-      vec2 seedOffset = vec2(325.8900, 124.2700);
+      vec2 seedOffset = vec2(" + seedOffsetX + ", " + seedOffsetZ + ");
       float warpX = fbm(p * 0.0024 + seedOffset, 3) * 38.0;
       float warpZ = fbm(p * 0.0024 + vec2(41.0, -23.0) + seedOffset, 3) * 38.0;
       vec2 q = p + vec2(warpX, warpZ);
