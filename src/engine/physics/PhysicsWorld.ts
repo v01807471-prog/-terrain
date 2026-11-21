@@ -64,7 +64,81 @@ export class PhysicsWorld {
   }
 
   step(dt = this.config.fixedDelta): void {
-    for (const body of this.bodies.values()) this.stepSphere(body, dt);
+    const bodies = [...this.bodies.values()];
+    for (const body of bodies) this.stepSphere(body, dt);
+    // Несколько проходов стабилизируют цепочки и стопки сфер.
+    for (let iteration = 0; iteration < 4; iteration++) {
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          this.resolveSphereContact(bodies[i], bodies[j]);
+        }
+      }
+    }
+  }
+
+  /** Двусторонний контакт сфер с импульсом, трением и коррекцией проникновения. */
+  private resolveSphereContact(a: SphereBody, b: SphereBody): void {
+    const delta = sub(b.position, a.position);
+    const distanceSq = dot(delta, delta);
+    const radiusSum = a.radius + b.radius;
+    if (distanceSq >= radiusSum * radiusSum) return;
+
+    const distance = Math.sqrt(Math.max(distanceSq, 1e-12));
+    const normal = distance > 1e-8 ? scale(delta, 1 / distance) : { x: 1, y: 0, z: 0 };
+    const penetration = radiusSum - distance;
+    const invMassA = 1 / a.mass;
+    const invMassB = 1 / b.mass;
+    const invMassSum = invMassA + invMassB;
+    if (invMassSum <= 0) return;
+
+    // Раздвигаем тела пропорционально обратной массе.
+    const correction = Math.max(0, penetration - 0.001) *
+      this.config.positionCorrection / invMassSum;
+    a.position = sub(a.position, scale(normal, correction * invMassA));
+    b.position = add(b.position, scale(normal, correction * invMassB));
+
+    const armA = scale(normal, a.radius);
+    const armB = scale(normal, -b.radius);
+    const velocityA = add(a.velocity, cross(a.angularVelocity, armA));
+    const velocityB = add(b.velocity, cross(b.angularVelocity, armB));
+    const relativeVelocity = sub(velocityB, velocityA);
+    const normalSpeed = dot(relativeVelocity, normal);
+
+    if (normalSpeed < 0) {
+      const restitution = Math.min(a.restitution, b.restitution);
+      const normalImpulseMagnitude = -(1 + restitution) * normalSpeed / invMassSum;
+      const normalImpulse = scale(normal, normalImpulseMagnitude);
+      a.velocity = sub(a.velocity, scale(normalImpulse, invMassA));
+      b.velocity = add(b.velocity, scale(normalImpulse, invMassB));
+
+      // Касательный импульс учитывает вращательную инерцию обеих сфер.
+      const afterA = add(a.velocity, cross(a.angularVelocity, armA));
+      const afterB = add(b.velocity, cross(b.angularVelocity, armB));
+      const afterRelative = sub(afterB, afterA);
+      const tangentVelocity = sub(afterRelative, scale(normal, dot(afterRelative, normal)));
+      const tangentSpeed = length(tangentVelocity);
+      if (tangentSpeed > 1e-7) {
+        const tangent = scale(tangentVelocity, 1 / tangentSpeed);
+        const inertiaA = 2.5 / (a.mass * a.radius * a.radius);
+        const inertiaB = 2.5 / (b.mass * b.radius * b.radius);
+        const crossA = cross(armA, tangent);
+        const crossB = cross(armB, tangent);
+        const rotationalA = dot(cross(scale(crossA, inertiaA), armA), tangent);
+        const rotationalB = dot(cross(scale(crossB, inertiaB), armB), tangent);
+        const denominator = invMassSum + rotationalA + rotationalB;
+        const desired = tangentSpeed / Math.max(denominator, 1e-8);
+        const friction = Math.sqrt(a.friction * b.friction);
+        const magnitude = Math.min(desired, friction * normalImpulseMagnitude);
+        const impulse = scale(tangent, magnitude);
+        a.velocity = add(a.velocity, scale(impulse, invMassA));
+        b.velocity = sub(b.velocity, scale(impulse, invMassB));
+        a.angularVelocity = add(a.angularVelocity, scale(cross(armA, impulse), inertiaA));
+        b.angularVelocity = sub(b.angularVelocity, scale(cross(armB, impulse), inertiaB));
+      }
+    }
+
+    a.grounded = a.grounded || false;
+    b.grounded = b.grounded || false;
   }
 
   private findTerrainContact(body: SphereBody): TerrainCollision | null {
