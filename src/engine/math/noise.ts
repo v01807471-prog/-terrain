@@ -1,6 +1,6 @@
 /** Deterministic CPU noise for terrain sampling, graph evaluation and texture generation. */
 const lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
-function hash2(x,z){
+export function hash2(x,z){
  let h=(Math.imul(x+65536,1597334673)^Math.imul(z+65536,3812015801))>>>0;
  h=Math.imul(h^(h>>>16),2246822519)>>>0;
  h^=h>>>13;
@@ -9,11 +9,11 @@ function hash2(x,z){
  return (h>>>8)/8388607.5-1;
 }
 
-function smooth01(t){
+export function smooth01(t){
  return t*t*(3-2*t);
 }
 
-function noise2(x,z){
+export function noise2(x,z){
  const ix=Math.floor(x);
  const iz=Math.floor(z);
 
@@ -32,7 +32,7 @@ function noise2(x,z){
  );
 }
 
-function fbm(x,z){
+export function fbm(x,z){
  let v=0;
  let a=.5;
  let total=0;
@@ -48,13 +48,13 @@ function fbm(x,z){
  return v/total;
 }
 
-function originalBaseHeight(x,z){
+export function originalBaseHeight(x,z){
  return 6+
   fbm(x*.0048,z*.0048)*42+
   fbm(x*.018+31,z*.018-17)*12+
   fbm(x*.065-13,z*.065+42)*1.8;
 }
-function hashPixel(x,y,seed=0){
+export function hashPixel(x,y,seed=0){
  let n=(Math.imul(x+seed,374761393)^Math.imul(y-seed,668265263))|0;
 
  n=Math.imul(n^(n>>>13),1274126177);
@@ -64,7 +64,7 @@ function hashPixel(x,y,seed=0){
 }
 
 // Тайлящийся value-noise для процедурных текстур 256×256.
-function tnoise(x,y,p,seed){
+export function tnoise(x,y,p,seed){
  const ix=Math.floor(x),iy=Math.floor(y);
  const fx=smooth01(x-ix),fy=smooth01(y-iy);
  const h=(a,b)=>hashPixel(((a%p)+p)%p,((b%p)+p)%p,seed);
@@ -72,7 +72,7 @@ function tnoise(x,y,p,seed){
  return L(L(h(ix,iy),h(ix+1,iy),fx),L(h(ix,iy+1),h(ix+1,iy+1),fx),fy);
 }
 
-function tfbm(u,v,base,oct,seed){
+export function tfbm(u,v,base,oct,seed){
  let s=0,a=.5,t=0,p=base;
  for(let i=0;i<oct;i++){
   s+=tnoise(u*p,v*p,p,seed+i*7)*a;
@@ -80,7 +80,7 @@ function tfbm(u,v,base,oct,seed){
  }
  return s/t;
 }
-function fbmXZ(x,z,o){
+export function fbmXZ(x,z,o){
  let v=0,a=.5,t=0;
  for(let i=0;i<o;i++){
   v+=noise2(x,z)*a;
@@ -92,7 +92,7 @@ function fbmXZ(x,z,o){
  return v/t;
 }
 
-function ridgedXZ(x,z,o){
+export function ridgedXZ(x,z,o){
  const v=1-Math.abs(fbmXZ(x,z,o));
  return v*v;
 }
