@@ -33,6 +33,8 @@ export interface PhysicsConfig {
   maxSubSteps: number;
   maxFrameDelta: number;
   positionCorrection: number;
+  /** Must match TerrainRenderer.baseCellSize for exact LOD0 collision sampling. */
+  terrainCellSize: number;
 }
 
 export interface TerrainCollision {
