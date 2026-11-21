@@ -115,6 +115,11 @@ const cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZ
 const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1, terrainCellSize: LOD0_CELL_SIZE });
 const loop = new FixedStepLoop(world, 1 / 60, 10, 0.1);
 const sphereMeshes = new Map<string, THREE.Mesh>();
+// Все шары используют одну геометрию и один материал: меньше GPU-ресурсов.
+const sphereGeometry = new THREE.SphereGeometry(1.15, 24, 16);
+const sphereMaterial = new THREE.MeshStandardMaterial({
+  color: '#e9a95e', roughness: 0.28, metalness: 0.12
+});
 let nextId = 1;
 let paused = false;
 let friction = 0.65;
@@ -321,19 +326,19 @@ function createSphere(x: number, z: number, lift = 8): void {
     id, position: { x, y, z }, radius, mass: 1,
     friction, restitution, linearDamping: 0.008, angularDamping: 0.015
   });
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 40, 28),
-    new THREE.MeshStandardMaterial({ color: '#e9a95e', roughness: 0.28, metalness: 0.12 })
-  );
-  mesh.castShadow = true;
+  const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+  // Тени от десятков динамических сфер дорого пересчитывать каждый кадр.
+  // Солнце и рельеф сохраняют тени, сами шары остаются освещёнными.
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
   mesh.position.set(body.position.x, body.position.y, body.position.z);
   scene.add(mesh);
   sphereMeshes.set(id, mesh);
 }
 function clearSpheres(): void {
   for (const [id, mesh] of sphereMeshes) {
-    scene.remove(mesh); mesh.geometry.dispose();
-    (mesh.material as THREE.Material).dispose(); world.removeBody(id);
+    scene.remove(mesh);
+    world.removeBody(id);
   }
   sphereMeshes.clear();
 }
@@ -427,4 +432,5 @@ updateFollowCamera();
 requestAnimationFrame(animate);
 window.addEventListener('beforeunload', () => {
   resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); cpuSurfaceDebug.dispose();
+  sphereGeometry.dispose(); sphereMaterial.dispose();
 });
