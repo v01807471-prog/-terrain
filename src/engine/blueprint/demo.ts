@@ -38,7 +38,7 @@ export function createDemoBlueprint(seed = 17): TerrainBlueprint {
       float detail = fbmXZ(q.x * 0.085 + 57.0 + seedOffset.x, q.y * 0.085 - 71.0 + seedOffset.y, 3);
       float ridgeSignal = fbmXZ(q.x * 0.014 + 91.0 + seedOffset.x, q.y * 0.014 + 37.0 + seedOffset.y, 4);
       float ridges = 1.0 - 2.0 * abs(ridgeSignal);
-      float valleySignal = noise2(q.x * 0.006 + 151.0 + seedOffset.x, q.y * 0.006 - 83.0 + seedOffset.y) * 0.5 + 0.5;
+      float valleySignal = noise2(vec2(q.x * 0.006 + 151.0 + seedOffset.x, q.y * 0.006 - 83.0 + seedOffset.y)) * 0.5 + 0.5;
       float valleys = pow(max(0.0, 1.0 - abs(valleySignal - 0.5) * 5.0), 2.0);
       return 3.0 + broad * 19.0 + medium * 7.0 + detail * 1.8 + max(0.0, ridges) * 5.0 - valleys * 8.0;
     }
