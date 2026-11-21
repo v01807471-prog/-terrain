@@ -2,7 +2,6 @@ precision highp float;
 uniform vec2 uCamera;
 uniform float uAltitude;
 uniform float uCut;
-uniform float uOuter;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
@@ -14,7 +13,7 @@ void main() {
   if (!gl_FrontFacing) discard;
   vec2 delta = abs(vWorld.xz-uCamera);
   float d = max(max(delta.x,delta.y),uAltitude);
-  if (d < uCut || d >= uOuter) discard;
+  if (d < uCut) discard;
   vec3 n = normalize(vNormal);
   vec3 lightDir = normalize(vec3(-0.45,0.78,0.42));
   float diffuse = max(dot(n,lightDir),0.0);
