@@ -98,15 +98,16 @@ sun.shadow.camera.top = 55;
 sun.shadow.camera.bottom = -55;
 scene.add(sun);
 
+const LOD0_CELL_SIZE = 1;
 const blueprint = createDemoBlueprint(17);
 const terrain = new Terrain(blueprint.heightAt, {
   seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
 });
 const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
-  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: 1, showWireframe: false
+  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
 });
 
-const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1 });
+const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1, terrainCellSize: LOD0_CELL_SIZE });
 const loop = new FixedStepLoop(world, 1 / 60, 10, 0.1);
 const sphereMeshes = new Map<string, THREE.Mesh>();
 let nextId = 1;
@@ -118,7 +119,7 @@ let totalSteps = 0;
 const playerRadius = 0.48;
 const playerHeight = 1.35;
 const player = {
-  x: 0, z: 0, y: terrain.getGroundHeight(0, 0, 1) + playerHeight * 0.5 + playerRadius,
+  x: 0, z: 0, y: terrain.getGroundHeight(0, 0, LOD0_CELL_SIZE) + playerHeight * 0.5 + playerRadius,
   vx: 0, vy: 0, vz: 0, yaw: 0, grounded: true
 };
 const playerMesh = new THREE.Mesh(
@@ -138,7 +139,7 @@ const keys = new Set<string>();
 
 function placePlayerAt(x: number, z: number): void {
   player.x = x; player.z = z;
-  player.y = terrain.getGroundHeight(x, z, 1) + playerHeight * 0.5 + playerRadius;
+  player.y = terrain.getGroundHeight(x, z, LOD0_CELL_SIZE) + playerHeight * 0.5 + playerRadius;
   player.vx = 0; player.vy = 0; player.vz = 0;
   player.grounded = true;
 }
@@ -173,7 +174,7 @@ function updatePlayer(dt: number): void {
   player.x += player.vx * dt;
   player.z += player.vz * dt;
   player.y += player.vy * dt;
-  const ground = terrain.getGroundHeight(player.x, player.z, 1) + playerHeight * 0.5 + playerRadius;
+  const ground = terrain.getGroundHeight(player.x, player.z, LOD0_CELL_SIZE) + playerHeight * 0.5 + playerRadius;
   if (player.y <= ground) {
     player.y = ground;
     player.vy = 0;
@@ -224,7 +225,7 @@ window.addEventListener('blur', () => keys.clear());
 
 function createSphere(x: number, z: number, lift = 8): void {
   const id = `sphere-${nextId++}`, radius = 1.15;
-  const y = terrain.getGroundHeight(x, z, 1) + radius + lift;
+  const y = terrain.getGroundHeight(x, z, LOD0_CELL_SIZE) + radius + lift;
   const body = world.addSphere({
     id, position: { x, y, z }, radius, mass: 1,
     friction, restitution, linearDamping: 0.008, angularDamping: 0.015
