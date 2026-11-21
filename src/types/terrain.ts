@@ -1,4 +1,4 @@
-/** Shared domain types for the terrain editor. */
+/** Общие типы предметной области редактора рельефа. */
 export type TerrainTool = 'raise' | 'lower' | 'flatten' | 'smooth' | 'slope' | 'noise';
 
 export interface BrushSettings {
