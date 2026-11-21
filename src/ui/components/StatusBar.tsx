@@ -1,1 +1,0 @@
-export default function StatusBar({activeTool}:{activeTool:string}){return <footer className="statusbar"><span><i className="status-green"/> ENGINE READY</span><span>GPU CLIPMAP <b>8 LOD</b></span><span>HEIGHT FIELD <b>1024²</b></span><span className="status-right">ACTIVE TOOL <b>{activeTool.toUpperCase()}</b></span></footer>}

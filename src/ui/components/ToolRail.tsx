@@ -1,4 +1,0 @@
-import type {ToolId} from '../types';
-import {TOOL_DEFINITIONS} from '../types';
-type Props={activeTool:ToolId;onChoose:(tool:ToolId)=>void;onUndo:()=>void;onRedo:()=>void;onAdvanced:()=>void};
-export default function ToolRail({activeTool,onChoose,onUndo,onRedo,onAdvanced}:Props){return <nav className="tool-rail"><div className="rail-caption">SCULPT</div>{TOOL_DEFINITIONS.map(t=><button key={t.id} className={activeTool===t.id?'tool-button selected':'tool-button'} onClick={()=>onChoose(t.id)} title={t.label+' ('+t.key+')'}><span>{t.glyph}</span><small>{t.label}</small><kbd>{t.key}</kbd></button>)}<div className="rail-separator"/><button className="tool-button" onClick={onUndo}><span>↶</span><small>Undo</small></button><button className="tool-button" onClick={onRedo}><span>↷</span><small>Redo</small></button><div className="rail-spacer"/><button className="tool-button" onClick={onAdvanced}><span>⚙</span><small>Advanced</small></button></nav>}

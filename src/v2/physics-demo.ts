@@ -26,7 +26,7 @@ root.innerHTML = `
           <span class="pv2-chip">Симуляция: <b id="pv2-state">запущена</b></span>
           <span class="pv2-chip">Физика: <b>60 шагов/с</b></span>
         </div>
-        <div class="pv2-hint">ЛКМ — вращать · колёсико — приблизить · ПКМ — переместить камеру</div>
+        <div class="pv2-hint">ЛКМ — вращать · ПКМ/средняя кнопка — перемещать · колёсико — масштаб · стрелки — двигать камеру</div>
       </div>
     </section>
     <aside class="pv2-side">
@@ -37,6 +37,7 @@ root.innerHTML = `
           <button class="pv2-button" id="pv2-pause">Ⅱ Пауза</button>
           <button class="pv2-button" id="pv2-drop">↓ Уронить шар</button>
           <button class="pv2-button" id="pv2-camera">◎ Камера</button>
+          <label class="pv2-toggle"><input id="pv2-wire" type="checkbox" checked> Показать сетку рельефа</label>
         </div>
         <p class="pv2-note">«Уронить шар» создаёт ещё одну сферу над склоном. Можно наблюдать несколько тел одновременно.</p>
       </section>
@@ -91,9 +92,19 @@ viewport.prepend(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 4, 0);
 controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI * 0.48;
-controls.minDistance = 9;
-controls.maxDistance = 100;
+controls.dampingFactor = 0.075;
+controls.enablePan = true;
+controls.screenSpacePanning = true;
+controls.rotateSpeed = 0.9;
+controls.panSpeed = 1.15;
+controls.zoomSpeed = 1.2;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 3;
+controls.maxDistance = 600;
+controls.listenToKeyEvents(window);
+controls.keys = {
+  LEFT: 'ArrowLeft', UP: 'ArrowUp', RIGHT: 'ArrowRight', BOTTOM: 'ArrowDown'
+};
 
 scene.add(new THREE.HemisphereLight('#e5f5f1', '#38464a', 2.0));
 const sun = new THREE.DirectionalLight('#fff0d5', 3.1);
@@ -111,7 +122,7 @@ const terrain = new Terrain(blueprint.heightAt, {
   seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
 });
 const terrainRenderer = new TerrainRenderer(scene, camera, terrain, blueprint, {
-  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: 1
+  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: 1, showWireframe: true
 });
 terrainRenderer.update();
 
@@ -191,6 +202,7 @@ function updateStats(): void {
 document.querySelector('#pv2-reset')!.addEventListener('click', reset);
 document.querySelector('#pv2-pause')!.addEventListener('click', () => { paused = !paused; setPauseLabel(); });
 document.querySelector('#pv2-drop')!.addEventListener('click', () => createSphere(-21 - Math.random() * 5, (Math.random() - 0.5) * 8, 12 + Math.random() * 7));
+document.querySelector<HTMLInputElement>('#pv2-wire')!.addEventListener('change', (event) => terrainRenderer.setWireframe((event.currentTarget as HTMLInputElement).checked));
 document.querySelector('#pv2-camera')!.addEventListener('click', () => {
   camera.position.set(27, 25, 34);
   controls.target.set(0, 4, 0);

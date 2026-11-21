@@ -24,12 +24,13 @@ export class TerrainRenderer {
 
   private readonly tilesPerSide: number;
   private readonly geometries: THREE.BufferGeometry[] = [];
+  private readonly wireGeometries: THREE.BufferGeometry[] = [];
   private readonly rings: Array<{
     step: number;
     half: number;
     cut: number;
     outer: number;
-    tiles: Array<{ mesh: THREE.Mesh; wire: THREE.Mesh; ox: number; oz: number }>;
+    tiles: Array<{ mesh: THREE.Mesh; wire: THREE.LineSegments; ox: number; oz: number }>;
     material: THREE.ShaderMaterial;
     wireMaterial: THREE.ShaderMaterial;
   }> = [];
@@ -143,9 +144,11 @@ export class TerrainRenderer {
       ring.wireMaterial.dispose();
     }
     for (const geometry of this.geometries) geometry.dispose();
+    for (const geometry of this.wireGeometries) geometry.dispose();
     this.scene.remove(this.group);
     this.rings.length = 0;
     this.geometries.length = 0;
+    this.wireGeometries.length = 0;
   }
 
   private build(blueprint: TerrainBlueprint): void {
@@ -232,7 +235,9 @@ export class TerrainRenderer {
     for (let tz = 0; tz < this.tilesPerSide; tz++) {
       for (let tx = 0; tx < this.tilesPerSide; tx++) {
         const geometry = this.createTileGeometry(tx, tz);
+        const wireGeometry = this.createTileWireGeometry(tx, tz);
         this.geometries.push(geometry);
+        this.wireGeometries.push(wireGeometry);
       }
     }
 
@@ -259,16 +264,17 @@ export class TerrainRenderer {
       });
       const wireMaterial = new THREE.ShaderMaterial({
         uniforms: common, vertexShader, fragmentShader: wireFragment,
-        wireframe: true, transparent: true, depthWrite: false, side: THREE.DoubleSide
+        transparent: true, depthWrite: false, side: THREE.DoubleSide,
+        polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
       });
-      const tiles: Array<{ mesh: THREE.Mesh; wire: THREE.Mesh; ox: number; oz: number }> = [];
+      const tiles: Array<{ mesh: THREE.Mesh; wire: THREE.LineSegments; ox: number; oz: number }> = [];
       for (let i = 0; i < this.geometries.length; i++) {
         const tx = i % this.tilesPerSide;
         const tz = Math.floor(i / this.tilesPerSide);
         const ox = tx * this.tileSize - halfGrid;
         const oz = tz * this.tileSize - halfGrid;
         const mesh = new THREE.Mesh(this.geometries[i], material);
-        const wire = new THREE.Mesh(this.geometries[i], wireMaterial);
+        const wire = new THREE.LineSegments(this.wireGeometries[i], wireMaterial);
         mesh.scale.set(step, 1, step);
         wire.scale.set(step, 1, step);
         mesh.frustumCulled = false;
@@ -278,6 +284,28 @@ export class TerrainRenderer {
       }
       this.rings.push({ step, half, cut, outer, tiles, material, wireMaterial });
     }
+  }
+
+  private createTileWireGeometry(tx: number, tz: number): THREE.BufferGeometry {
+    const side = this.tileSize + 1;
+    const positions = new Float32Array(side * side * 3);
+    const indices: number[] = [];
+    const ox = tx * this.tileSize - this.gridSize / 2;
+    const oz = tz * this.tileSize - this.gridSize / 2;
+    for (let z = 0; z < side; z++) {
+      for (let x = 0; x < side; x++) {
+        const i = (z * side + x) * 3;
+        positions[i] = ox + x;
+        positions[i + 2] = oz + z;
+        const vertex = z * side + x;
+        if (x < this.tileSize) indices.push(vertex, vertex + 1);
+        if (z < this.tileSize) indices.push(vertex, vertex + side);
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    return geometry;
   }
 
   private createTileGeometry(tx: number, tz: number): THREE.BufferGeometry {
