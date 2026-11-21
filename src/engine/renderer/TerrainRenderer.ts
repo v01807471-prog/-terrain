@@ -176,11 +176,11 @@ export class TerrainRenderer {
         uWireColor: { value: new THREE.Color().setHSL(0.48 + level * 0.075, 0.88, 0.62) }
       };
       const material = new THREE.ShaderMaterial({
-        uniforms: common, vertexShader, fragmentShader: terrainFragmentShader,
+        uniforms: { ...common, uWireLift: { value: 0 } }, vertexShader, fragmentShader: terrainFragmentShader,
         side: THREE.FrontSide
       });
       const wireMaterial = new THREE.ShaderMaterial({
-        uniforms: common, vertexShader, fragmentShader: wireFragmentShader,
+        uniforms: { ...common, uWireLift: { value: 0.025 } }, vertexShader, fragmentShader: wireFragmentShader,
         transparent: true, depthWrite: false, side: THREE.FrontSide,
         polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
       });
