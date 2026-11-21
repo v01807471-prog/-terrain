@@ -211,8 +211,9 @@ export class TerrainRenderer {
     for (let z = 0; z < side; z++) for (let x = 0; x < side; x++) {
       const i = (z * side + x) * 3, vertex = z * side + x;
       positions[i] = ox + x; positions[i + 2] = oz + z;
-      if (x < this.tileSize) indices.push(vertex, vertex + 1);
-      if (z < this.tileSize) indices.push(vertex, vertex + side);
+      // Соседние тайлы делят граничные линии: рисуем каждую границу только один раз.
+      if (x < this.tileSize && !(x === 0 && tx > 0)) indices.push(vertex, vertex + 1);
+      if (z < this.tileSize && !(z === 0 && tz > 0)) indices.push(vertex, vertex + side);
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
