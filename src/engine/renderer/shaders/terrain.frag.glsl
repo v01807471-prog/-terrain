@@ -6,6 +6,14 @@ uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
 uniform vec3 uBaseColor;
+uniform sampler2D uAsset0;
+uniform sampler2D uAsset1;
+uniform sampler2D uAsset2;
+uniform sampler2D uAsset3;
+uniform sampler2D uAsset4;
+uniform sampler2D uAsset5;
+uniform sampler2D uAsset6;
+uniform sampler2D uAsset7;
 in vec3 vWorld;
 in vec3 vNormal;
 in float vDistance;
@@ -20,6 +28,10 @@ void main() {
   vec2 pw = vWorld.xz;
   float vHeight = vWorld.y;
   float slopeV = 1.0 - clamp(n.y, 0.0, 1.0);
+  vec3 vWorldPosition = vWorld;
+  vec3 tw = pow(abs(n), vec3(4.0));
+  tw /= max(dot(tw, vec3(1.0)), 0.00001);
+  float dist = vDistance;
   vec3 grassColor = vec3(0.18, 0.34, 0.12);
   vec3 rockColor = vec3(0.34, 0.32, 0.29);
   __TERRAIN_COLOR_GRAPH__
