@@ -152,6 +152,17 @@ export function runTerrainSelfTests(): TerrainSelfTestResult {
   assert(nearest.version === 2 && prioritizedQueue.pendingCount === 1,
     'очередь отдаёт ближайшую к камере область и соблюдает лимит выдачи');
 
+  const eventSource = new Terrain(() => 0);
+  const connectedQueue = new TerrainUpdateQueue();
+  const disconnectQueue = connectedQueue.connect(eventSource);
+  eventSource.applyEdit(0, 0, 1, 1);
+  assert(connectedQueue.pendingCount === 1,
+    'TerrainUpdateQueue получает события напрямую через подписку на Terrain');
+  disconnectQueue();
+  eventSource.applyEdit(10, 0, 1, 1);
+  assert(connectedQueue.pendingCount === 1,
+    'отключённая очередь больше не принимает события Terrain');
+
   const fullResetQueue = new TerrainUpdateQueue();
   fullResetQueue.enqueue({
     version: 5,
