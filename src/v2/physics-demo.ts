@@ -12,13 +12,14 @@ import './physics-demo.css';
 
 class BlueprintNodeEditor {
   private graph: ReturnType<typeof createDefaultTerrainGraph>;
-  private host: HTMLElement; private apply: (g: ReturnType<typeof createDefaultTerrainGraph>) => void;
+  private host: HTMLElement; private viewport: HTMLElement; private viewportMarker: Comment; private apply: (g: ReturnType<typeof createDefaultTerrainGraph>) => void;
   private zoom=1; private selected:number|null=null; private pending:number|null=null; private timer=0; private previewTimer=0;
-  constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void){
-    this.host=host;this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
+  constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void,viewport:HTMLElement){
+    this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
   }
   private el<T extends HTMLElement=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
-  open():void{this.host.classList.add('open');requestAnimationFrame(()=>this.fit());}
+  open():void{this.host.classList.add('open');this.el('v2g-preview-slot').append(this.viewport);this.viewport.classList.add('v2g-live-preview');requestAnimationFrame(()=>{this.fit();window.dispatchEvent(new Event('resize'));});}
+  private close():void{this.viewport.classList.remove('v2g-live-preview');this.viewportMarker.parentNode?.insertBefore(this.viewport,this.viewportMarker);this.host.classList.remove('open','preview-expanded');window.dispatchEvent(new Event('resize'));}
   private node(id:number):any{return this.graph.nodes.find(n=>n.id===id);}
   private shell():void{
     this.host.innerHTML=`<div class="v2-graph-window"><header class="v2-graph-toolbar">
@@ -26,7 +27,8 @@ class BlueprintNodeEditor {
     <select id="v2g-add"></select><button data-a="add">+ Узел</button><button data-a="fit">Уместить</button>
     <button data-a="minus">−</button><span id="v2g-zoom">100%</span><button data-a="plus">+</button>
     <button data-a="export">Экспорт</button><button data-a="import">Импорт</button><input id="v2g-file" type="file" accept=".json" hidden>
-    <span id="v2g-status">Граф готов</span><button data-a="apply">Применить</button><button data-a="close">Закрыть</button></header>
+    <span id="v2g-status">Граф готов</span><button data-a="apply">Применить</button><button data-a="close">← В игру</button></header>
+    <div class="v2-graph-preview-dock"><div class="v2-graph-preview-caption"><b>Живой предпросмотр</b><span>Нажми, чтобы увеличить</span><button data-a="preview" aria-label="Увеличить предпросмотр">⤢</button></div><div id="v2g-preview-slot"></div></div>
     <div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world">
     <svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div><aside class="v2-graph-inspector"><b>Узел</b><div id="v2g-info">Выбери узел</div>
     <p>Перетаскивай узлы за заголовок. Выход → вход создаёт связь. Нажми на подключённый вход, чтобы отключить. Ctrl + колесо — масштаб.</p></aside></div></div>`;
@@ -39,7 +41,8 @@ class BlueprintNodeEditor {
     this.el('v2g-scroll').addEventListener('pointerdown',e=>this.pan(e as PointerEvent));
   }
   private action(a:string):void{
-    if(a==='close'){this.host.classList.remove('open');return;}
+    if(a==='close'){this.close();return;}
+    if(a==='preview'){this.host.classList.toggle('preview-expanded');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
     if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);
     if(a==='apply')this.applyNow();
     if(a==='fit')this.fit();
@@ -289,7 +292,7 @@ const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (ne
   scene.fog = new THREE.Fog(nextBlueprint.fogColor, nextBlueprint.fogNear, nextBlueprint.fogFar);
   blueprintStatus.textContent = 'Blueprint применён: CPU, физика и GPU обновлены без перезапуска.';
   blueprintStatus.style.color = '#8affc1';
-});
+}, viewport);
 document.querySelector('#pv2-open-blueprint')!.addEventListener('click', () => graphEditor.open());
 document.querySelector<HTMLInputElement>('#pv2-water')!.addEventListener('change', (event) => {
   waterRenderer.mesh.visible = (event.currentTarget as HTMLInputElement).checked;
