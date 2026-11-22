@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { ResizeManager } from './ResizeManager';
 import { SphericalClipmap } from '../planet/SphericalClipmap';
 import { terrainBlueprint } from '../planet/TerrainBlueprint';
@@ -33,6 +34,11 @@ export class PlanetViewport {
   private clock=new THREE.Clock();
   private thirdPerson=false;
   private avatar=new THREE.Group();
+  private avatarMixer:THREE.AnimationMixer|null=null;
+  private animationSelect:HTMLSelectElement|null=null;
+  private animationStatus:HTMLDivElement|null=null;
+  private animationClips=new Map<string,THREE.AnimationClip>();
+  private activeAnimation:THREE.AnimationAction|null=null;
   // Cached world-space positions are read from the Solar scene graph.
   private planetCenter=new THREE.Vector3();
   private moonCenter=new THREE.Vector3();
@@ -311,10 +317,92 @@ export class PlanetViewport {
           }
         });
         this.avatar.add(model);
+        const skins:THREE.SkinnedMesh[]=[];
+        model.traverse(object=>{if(object instanceof THREE.SkinnedMesh)skins.push(object);});
+        const targetMesh=skins.sort((a,b)=>(b.geometry.getAttribute('position')?.count??0)-(a.geometry.getAttribute('position')?.count??0))[0];
+        if(!targetMesh){console.error('В модели героя не найден SkinnedMesh');return;}
+        this.avatarMixer=new THREE.AnimationMixer(targetMesh);
+        this.createAnimationPicker();
+        this.loadAnimationLibrary('/Universal%20Animation%20Library%5BStandard%5D/Unreal-Godot/UAL1_Standard.glb','UAL1');
+        this.loadAnimationLibrary('/Universal%20Animation%20Library%202%5BStandard%5D/Unreal-Godot/UAL2_Standard.glb','UAL2');
       },
       undefined,
       (error)=>console.error('Не удалось загрузить модель героя:',error)
     );
+  }
+
+
+  private createAnimationPicker(){
+    this.animationStatus=document.createElement('div');
+    this.animationStatus.className='character-test-status';
+    this.animationStatus.textContent='Загрузка библиотек анимаций…';
+    document.body.appendChild(this.animationStatus);
+    this.animationSelect=document.createElement('select');
+    this.animationSelect.className='character-test-animation-select';
+    this.animationSelect.disabled=true;
+    this.animationSelect.addEventListener('change',()=>{
+      const clip=this.animationClips.get(this.animationSelect?.value??'');
+      if(!clip||!this.avatarMixer)return;
+      this.activeAnimation?.fadeOut(.18);
+      this.activeAnimation=this.avatarMixer.clipAction(clip);
+      this.activeAnimation.reset().fadeIn(.18).play();
+    });
+    document.body.appendChild(this.animationSelect);
+  }
+
+  private loadAnimationLibrary(url:string,label:string){
+    new GLTFLoader().load(url,gltf=>{
+      const sourceMeshes:THREE.SkinnedMesh[]=[];
+      gltf.scene.traverse(object=>{if(object instanceof THREE.SkinnedMesh)sourceMeshes.push(object);});
+      const model=this.avatar.children[0];
+      const targetMeshes:THREE.SkinnedMesh[]=[];
+      model?.traverse(object=>{if(object instanceof THREE.SkinnedMesh)targetMeshes.push(object);});
+      const target=targetMeshes.sort((a,b)=>(b.geometry.getAttribute('position')?.count??0)-(a.geometry.getAttribute('position')?.count??0))[0];
+      if(!target||sourceMeshes.length===0){console.warn(label+': не найден скелет');this.updateAnimationStatus();return;}
+      const targetNames=new Set(target.skeleton.bones.map(b=>b.name));
+      const ranked=sourceMeshes.map(mesh=>({mesh,overlap:mesh.skeleton.bones.filter(b=>targetNames.has(b.name)).length})).sort((a,b)=>b.overlap-a.overlap);
+      const source=ranked[0].mesh;
+      const sourceNames=new Set(source.skeleton.bones.map(b=>b.name));
+      const boneMap:Record<string,string>={};
+      for(const bone of target.skeleton.bones)if(sourceNames.has(bone.name))boneMap[bone.name]=bone.name;
+      if(Object.keys(boneMap).length<5){console.warn(label+': совпало слишком мало костей',Object.keys(boneMap).length);this.updateAnimationStatus();return;}
+      const boneSet=new Set(target.skeleton.bones);
+      const rootNames=target.skeleton.bones.filter(b=>!boneSet.has(b.parent as THREE.Bone)).map(b=>b.name);
+      for(const sourceClip of gltf.animations){
+        try{
+          const converted=SkeletonUtils.retargetClip(target,source,sourceClip,{names:boneMap,fps:30,preserveBoneMatrix:true,preserveBonePositions:true});
+          converted.tracks=converted.tracks.filter(track=>!(track.name.endsWith('.position')&&rootNames.some(name=>track.name.includes('['+name+']'))));
+          if(converted.tracks.length){
+            const name=label+' · '+(sourceClip.name||'Clip '+(this.animationClips.size+1));
+            converted.name=name;
+            this.animationClips.set(name,converted);
+          }
+        }catch(error){console.warn(label+' retarget failed:',sourceClip.name,error);}
+      }
+      this.updateAnimationStatus();
+    },undefined,error=>{console.error(label+' load failed:',error);this.updateAnimationStatus();});
+  }
+
+  private updateAnimationStatus(){
+    if(this.animationSelect){
+      const selected=this.animationSelect.value;
+      this.animationSelect.replaceChildren();
+      for(const name of this.animationClips.keys()){
+        const option=document.createElement('option');option.value=name;option.textContent=name;
+        this.animationSelect.appendChild(option);
+      }
+      this.animationSelect.disabled=this.animationClips.size===0;
+      if(selected&&this.animationClips.has(selected))this.animationSelect.value=selected;
+      else if(this.animationClips.size>0){
+        const first=[...this.animationClips.keys()].find(name=>/idle|stand|breath/i.test(name))??this.animationClips.keys().next().value!;
+        this.animationSelect.value=first;
+        this.activeAnimation=this.avatarMixer?.clipAction(this.animationClips.get(first)!)??null;
+        this.activeAnimation?.reset().play();
+      }
+    }
+    if(this.animationStatus)this.animationStatus.textContent=this.animationClips.size
+      ?'Анимации загружены: '+this.animationClips.size+' · UAL1 + UAL2'
+      :'Загружаются библиотеки анимаций…';
   }
 
   private updateCameraMode(){
@@ -369,6 +457,7 @@ export class PlanetViewport {
         this.controls.update();
         this.thirdPerson=false;
       }
+      this.avatarMixer?.update(deltaTime);
       this.updateDepthRange();
       this.updatePlanetRenderPass(t);
       this.renderer.render(this.scene,this.camera);
@@ -419,6 +508,9 @@ export class PlanetViewport {
     cancelAnimationFrame(this.frame);
     this.controls.dispose();
     this.player.dispose();
+    this.avatarMixer?.stopAllAction();
+    this.animationSelect?.remove();
+    this.animationStatus?.remove();
     this.scene.remove(this.avatar);
     this.scene.remove(this.flatTestGroup);
     this.flatTestGroup.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const material=object.material;if(Array.isArray(material))material.forEach(m=>m.dispose());else material.dispose();}else if(object instanceof THREE.Line){object.geometry.dispose();const material=object.material;if(Array.isArray(material))material.forEach(m=>m.dispose());else material.dispose();}});
