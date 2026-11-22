@@ -232,19 +232,16 @@ export class SphericalClipmap {
     this.currentExtent=totalExtent;
   }
 
-  update(camera:THREE.PerspectiveCamera,time:number,planetRotation=new THREE.Quaternion()) {
+  update(camera:THREE.PerspectiveCamera,time:number) {
     this.material.uniforms.uTime.value=time;
 
-    // Keep the camera fixed in world space while the planet rotates beneath it.
-    // Find the camera's ground direction in planet-local coordinates, then
-    // rotate the clipmap back into world space with the planet.
-    const inversePlanetRotation=planetRotation.clone().invert();
-    const localDirection=camera.position.clone().normalize().applyQuaternion(inversePlanetRotation);
-    const localOrientation=new THREE.Quaternion().setFromUnitVectors(
+    // The planet stays fixed; orient the local clipmap beneath the orbiting camera.
+    const direction=camera.position.clone().normalize();
+    const orientation=new THREE.Quaternion().setFromUnitVectors(
       new THREE.Vector3(0,1,0),
-      localDirection
+      direction
     );
-    this.group.quaternion.copy(planetRotation).multiply(localOrientation);
+    this.group.quaternion.copy(orientation);
 
     const altitude=Math.max(0,camera.position.length()-this.settings.radius);
     const nextExtent=this.calculateExtent(altitude);
