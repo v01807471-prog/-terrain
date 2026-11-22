@@ -198,7 +198,7 @@ function updateCamera():void {
 function movePlayer(dt:number):void {
  const f=frameAt(geo.latitude,geo.longitude);
  const forward=f.north.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(f.east,Math.sin(yaw)).normalize();
- const right=new THREE.Vector3().crossVectors(forward,f.up).normalize();
+ const right=new THREE.Vector3().crossVectors(f.up,forward).normalize();
  const forwardInput=(keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0);
  const sideInput=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
  const input=new THREE.Vector3().addScaledVector(forward,forwardInput).addScaledVector(right,sideInput);
