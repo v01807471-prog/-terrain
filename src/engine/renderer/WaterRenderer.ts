@@ -57,6 +57,8 @@ uniform vec3 uAmbient;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
+uniform vec4 uExclusions[16];
+uniform int uExclusionCount;
 
 __TERRAIN_HEIGHT_FUNCTION__
 
@@ -73,6 +75,14 @@ void main() {
 
   // Ключевой принцип: шейдер не рисует воду над сушей.
   if (depth <= 0.0) discard;
+  float exclusionFoam = 0.0;
+  for (int i = 0; i < 16; i++) {
+    if (i >= uExclusionCount) break;
+    vec4 hole = uExclusions[i];
+    float holeDistance = distance(p, hole.xy);
+    if (holeDistance < hole.z) discard;
+    exclusionFoam = max(exclusionFoam, 1.0 - smoothstep(hole.z, hole.z + max(hole.w, 0.01), holeDistance));
+  }
 
   float distanceToCamera = length(vWorld - cameraPosition);
   float fade = 1.0 - smoothstep(uFadeDistance * 0.2, uFadeDistance, distanceToCamera);
@@ -107,6 +117,7 @@ void main() {
   color += uSunColor * specular * 1.4 * uGlint * mix(0.35, 1.0, fade);
   float foam = (1.0 - smoothstep(0.0, max(0.01, uShoreWidth), depth))
     * (0.6 + 0.4 * noise2(p * 1.7 + vec2(t * 0.3, 0.0))) * mix(0.5, 1.0, fade);
+  foam = max(foam, exclusionFoam * fade);
   color = mix(color, vec3(0.9), clamp(foam, 0.0, 1.0) * uFoamStrength);
   float alpha = clamp(max(mix(0.3, 0.96, depthTint), fresnel * 0.8) * shore * uOpacity, 0.0, 1.0);
   color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
