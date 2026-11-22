@@ -1,4 +1,8 @@
 precision highp float;
+#include <common>
+#include <packing>
+#include <lights_pars_begin>
+#include <shadowmap_pars_fragment>
 uniform vec2 uCamera;
 uniform float uAltitude;
 in float vCut;
@@ -58,8 +62,12 @@ void main() {
   }
   float cameraShadowFade = 1.0 - smoothstep(92.0, 150.0, shadowDistance);
   float shadow = mix(1.0, terrainShadow, cameraShadowFade);
+  float threeShadow = 1.0;
+  #if NUM_DIR_LIGHT_SHADOWS > 0
+    threeShadow = getShadow(directionalShadowMap[0], directionalLightShadows[0], vDirectionalShadowCoord[0]);
+  #endif
   float daylight = 0.18 + uSunIntensity * 0.20;
-  vec3 color = base*(daylight+diffuse*uSunIntensity*0.82*shadow)*(1.0-slopeV*0.2);
+  vec3 color = base*(daylight+diffuse*uSunIntensity*0.82*shadow*threeShadow)*(1.0-slopeV*0.2);
   float distanceToCamera = length(vWorld-vec3(uCamera.x,0.0,uCamera.y));
   color = mix(color,uFogColor,smoothstep(uFogNear,uFogFar,distanceToCamera));
   terrainFragColor = vec4(color,1.0);
