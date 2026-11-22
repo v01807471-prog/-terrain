@@ -218,8 +218,8 @@ export class SphericalClipmap {
 
       const palette=[0x22d3ee,0xf59e0b,0xa78bfa,0x4ade80,0xfb7185,0xfacc15,0x60a5fa,0xe879f9];
       const gridMaterial=new THREE.ShaderMaterial({
-        uniforms:{...uniforms,uGridColor:{value:new THREE.Color(palette[i%palette.length])}},
-        vertexShader,
+        uniforms:{...this.material.uniforms,uGridColor:{value:new THREE.Color(palette[i%palette.length])}},
+        vertexShader:this.material.vertexShader,
         fragmentShader:`
           uniform vec3 uGridColor;
           void main() {
@@ -320,6 +320,7 @@ export class SphericalClipmap {
     for (const level of this.levels) {
       level.mesh.geometry.dispose();
       level.lines.geometry.dispose();
+      level.gridMaterial.dispose();
     }
     this.material.dispose();
     this.scene.remove(this.group);
