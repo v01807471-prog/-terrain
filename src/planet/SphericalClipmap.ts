@@ -256,7 +256,11 @@ export class SphericalClipmap {
           }
         `,
         transparent:true,
+        depthTest:true,
         depthWrite:false,
+        polygonOffset:true,
+        polygonOffsetFactor:-1,
+        polygonOffsetUnits:-1,
         side:THREE.DoubleSide
       });
       const lines=new THREE.LineSegments(geometry.grid,gridMaterial);
