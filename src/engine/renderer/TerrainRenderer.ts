@@ -311,7 +311,6 @@ export class TerrainRenderer {
     sharedInstances.count = totalInstances;
     const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
     for (let i = 0; i < totalInstances; i++) sharedInstances.setMatrixAt(i, hidden);
-    const halfGrid = this.gridSize / 2;
     let instanceOffset = 0;
     for (let level = 0; level < this.levels; level++) {
       const step = this.baseCellSize * 2 ** level;
