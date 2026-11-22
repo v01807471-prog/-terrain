@@ -145,7 +145,7 @@ export class PlanetViewport {
     this.camera.position.copy(this.savedCameraPosition);
     this.camera.up.copy(this.savedCameraUp);
     this.controls.target.copy(this.savedCameraTarget);
-    this.controls.minDistance=this.thirdPerson?.003:this.activeRadius+1;
+    this.controls.minDistance=this.thirdPerson ? 0.003 : this.activeRadius+1;
     this.controls.maxDistance=this.thirdPerson?150000:this.systemViewDistance;
     this.controls.update();
     this.updateDepthRange();
