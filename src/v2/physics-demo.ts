@@ -171,6 +171,7 @@ class BlueprintNodeEditor {
       const r=previewGraph(this.graph,0,0,400,40,null);
       for(const cv of this.host.querySelectorAll<HTMLCanvasElement>('.v2-gnode-preview')){
         const n=this.node(Number(cv.parentElement?.dataset.id)),s=n&&r.map.get(n.id),ctx=cv.getContext('2d')!;ctx.clearRect(0,0,80,80);
+        if(n?.type==='tex_asset'){ctx.drawImage(this.assetCanvas(String(n.p?.asset??'b_grass')),0,0,80,80);continue;}
         if(!s){ctx.fillStyle='#17242a';ctx.fillRect(0,0,80,80);continue;}
         const img=ctx.createImageData(40,40);for(let i=0;i<1600;i++){let a,b,c;if(s.c){a=s.data[i*3];b=s.data[i*3+1];c=s.data[i*3+2];}else{a=b=c=(s.data[i]-s.min)/Math.max(1e-6,s.max-s.min);}img.data[i*4]=Math.max(0,Math.min(255,a*255));img.data[i*4+1]=Math.max(0,Math.min(255,b*255));img.data[i*4+2]=Math.max(0,Math.min(255,c*255));img.data[i*4+3]=255;}const tmp=document.createElement('canvas');tmp.width=tmp.height=40;tmp.getContext('2d')!.putImageData(img,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(tmp,0,0,80,80);
       }
