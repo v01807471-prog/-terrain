@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import './game.css';
 import { DEFAULT_PLANET, terrainHeight, terrainHeightGLSL } from './planet/blueprint.js';
+import { PlanetPhysicsWorld } from './physics/PlanetPhysicsWorld.js';
 import { PLANET_RADIUS, frameAt, fromWorld, gravityAt, moveOnSurface, toWorld, type GeoPosition } from './planet/coordinates.js';
 
 const root=document.querySelector<HTMLElement>('#game-root');
@@ -10,7 +11,7 @@ root.innerHTML=`
   <div class="game-hud"><div class="brand"><span class="brand-mark">◉</span><div><b>PLANETARY WORLD</b><small>OPEN PLANET SIMULATION</small></div></div><div class="location"><span id="coordinates">0.00° N · 0.00° E</span><b id="altitude">0 m</b></div><button id="flight" class="flight">ПОЛЁТ: ВЫКЛ.</button></div>
   <div id="viewport" class="viewport"></div>
   <div class="crosshair"></div>
-  <div class="bottom-hud"><div class="status"><i></i><span id="surface-state">НА ПОВЕРХНОСТИ</span></div><div class="controls">WASD — движение <span>·</span> мышь — обзор <span>·</span> Space — прыжок / тяга <span>·</span> Shift — тормоз <span>·</span> F — режим полёта</div></div>
+  <div class="bottom-hud"><div class="status"><i></i><span id="surface-state">НА ПОВЕРХНОСТИ</span></div><div class="controls">WASD — движение <span>·</span> мышь — обзор <span>·</span> Space — прыжок / тяга <span>·</span> Shift — тормоз <span>·</span> F — полёт <span>·</span> B — создать шар <span>·</span> X — очистить</div></div>
   <div class="hint" id="hint">Кликни по миру, чтобы захватить мышь · Esc — освободить</div>
  </section>`;
 const viewport=document.querySelector<HTMLElement>('#viewport')!;
@@ -133,6 +134,20 @@ scene.add(new THREE.AmbientLight(0x7895c8,0.32));
 const playerGeometry=new THREE.CapsuleGeometry(0.42,0.9,6,12);
 const playerMaterial=new THREE.MeshStandardMaterial({color:'#e4b47b',roughness:0.8});
 const player=new THREE.Mesh(playerGeometry,playerMaterial);player.castShadow=false;scene.add(player);
+const planetPhysics=new PlanetPhysicsWorld(blueprint);
+const ballGeometry=new THREE.SphereGeometry(1,24,16);
+const ballMaterial=new THREE.MeshStandardMaterial({color:'#d5dce7',roughness:0.32,metalness:0.18});
+const ballMeshes=new Map<number,THREE.Mesh>();
+let physicsAccumulator=0;
+function spawnBall():void {
+ const f=frameAt(geo.latitude,geo.longitude);
+ const forward=f.north.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(f.east,Math.sin(yaw)).normalize();
+ const direction=worldPosition.clone().addScaledVector(forward,9).normalize();
+ const position=direction.multiplyScalar(blueprint.radius+terrainHeight(direction,blueprint)+14);
+ const body=planetPhysics.addSphere(position,1.25,1);
+ const mesh=new THREE.Mesh(ballGeometry,ballMaterial);mesh.scale.setScalar(body.radius);mesh.position.copy(body.position);scene.add(mesh);ballMeshes.set(body.id,mesh);
+}
+function clearBalls():void {for(const mesh of ballMeshes.values())scene.remove(mesh);ballMeshes.clear();planetPhysics.clear();}
 
 let geo:GeoPosition={latitude:48.2,longitude:16.37,altitude:2};
 let worldPosition=toWorld(geo);
@@ -224,6 +239,9 @@ function movePlayer(dt:number):void {
 function animate():void {
  const dt=Math.min(clock.getDelta(),0.04);
  movePlayer(dt);
+ physicsAccumulator+=dt;
+ while(physicsAccumulator>=1/120){planetPhysics.step(1/120);physicsAccumulator-=1/120;}
+ for(const [id,body] of planetPhysics.all){const mesh=ballMeshes.get(id);if(mesh)mesh.position.copy(body.position);}
  updatePlanetFrame();
  updateCamera();
  renderer.render(scene,camera);
@@ -242,6 +260,8 @@ document.addEventListener('mousemove',e=>{if(!pointerLocked)return;yaw-=e.moveme
 document.addEventListener('keydown',e=>{
  if(['Space','ShiftLeft','ShiftRight','KeyW','KeyA','KeyS','KeyD'].includes(e.code))e.preventDefault();
  if(e.code==='KeyF'&&!e.repeat){flightMode=!flightMode;velocity.set(0,0,0);onGround=false;}
+ if(e.code==='KeyB'&&!e.repeat)spawnBall();
+ if(e.code==='KeyX'&&!e.repeat)clearBalls();
  keys.add(e.code);
 });
 document.addEventListener('keyup',e=>keys.delete(e.code));
@@ -250,4 +270,4 @@ flightButton.addEventListener('click',()=>{flightMode=!flightMode;onGround=false
 document.addEventListener('pointerlockchange',()=>{if(!pointerLocked)keys.clear();});
 window.addEventListener('blur',()=>keys.clear());
 updatePlanetFrame();updateCamera();requestAnimationFrame(animate);
-window.addEventListener('beforeunload',()=>{observer.disconnect();renderer.dispose();planet.geometry.dispose();planetMaterial.dispose();patchGeometry.dispose();for(const ring of patchRings){scene.remove(ring.mesh);ring.material.dispose();}atmosphere.geometry.dispose();atmosphereMaterial.dispose();starGeometry.dispose();playerGeometry.dispose();playerMaterial.dispose();});
+window.addEventListener('beforeunload',()=>{observer.disconnect();renderer.dispose();planet.geometry.dispose();planetMaterial.dispose();ballGeometry.dispose();ballMaterial.dispose();patchGeometry.dispose();for(const ring of patchRings){scene.remove(ring.mesh);ring.material.dispose();}atmosphere.geometry.dispose();atmosphereMaterial.dispose();starGeometry.dispose();playerGeometry.dispose();playerMaterial.dispose();});
