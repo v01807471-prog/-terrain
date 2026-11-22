@@ -116,7 +116,7 @@ class BlueprintNodeEditor {
       const foot=document.createElement('footer');
       if(!t.sink){const out=document.createElement('button');out.className='v2-gdot v2-gout'+(this.pending===n.id?' active':'');out.dataset.node=String(n.id);out.textContent='●';out.onclick=()=>{this.pending=this.pending===n.id?null:n.id;this.render();};foot.append('Выход ',out);}
       if(!['out_height','out_color','out_water','out_fog'].includes(n.type)){const del=document.createElement('button');del.textContent='Удалить';del.onclick=()=>this.remove(n.id);foot.append(del);}
-      card.append(foot);card.onpointerdown=()=>{this.selected=n.id;this.info(n);};host.append(card);
+      card.append(foot);card.onpointerdown=()=>{this.selected=n.id;host.querySelectorAll('.v2-gnode').forEach(el=>el.classList.toggle('selected',Number((el as HTMLElement).dataset.id)===n.id));};host.append(card);
     }
     this.drawLinks();this.renderAssetLibrary();
     this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width='3200px';this.el('v2g-world').style.height='2000px';
