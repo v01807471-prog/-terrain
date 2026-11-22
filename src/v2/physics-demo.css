@@ -186,3 +186,7 @@ html,body.physics-v2-page,#physics-v2-root{height:100%;min-height:0;overflow:hid
 .v2g-asset-card small{font-size:9px;color:#a9eed4;margin-top:2px}
 .v2-gparam select{width:102px;min-width:0;background:#0d171c;border:1px solid #425861;color:#e4eff1;border-radius:6px;padding:5px;font-size:10px}
 @media(max-width:680px){.v2g-asset-library{display:none}}
+
+/* Пресеты и управление освещением в Blueprint workspace. */
+#v2g-preset{background:#20343d;color:#e9f4f4;border:1px solid #4a6670;border-radius:8px;padding:8px;font:inherit}
+.pv2-control input[type=range]{cursor:pointer}
