@@ -818,9 +818,9 @@ function animate(now: number): void {
   const cameraStart = performance.now();
   updateFollowCamera();
   cameraCpuMs = performance.now() - cameraStart;
-  waterRenderer.update(camera, now / 1000);
   const terrainStart = performance.now();
   const culling = terrainRenderer.update(camera);
+  waterRenderer.update(camera, now / 1000, culling.lodScale);
   terrainUpdateCpuMs = performance.now() - terrainStart;
   document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
   updateStats();
