@@ -44,7 +44,8 @@ class BlueprintNodeEditor {
   private action(a:string):void{
     if(a==='close'){this.close();return;}
     if(a==='preview'){this.host.classList.toggle('preview-expanded');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
-    if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);\n    if(a==='preset'){const preset=this.el<HTMLSelectElement>('v2g-preset').value as any;this.graph=createTerrainPresetGraph(preset,this.graph.seed);this.graph.nodes.forEach((n,i)=>{n.x=30+(i%5)*250;n.y=30+Math.floor(i/5)*250;});this.selected=null;this.render();this.applyNow();}
+    if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);
+    if(a==='preset'){const preset=this.el<HTMLSelectElement>('v2g-preset').value as any;this.graph=createTerrainPresetGraph(preset,this.graph.seed);this.graph.nodes.forEach((n,i)=>{n.x=30+(i%5)*250;n.y=30+Math.floor(i/5)*250;});this.selected=null;this.render();this.applyNow();}
     if(a==='apply')this.applyNow();
     if(a==='fit')this.fit();
     if(a==='plus')this.zoomAt(this.zoom*1.2);
@@ -251,7 +252,9 @@ root.innerHTML = `
         <button class="pv2-button primary" id="pv2-open-blueprint">Открыть визуальный редактор узлов</button>
         <p id="pv2-blueprint-status" class="pv2-note">Соединяй узлы мышью. Изменения автоматически компилируются для CPU и GPU.</p>
         <label class="pv2-toggle"><input id="pv2-water" type="checkbox" checked> Показывать процедурную воду</label>
-        <label class="pv2-toggle"><input id="pv2-water-hole" type="checkbox"> Пример сухой пещеры в центре</label>\n        <label class="pv2-toggle"><input id="pv2-day-cycle" type="checkbox" checked> Автоматическая смена дня и ночи</label>\n        <div class="pv2-control"><label for="pv2-time">Время суток <output id="pv2-time-value">12:00</output></label><input id="pv2-time" type="range" min="0" max="1" step="0.001" value="0.5"></div>
+        <label class="pv2-toggle"><input id="pv2-water-hole" type="checkbox"> Пример сухой пещеры в центре</label>
+        <label class="pv2-toggle"><input id="pv2-day-cycle" type="checkbox" checked> Автоматическая смена дня и ночи</label>
+        <div class="pv2-control"><label for="pv2-time">Время суток <output id="pv2-time-value">12:00</output></label><input id="pv2-time" type="range" min="0" max="1" step="0.001" value="0.5"></div>
         <p class="pv2-footer">Отсечение тайлов выполняется по пирамиде видимости активной камеры. Обратные грани поверхности отсекаются материалом FrontSide и проверкой gl_FrontFacing.</p>
       </section>
     </aside>
@@ -328,7 +331,31 @@ document.querySelector<HTMLInputElement>('#pv2-water-hole')!.addEventListener('c
   const enabled = (event.currentTarget as HTMLInputElement).checked;
   waterRenderer.setExclusionCircles(enabled ? [{ x: 0, z: 0, radius: 18, feather: 5 }] : []);
 });
-let dayTime = 0.5;\nlet dayCycle = true;\nconst dayNightToggle = document.querySelector<HTMLInputElement>('#pv2-day-cycle')!;\nconst dayTimeInput = document.querySelector<HTMLInputElement>('#pv2-time')!;\nconst dayTimeLabel = document.querySelector<HTMLOutputElement>('#pv2-time-value')!;\nfunction updateDayNight(delta: number): void {\n  if (dayCycle) dayTime = (dayTime + delta / 240) % 1;\n  const angle = (dayTime - 0.25) * Math.PI * 2;\n  const height = Math.sin(angle);\n  const daylight = THREE.MathUtils.smoothstep(height, -0.12, 0.28);\n  sun.position.set(Math.cos(angle) * 65, Math.max(-8, height * 65), 18);\n  sun.intensity = 0.06 + daylight * 3.0;\n  sun.color.set('#7189bd').lerp(new THREE.Color('#fff0d5'), daylight);\n  hemisphere.intensity = 0.25 + daylight * 1.55;\n  const sky = new THREE.Color('#071323').lerp(new THREE.Color(blueprint.fogColor), daylight);\n  scene.background = sky;\n  if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(sky);\n  terrainRenderer.setLighting(sun.position.clone().normalize(), sun.intensity);\n  const hours = Math.floor(dayTime * 24), minutes = Math.floor((dayTime * 24 - hours) * 60);\n  dayTimeLabel.textContent = String(hours).padStart(2,'0')+':'+String(minutes).padStart(2,'0');\n  if (document.activeElement !== dayTimeInput) dayTimeInput.value = String(dayTime);\n}\ndayNightToggle.addEventListener('change',()=>{dayCycle=dayNightToggle.checked;});\ndayTimeInput.addEventListener('input',()=>{dayTime=Number(dayTimeInput.value);updateDayNight(0);});\nconst cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
+let dayTime = 0.5;
+let dayCycle = true;
+const dayNightToggle = document.querySelector<HTMLInputElement>('#pv2-day-cycle')!;
+const dayTimeInput = document.querySelector<HTMLInputElement>('#pv2-time')!;
+const dayTimeLabel = document.querySelector<HTMLOutputElement>('#pv2-time-value')!;
+function updateDayNight(delta: number): void {
+  if (dayCycle) dayTime = (dayTime + delta / 240) % 1;
+  const angle = (dayTime - 0.25) * Math.PI * 2;
+  const height = Math.sin(angle);
+  const daylight = THREE.MathUtils.smoothstep(height, -0.12, 0.28);
+  sun.position.set(Math.cos(angle) * 65, Math.max(-8, height * 65), 18);
+  sun.intensity = 0.06 + daylight * 3.0;
+  sun.color.set('#7189bd').lerp(new THREE.Color('#fff0d5'), daylight);
+  hemisphere.intensity = 0.25 + daylight * 1.55;
+  const sky = new THREE.Color('#071323').lerp(new THREE.Color(blueprint.fogColor), daylight);
+  scene.background = sky;
+  if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(sky);
+  terrainRenderer.setLighting(sun.position.clone().normalize(), sun.intensity);
+  const hours = Math.floor(dayTime * 24), minutes = Math.floor((dayTime * 24 - hours) * 60);
+  dayTimeLabel.textContent = String(hours).padStart(2,'0')+':'+String(minutes).padStart(2,'0');
+  if (document.activeElement !== dayTimeInput) dayTimeInput.value = String(dayTime);
+}
+dayNightToggle.addEventListener('change',()=>{dayCycle=dayNightToggle.checked;});
+dayTimeInput.addEventListener('input',()=>{dayTime=Number(dayTimeInput.value);updateDayNight(0);});
+const cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
 
 const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1, terrainCellSize: LOD0_CELL_SIZE });
 const loop = new FixedStepLoop(world, 1 / 60, 10, 0.1);
@@ -643,7 +670,8 @@ function animate(now: number): void {
     document.querySelector('#pv2-fps')!.textContent = String(Math.round(fpsFrames / fpsElapsed));
     fpsFrames = 0; fpsElapsed = 0;
   }
-  updateDayNight(delta);\n  updatePlayer(delta);
+  updateDayNight(delta);
+  updatePlayer(delta);
   if (cpuSurfaceDebug.group.visible) cpuSurfaceDebug.update(player.x, player.z);
   if (!paused) {
     const result = loop.advance(delta);
