@@ -254,7 +254,7 @@ root.innerHTML = `
         <label class="pv2-toggle"><input id="pv2-water" type="checkbox" checked> Показывать процедурную воду</label>
         <label class="pv2-toggle"><input id="pv2-water-hole" type="checkbox"> Пример сухой пещеры в центре</label>
         <label class="pv2-toggle"><input id="pv2-day-cycle" type="checkbox" checked> Автоматическая смена дня и ночи</label>
-        <div class="pv2-control"><label for="pv2-time">Время суток <output id="pv2-time-value">12:00</output></label><input id="pv2-time" type="range" min="0" max="1" step="0.001" value="0.5"></div>
+        <div class="pv2-control"><label for="pv2-time">Время суток <output id="pv2-time-value">12:00</output></label><input id="pv2-time" type="range" min="0" max="1" step="0.001" value="0.36"></div>
         <p class="pv2-footer">Отсечение тайлов выполняется по пирамиде видимости активной камеры. Обратные грани поверхности отсекаются материалом FrontSide и проверкой gl_FrontFacing.</p>
       </section>
     </aside>
@@ -332,7 +332,7 @@ document.querySelector<HTMLInputElement>('#pv2-water-hole')!.addEventListener('c
   const enabled = (event.currentTarget as HTMLInputElement).checked;
   waterRenderer.setExclusionCircles(enabled ? [{ x: 0, z: 0, radius: 18, feather: 5 }] : []);
 });
-let dayTime = 0.5;
+let dayTime = 0.36;
 let dayCycle = true;
 const dayNightToggle = document.querySelector<HTMLInputElement>('#pv2-day-cycle')!;
 const dayTimeInput = document.querySelector<HTMLInputElement>('#pv2-time')!;
