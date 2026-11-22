@@ -120,6 +120,7 @@ export class PlanetViewport {
   }
 
   enterFlatClipmapTest(worldOffset:number){
+    if(this.player.isActive){this.player.detach();this.thirdPerson=false;}
     if(!this.flatTestActive){
       this.savedCameraPosition.copy(this.camera.position);
       this.savedCameraTarget.copy(this.controls.target);
@@ -377,6 +378,7 @@ export class PlanetViewport {
         : this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.activeCenter)-this.activeRadius),
       testMode:this.flatTestActive,
       testOffset:this.flatTestActive?this.flatTestGroup.position.x:0,
+      surfaceMode:this.player.isActive,
       rings:this.settings.rings,
       lod:this.activeClipmap.lod,
       levels:this.activeClipmap.activeLevels,
