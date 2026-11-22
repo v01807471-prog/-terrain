@@ -61,7 +61,8 @@ export function compileTerrainGraph(graph: TerrainGraph): TerrainBlueprint {
   return {
     heightAt: compiled.js,
     heightFunctionGLSL,
-    fragmentGraphGLSL: compiled.glColor,
+    fragmentGraphGLSL: compiled.glColor.replaceAll('texture2D(', 'texture('),
+    textureAssets: compiled.assets,
     terrainColor: '#668b55',
     fogColor,
     fogNear,
