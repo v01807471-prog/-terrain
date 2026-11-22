@@ -152,8 +152,20 @@ export class TerrainRenderer {
     this.uniforms.uCamera.value.set(cx, cz);
     this.uniforms.uAltitude.value = altitude;
 
-    // Create only a few tiles per frame. Queue order is LOD-first, then nearest-to-camera.
-    // This makes the central terrain appear first and spreads GPU program compilation over frames.
+    // Re-prioritize unfinished tiles around the camera every frame: inner LOD first,
+    // then nearest tile centers. This keeps the visible center responsive while moving.
+    this.creationQueue.sort((a, b) => {
+      if (a.ringIndex !== b.ringIndex) return a.ringIndex - b.ringIndex;
+      const ra = this.rings[a.ringIndex], rb = this.rings[b.ringIndex];
+      const sa = 2 * ra.step, sb = 2 * rb.step;
+      const ax = cx - Math.round(cx / sa) * sa, az = cz - Math.round(cz / sa) * sa;
+      const bx = cx - Math.round(cx / sb) * sb, bz = cz - Math.round(cz / sb) * sb;
+      const ta = ra.tiles[a.tileIndex], tb = rb.tiles[b.tileIndex];
+      const da = Math.hypot((ta.ox + this.tileSize / 2) * ra.step - ax, (ta.oz + this.tileSize / 2) * ra.step - az);
+      const db = Math.hypot((tb.ox + this.tileSize / 2) * rb.step - bx, (tb.oz + this.tileSize / 2) * rb.step - bz);
+      return da - db;
+    });
+    // Create only a few tiles per frame; never build the full clipmap in one blocking burst.
     for (let i = 0; i < 4 && this.creationQueue.length > 0; i++) {
       const item = this.creationQueue.shift()!;
       const ring = this.rings[item.ringIndex];
