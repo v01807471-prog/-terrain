@@ -16,7 +16,9 @@ export function runPlanetSelfTests():{passed:string[]} {
 
  const moved=moveOnSurface({latitude:0,longitude:0,altitude:10},1000,0);
  if(!(moved.longitude>0)||Math.abs(moved.latitude)>1e-8)throw new Error('Great-circle east movement failed');
- passed.push('Перемещение по поверхности корректно меняет долготу вдоль большой окружности');
+ const movedNorth=moveOnSurface({latitude:0,longitude:0,altitude:10},0,1000);
+ if(!(movedNorth.latitude>0))throw new Error('Geodetic north points south');
+ passed.push('Перемещение по поверхности корректно меняет широту и долготу вдоль большой окружности');
 
  const gravity=gravityAt(new THREE.Vector3(PLANET_RADIUS+1000,0,0),DEFAULT_PLANET.gravity);
  if(!(gravity.x<0)||Math.abs(gravity.y)>1e-8||Math.abs(gravity.z)>1e-8)throw new Error('Gravity is not radial');
