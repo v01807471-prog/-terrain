@@ -72,8 +72,8 @@ root.innerHTML = `
       </section>
       <section class="pv2-panel">
         <h2>Blueprint рельефа</h2>
-        <p class="pv2-note">V2 теперь получает высоту и цвет из узлового Blueprint-компилятора V1. Один граф компилируется в CPU-функцию для Terrain/физики и GLSL для GPU. В демо подключён граф холмов с шумом, арифметическими узлами, маской уклона и смешиванием цветов.</p>
-        <p class="pv2-note">Выходы воды и тумана также читаются компилятором; отдельный рендер воды и перенос пользовательских текстурных ассетов в V2 ещё не подключены.</p>
+        <p class="pv2-note">Визуальный граф V2: создавай узлы, соединяй входы и выходы, меняй параметры и сразу смотри результат в игре. Граф компилируется для CPU-физики и GPU-шейдера.</p>
+        <p class="pv2-note">Узлы высоты, цвета, океана и тумана доступны в одной схеме. Импорт и экспорт графов поддерживаются.</p>
         <button class="pv2-button primary" id="pv2-open-blueprint">Открыть визуальный редактор узлов</button>
         <p id="pv2-blueprint-status" class="pv2-note">Соединяй узлы мышью. Изменения автоматически компилируются для CPU и GPU.</p>
         <label class="pv2-toggle"><input id="pv2-water" type="checkbox" checked> Показывать процедурную воду</label>
@@ -134,7 +134,7 @@ const waterRenderer = new WaterRenderer(scene, { seaLevel: -6, extent: 8192 });
 waterRenderer.applyBlueprint(blueprint.water);
 const blueprintStatus = document.querySelector<HTMLParagraphElement>('#pv2-blueprint-status')!;
 const graphEditorHost = document.querySelector<HTMLDivElement>('#pv2-blueprint-editor')!;
-const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (nextGraph) => {
+new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (nextGraph) => {
   const nextBlueprint = compileTerrainGraph(nextGraph);
   terrain.setBaseHeight(nextBlueprint.heightAt);
   terrainRenderer.setBlueprint(nextBlueprint);
@@ -503,7 +503,7 @@ class BlueprintNodeEditor {
   private host: HTMLElement; private apply: (g: ReturnType<typeof createDefaultTerrainGraph>) => void;
   private zoom=1; private selected:number|null=null; private pending:number|null=null; private timer=0;
   constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void){
-    this.host=host;this.graph=structuredClone(graph);this.apply=apply;this.shell();this.render();
+    this.host=host;this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
   }
   private el<T extends HTMLElement=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
   private node(id:number):any{return this.graph.nodes.find(n=>n.id===id);}
@@ -587,7 +587,7 @@ class BlueprintNodeEditor {
       card.append(foot);card.onpointerdown=()=>{this.selected=n.id;this.info(n);};host.append(card);
     }
     this.drawLinks();this.info(this.selected===null?null:this.node(this.selected));
-    this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width=3200*this.zoom+'px';this.el('v2g-world').style.height=2000*this.zoom+'px';
+    this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width='3200px';this.el('v2g-world').style.height='2000px';
     this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';this.preview();
   }
   private info(n:any):void{
@@ -618,7 +618,7 @@ class BlueprintNodeEditor {
   }
   private zoomAt(z:number,x?:number,y?:number):void{
     const sc=this.el('v2g-scroll'),fx=x??sc.clientWidth/2,fy=y??sc.clientHeight/2,cx=(sc.scrollLeft+fx)/this.zoom,cy=(sc.scrollTop+fy)/this.zoom;
-    this.zoom=Math.max(.35,Math.min(1.6,z));this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width=3200*this.zoom+'px';this.el('v2g-world').style.height=2000*this.zoom+'px';this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';sc.scrollLeft=cx*this.zoom-fx;sc.scrollTop=cy*this.zoom-fy;this.drawLinks();
+    this.zoom=Math.max(.35,Math.min(1.6,z));this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width='3200px';this.el('v2g-world').style.height='2000px';this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';sc.scrollLeft=cx*this.zoom-fx;sc.scrollTop=cy*this.zoom-fy;this.drawLinks();
   }
   private fit():void{
     const sc=this.el('v2g-scroll'),xs=this.graph.nodes.map(n=>n.x||0),ys=this.graph.nodes.map(n=>n.y||0),x0=Math.min(...xs),y0=Math.min(...ys),x1=Math.max(...xs)+240,y1=Math.max(...ys)+340;
