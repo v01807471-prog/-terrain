@@ -342,7 +342,7 @@ export class PlanetViewport {
     this.controls.zoomSpeed=Math.max(.1,Math.min(3,this.settings.zoomSpeed));
     if(!this.thirdPerson){
       this.controls.minDistance=this.activeRadius+1;
-      this.controls.maxDistance=this.activeRadius+250000;
+      this.controls.maxDistance=this.systemViewDistance;
     }
     if(typeof patch.showGrid==='boolean'){
       this.clipmap.setGridVisible(patch.showGrid);
