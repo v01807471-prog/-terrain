@@ -19,7 +19,7 @@ npm run dev
 
 ## Seam handling
 
-- Adjacent level origins are snapped to compatible sample lattices.
+- All levels derive their origins from one shared camera-following anchor, snapped once at the finest-level interval. Levels are never snapped independently, so a coarse ring's inner boundary cannot drift away from the fine ring's outer boundary.
 - Odd vertices along a fine level's outer boundary collapse onto the matching coarser boundary samples. This removes boundary T-junctions instead of merely hiding them with material.
 - An eight-cell transition band geo-morphs fine-level heights toward the coarser level's interpolated surface. At the shared boundary, both levels evaluate to the same coarse edge profile.
 - Coarser ring inner boundaries line up with the finer ring outer boundaries.
