@@ -6,6 +6,9 @@ const CHECKER_TILE_WORLD_SIZE = 4;
 const CHECKER_REPEAT_WORLD_SIZE = CHECKER_TILE_WORLD_SIZE * 8;
 const MORPH_BAND_CELLS = 8;
 
+// Distinct tints make the resolution bands visible without drawing wireframe.
+const LEVEL_COLORS = [0xffffff, 0xc8e8ff, 0xbde7cf, 0xf2e6a6, 0xf0c39a, 0xe8a6a6, 0xc5b2eb];
+
 function terrainHeight(x: number, z: number): number {
   const broad = Math.sin(x * 0.018) * Math.cos(z * 0.021) * 5.5;
   const detail = Math.sin(x * 0.071 + z * 0.035) * Math.cos(z * 0.063) * 1.4;
@@ -44,13 +47,13 @@ export class ThreeClipmap {
   readonly core: Clipmap;
 
   private readonly levelGroups: THREE.Group[] = [];
-  private readonly surfaceMaterial: THREE.MeshStandardMaterial;
-  private readonly gridMaterial: THREE.MeshBasicMaterial;
+  private readonly surfaceMaterials: THREE.MeshStandardMaterial[] = [];
+  private readonly checkerTexture: THREE.CanvasTexture;
   private lastOrigins: string[] = [];
 
   constructor(config: Partial<ClipmapConfig> = {}, material?: THREE.Material) {
     this.core = new Clipmap(config);
-    this.surfaceMaterial = material instanceof THREE.MeshStandardMaterial
+    const baseMaterial = material instanceof THREE.MeshStandardMaterial
       ? material
       : new THREE.MeshStandardMaterial({
           map: this.createCheckerTexture(),
@@ -58,23 +61,22 @@ export class ThreeClipmap {
           roughness: 0.96,
           metalness: 0
         });
-    this.gridMaterial = new THREE.MeshBasicMaterial({
-      color: 0x182b38,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.58,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -1
-    });
+    this.checkerTexture = baseMaterial.map instanceof THREE.CanvasTexture
+      ? baseMaterial.map
+      : this.createCheckerTexture();
 
     const initial = this.core.refresh();
     for (const level of initial.levels) {
       const levelGroup = new THREE.Group();
       levelGroup.userData.clipmapLevel = level.index;
       this.levelGroups.push(levelGroup);
+      const levelMaterial = baseMaterial.clone();
+      levelMaterial.map = baseMaterial.map ?? this.checkerTexture;
+      levelMaterial.color.setHex(LEVEL_COLORS[level.index % LEVEL_COLORS.length]);
+      this.surfaceMaterials.push(levelMaterial);
       this.group.add(levelGroup);
     }
+    if (material === undefined) baseMaterial.dispose();
     this.apply(initial);
   }
 
@@ -96,9 +98,9 @@ export class ThreeClipmap {
       this.group.remove(levelGroup);
     }
     this.levelGroups.length = 0;
-    this.surfaceMaterial.map?.dispose();
-    this.surfaceMaterial.dispose();
-    this.gridMaterial.dispose();
+    for (const material of this.surfaceMaterials) material.dispose();
+    this.surfaceMaterials.length = 0;
+    this.checkerTexture.dispose();
   }
 
   private apply(state: ClipmapUpdate): void {
@@ -129,15 +131,10 @@ export class ThreeClipmap {
     levelGroup.clear();
 
     const geometry = this.createRingGeometry(level, coarser);
-    const surface = new THREE.Mesh(geometry, this.surfaceMaterial);
+    const surface = new THREE.Mesh(geometry, this.surfaceMaterials[level.index]);
     surface.receiveShadow = true;
     surface.frustumCulled = false;
     levelGroup.add(surface);
-
-    const grid = new THREE.Mesh(geometry, this.gridMaterial);
-    grid.frustumCulled = false;
-    grid.renderOrder = 2;
-    levelGroup.add(grid);
   }
 
   private createRingGeometry(
