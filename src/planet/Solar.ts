@@ -13,18 +13,18 @@ export class Solar extends THREE.Group {
   readonly moon=new THREE.Group();
   readonly bodies:Array<{name:string;node:THREE.Object3D;radius:number}>;
 
-  readonly earthOrbitRadius=30000;
-  // Deliberately compressed for a readable demo; not to scale with real lunar distance.
-  readonly moonOrbitRadius=16000;
-  readonly earthOrbitSpeed=0.00005;
-  readonly moonOrbitSpeed=0.00012;
+  // Scene units are kilometres: mean astronomical distances and orbital periods.
+  readonly earthOrbitRadius=149597870.7;
+  readonly moonOrbitRadius=384400;
+  readonly earthOrbitSpeed=1.991e-7;
+  readonly moonOrbitSpeed=2.662e-6;
 
   constructor(){
     super();
     this.name='Solar';
 
     this.sun=new THREE.Mesh(
-      new THREE.SphereGeometry(3500,48,32),
+      new THREE.SphereGeometry(696340,64,48),
       new THREE.MeshBasicMaterial({color:0xffc45c})
     );
     this.sun.name='Sun';
@@ -50,7 +50,7 @@ export class Solar extends THREE.Group {
     this.moonOrbit.add(this.moon);
 
     this.bodies=[
-      {name:'Sun',node:this.sun,radius:3500},
+      {name:'Sun',node:this.sun,radius:696340},
       {name:'Earth',node:this.earth,radius:6371},
       {name:'Moon',node:this.moon,radius:1737}
     ];
