@@ -4,12 +4,21 @@ import { ResizeManager } from './ResizeManager';
 import { SphericalClipmap } from '../planet/SphericalClipmap';
 import { terrainBlueprint } from '../planet/TerrainBlueprint';
 
+type PlanetRenderEntry = {
+  name:string;
+  center:THREE.Vector3;
+  radius:number;
+  clipmap:SphericalClipmap;
+  shouldRender:(camera:THREE.PerspectiveCamera,frustum:THREE.Frustum,others:PlanetRenderEntry[])=>boolean;
+};
+
 export class PlanetViewport {
   readonly renderer:THREE.WebGLRenderer;
   readonly scene=new THREE.Scene();
   readonly camera=new THREE.PerspectiveCamera(48,1,.00005,120000);
   readonly clipmap:SphericalClipmap;
   readonly moonClipmap:SphericalClipmap;
+  readonly planets:PlanetRenderEntry[]=[];
   private controls:OrbitControls;
   private resize:ResizeManager;
   private radius=6371;
@@ -99,6 +108,10 @@ export class PlanetViewport {
     this.moonOrbitPath.frustumCulled=false;
     this.scene.add(this.moonOrbitPath);
     this.updateMoonPosition();
+    this.planets.push(
+      this.createPlanetRenderEntry('Earth',this.planetCenter,this.radius,this.clipmap),
+      this.createPlanetRenderEntry('Moon',this.moonCenter,this.moonRadius,this.moonClipmap)
+    );
     this.createAvatar();
 
     this.camera.position.copy(this.planetCenter).add(new THREE.Vector3(this.radius+8629,0,0));
@@ -135,6 +148,46 @@ export class PlanetViewport {
     return this.focusedMoon
       ?terrainBlueprint.heightKm(direction,this.moonTerrainSettings,0)
       :this.terrainHeightKm(direction);
+  }
+
+
+  private createPlanetRenderEntry(name:string,center:THREE.Vector3,radius:number,clipmap:SphericalClipmap):PlanetRenderEntry{
+    const entry:PlanetRenderEntry = {
+      name,center,radius,clipmap,
+      shouldRender:(camera,frustum,others)=>{
+        const bound=new THREE.Sphere(center,radius+clipmap.settings.amplitude);
+        if(!frustum.intersectsSphere(bound))return false;
+        const toTarget=center.clone().sub(camera.position);
+        const targetDistance=toTarget.length();
+        if(targetDistance<=radius)return true;
+        const rayDirection=toTarget.multiplyScalar(1/targetDistance);
+        for(const other of others){
+          if(other===entry)continue;
+          const toOccluder=other.center.clone().sub(camera.position);
+          const occluderRadius=other.radius+other.clipmap.settings.amplitude;
+          if(toOccluder.length()<occluderRadius*1.02)continue;
+          const along=toOccluder.dot(rayDirection);
+          if(along<=0||along>=targetDistance-radius)continue;
+          const closest=toOccluder.addScaledVector(rayDirection,-along).length();
+          if(closest<occluderRadius)return false;
+        }
+        return true;
+      }
+    };
+    return entry;
+  }
+
+  private updatePlanetRenderPass(time:number){
+    this.camera.updateMatrixWorld();
+    const viewProjection=new THREE.Matrix4().multiplyMatrices(
+      this.camera.projectionMatrix,this.camera.matrixWorldInverse
+    );
+    const frustum=new THREE.Frustum().setFromProjectionMatrix(viewProjection);
+    for(const planet of this.planets){
+      const visible=planet.shouldRender(this.camera,frustum,this.planets);
+      planet.clipmap.group.visible=visible;
+      if(visible)planet.clipmap.update(this.camera,time,planet.center);
+    }
   }
 
   private updateMoonPosition(){
@@ -322,8 +375,7 @@ export class PlanetViewport {
         }
       }
       this.updateDepthRange();
-      this.clipmap.update(this.camera,t,this.planetCenter);
-      this.moonClipmap.update(this.camera,t,this.moonCenter);
+      this.updatePlanetRenderPass(t);
       this.renderer.render(this.scene,this.camera);
     };
     tick();
