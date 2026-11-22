@@ -32,7 +32,7 @@ export class TerrainRenderer {
     centerX: number;
     centerZ: number;
     instances: THREE.InstancedMesh;
-    tiles: Array<{ ready: boolean; visible: boolean; wire: THREE.LineSegments | null; ox: number; oz: number }>;
+    tiles: Array<{ ready: boolean; visible: boolean; dirty: boolean; wire: THREE.LineSegments | null; ox: number; oz: number }>;
     material: THREE.ShaderMaterial;
     wireMaterial: THREE.ShaderMaterial;
   }> = [];
@@ -175,12 +175,7 @@ export class TerrainRenderer {
       const ring = this.rings[item.ringIndex];
       const tile = ring.tiles[item.tileIndex];
       tile.ready = true;
-      this.instanceTransform.position.set(ring.centerX + tile.ox * ring.step, 0, ring.centerZ + tile.oz * ring.step);
-      this.instanceTransform.rotation.set(0, 0, 0);
-      this.instanceTransform.scale.set(ring.step, 1, ring.step);
-      this.instanceTransform.updateMatrix();
-      ring.instances.setMatrixAt(item.tileIndex, this.instanceTransform.matrix);
-      ring.instances.instanceMatrix.needsUpdate = true;
+      tile.dirty = true;
       if (this.showWireframe) this.createWireForTile(ring, tile, item.tileIndex);
     }
     let visibleTiles = 0;
@@ -190,8 +185,10 @@ export class TerrainRenderer {
       const centerX = Math.round(cx / snap) * snap;
       const centerZ = Math.round(cz / snap) * snap;
       const last = level === this.rings.length - 1;
+      const centerChanged = ring.centerX !== centerX || ring.centerZ !== centerZ;
       ring.centerX = centerX;
       ring.centerZ = centerZ;
+      let instanceBufferChanged = false;
       for (let tileIndex = 0; tileIndex < ring.tiles.length; tileIndex++) {
         const tile = ring.tiles[tileIndex];
         if (!tile.ready) continue;
@@ -213,20 +210,20 @@ export class TerrainRenderer {
         const inCameraFrustum = this.frustum.intersectsBox(this.tileBounds);
         const inRing = maxDistance >= ring.cut && (last || minDistance < ring.outer);
         const visible = inCameraFrustum && inRing;
+        if (tile.dirty || centerChanged || visible !== tile.visible) {
+          this.instanceTransform.position.set(centerX + tile.ox * ring.step, 0, centerZ + tile.oz * ring.step);
+          this.instanceTransform.rotation.set(0, 0, 0);
+          this.instanceTransform.scale.set(visible ? ring.step : 0, visible ? 1 : 0, visible ? ring.step : 0);
+          this.instanceTransform.updateMatrix();
+          ring.instances.setMatrixAt(tileIndex, this.instanceTransform.matrix);
+          tile.dirty = false;
+          instanceBufferChanged = true;
+        }
         tile.visible = visible;
-        this.instanceTransform.position.set(
-          centerX + tile.ox * ring.step,
-          0,
-          centerZ + tile.oz * ring.step
-        );
-        this.instanceTransform.rotation.set(0, 0, 0);
-        this.instanceTransform.scale.set(visible ? ring.step : 0, visible ? 1 : 0, visible ? ring.step : 0);
-        this.instanceTransform.updateMatrix();
-        ring.instances.setMatrixAt(tileIndex, this.instanceTransform.matrix);
         if (tile.wire) tile.wire.visible = visible && this.showWireframe;
         if (visible) visibleTiles++;
       }
-      ring.instances.instanceMatrix.needsUpdate = true;
+      if (instanceBufferChanged) ring.instances.instanceMatrix.needsUpdate = true;
     }
     return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.ready).length, 0), queuedTiles: this.creationQueue.length, altitude };
   }
@@ -319,7 +316,7 @@ export class TerrainRenderer {
       for (let i = 0; i < this.tilesPerSide ** 2; i++) {
         const tx = i % this.tilesPerSide, tz = Math.floor(i / this.tilesPerSide);
         const ox = tx * this.tileSize - halfGrid, oz = tz * this.tileSize - halfGrid;
-        tiles.push({ ready: false, visible: false, wire: null, ox, oz });
+        tiles.push({ ready: false, visible: false, dirty: true, wire: null, ox, oz });
       }
       const instances = new THREE.InstancedMesh(this.geometries[0], material, tiles.length);
       instances.frustumCulled = false;
