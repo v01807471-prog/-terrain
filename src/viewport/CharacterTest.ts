@@ -122,10 +122,11 @@ export class CharacterTest {
 
   private tryStartRetargetedAnimation() {
     if (!this.mixer || !this.targetMesh || !this.sourceScene || this.sourceClips.length === 0) return;
-    let sourceMesh: THREE.SkinnedMesh | null = null;
+    const sourceMeshes: THREE.SkinnedMesh[] = [];
     this.sourceScene.traverse((object) => {
-      if (!sourceMesh && object instanceof THREE.SkinnedMesh) sourceMesh = object;
+      if (object instanceof THREE.SkinnedMesh) sourceMeshes.push(object);
     });
+    const sourceMesh = sourceMeshes[0];
     if (!sourceMesh) {
       this.status.textContent = 'UAL1 загружен, но в GLB не найден SkinnedMesh';
       return;
