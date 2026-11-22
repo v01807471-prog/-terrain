@@ -225,7 +225,7 @@ export class TerrainRenderer {
       ring.wireMaterial.dispose();
     }
     for (const geometry of this.geometries) geometry.dispose();
-    for (const geometry of this.wireGeometries) geometry.dispose();
+    for (const geometry of this.wireGeometries) geometry?.dispose();
     this.scene.remove(this.group);
     this.rings.length = 0;
     this.geometries.length = 0;
@@ -238,7 +238,13 @@ export class TerrainRenderer {
     tileIndex: number
   ): void {
     if (tile.wire) return;
-    const wire = new THREE.LineSegments(this.wireGeometries[tileIndex], ring.wireMaterial);
+    let wireGeometry = this.wireGeometries[tileIndex];
+    if (!wireGeometry) {
+      const tx = tileIndex % this.tilesPerSide, tz = Math.floor(tileIndex / this.tilesPerSide);
+      wireGeometry = this.createTileWireGeometry(tx, tz);
+      this.wireGeometries[tileIndex] = wireGeometry;
+    }
+    const wire = new THREE.LineSegments(wireGeometry, ring.wireMaterial);
     wire.scale.set(ring.step, 1, ring.step);
     wire.frustumCulled = false;
     wire.position.copy(tile.mesh?.position ?? new THREE.Vector3());
@@ -256,7 +262,7 @@ export class TerrainRenderer {
     for (let tz = 0; tz < this.tilesPerSide; tz++) {
       for (let tx = 0; tx < this.tilesPerSide; tx++) {
         this.geometries.push(this.createTileGeometry(tx, tz));
-        this.wireGeometries.push(this.createTileWireGeometry(tx, tz));
+        // Diagnostic wire geometry is generated only if the user enables the wire overlay.
       }
     }
     const halfGrid = this.gridSize / 2;
