@@ -9,6 +9,7 @@ export class PlanetViewport {
   readonly scene=new THREE.Scene();
   readonly camera=new THREE.PerspectiveCamera(48,1,.00005,120000);
   readonly clipmap:SphericalClipmap;
+  readonly moonClipmap:SphericalClipmap;
   private controls:OrbitControls;
   private resize:ResizeManager;
   private radius=6371;
@@ -19,6 +20,13 @@ export class PlanetViewport {
   private avatar=new THREE.Group();
   // World-space center of the Earth. The Sun remains fixed at the origin.
   private planetCenter=new THREE.Vector3(30000,0,0);
+  private moonCenter=new THREE.Vector3(0,0,0);
+  private moonRadius=1737;
+  private moonOrbitRadius=38440;
+  private moonOrbitAngle=0;
+  private moonOrbitSpeed=0.00012;
+  private focusedMoon=false;
+  private moonOrbitPath:THREE.LineLoop;
   private orbitAngle=0;
   private orbitRadius=30000;
   private orbitAngularSpeed=0.00005;
@@ -70,21 +78,41 @@ export class PlanetViewport {
     this.scene.add(this.orbitPath);
 
     this.clipmap=new SphericalClipmap(this.scene,this.settings);
+    this.moonClipmap=new SphericalClipmap(this.scene,{
+      rings:17,baseSegments:24,ringGrowth:1.22,radius:this.moonRadius,
+      amplitude:950,frequency:7.4
+    });
+    const moonOrbitPoints:THREE.Vector3[]=[];
+    for(let i=0;i<256;i++){
+      const a=i/256*Math.PI*2;
+      moonOrbitPoints.push(new THREE.Vector3(
+        Math.cos(a)*this.moonOrbitRadius,
+        Math.sin(a)*this.moonOrbitRadius*.089,
+        Math.sin(a)*this.moonOrbitRadius*.996
+      ));
+    }
+    this.moonOrbitPath=new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(moonOrbitPoints),
+      new THREE.LineBasicMaterial({color:0x9aa8b8,transparent:true,opacity:.48,depthWrite:false})
+    );
+    this.moonOrbitPath.frustumCulled=false;
+    this.scene.add(this.moonOrbitPath);
+    this.updateMoonPosition();
     this.createAvatar();
 
     this.camera.position.copy(this.planetCenter).add(new THREE.Vector3(this.radius+8629,0,0));
     this.camera.up.set(0,1,0);
     this.camera.lookAt(this.planetCenter);
     this.controls=new OrbitControls(this.camera,this.canvas);
-    this.controls.target.copy(this.planetCenter);
+    this.controls.target.copy(this.activeCenter);
     this.controls.enableRotate=true;
     this.controls.enablePan=false;
     this.controls.enableZoom=true;
     this.controls.enableDamping=false;
     this.controls.rotateSpeed=0.65;
     this.controls.zoomSpeed=this.settings.zoomSpeed;
-    this.controls.minDistance=this.radius+1;
-    this.controls.maxDistance=this.radius+250000;
+    this.controls.minDistance=this.activeRadius+1;
+    this.controls.maxDistance=this.activeRadius+250000;
     // OrbitControls has no setGizmosVisible method; gizmo visibility is not
     // part of its API. Keep the standard controls without this unsupported call.
     this.controls.update();
@@ -96,6 +124,55 @@ export class PlanetViewport {
       this.renderer.setPixelRatio(dpr);
       this.renderer.setSize(w,h,false);
     });
+  }
+
+  private get activeCenter(){return this.focusedMoon?this.moonCenter:this.planetCenter;}
+  private get activeRadius(){return this.focusedMoon?this.moonRadius:this.radius;}
+  private get activeClipmap(){return this.focusedMoon?this.moonClipmap:this.clipmap;}
+  private get activeGravity(){return this.focusedMoon?1.62:9.81;}
+
+  private updateMoonPosition(){
+    this.moonCenter.set(
+      this.planetCenter.x+Math.cos(this.moonOrbitAngle)*this.moonOrbitRadius,
+      this.planetCenter.y+Math.sin(this.moonOrbitAngle)*this.moonOrbitRadius*.089,
+      this.planetCenter.z+Math.sin(this.moonOrbitAngle)*this.moonOrbitRadius*.996
+    );
+    this.moonOrbitPath.position.copy(this.planetCenter);
+  }
+
+  focusMoon(){
+    if(this.focusedMoon)return;
+    const shift=this.moonCenter.clone().sub(this.planetCenter);
+    this.camera.position.add(shift);
+    this.controls.target.add(shift);
+    this.focusedMoon=true;
+    this.thirdPerson=false;
+    this.avatar.visible=false;
+    this.camera.up.set(0,1,0);
+    this.controls.minDistance=this.moonRadius+1;
+    this.controls.maxDistance=250000;
+    this.controls.update();
+    this.updateDepthRange();
+  }
+
+  focusEarth(){
+    if(!this.focusedMoon)return;
+    const shift=this.planetCenter.clone().sub(this.moonCenter);
+    this.camera.position.add(shift);
+    this.controls.target.add(shift);
+    this.focusedMoon=false;
+    this.thirdPerson=false;
+    this.avatar.visible=false;
+    this.camera.up.set(0,1,0);
+    this.controls.minDistance=this.radius+1;
+    this.controls.maxDistance=this.radius+250000;
+    this.controls.update();
+    this.updateDepthRange();
+  }
+
+  getGravityInfo(){
+    return {body:this.focusedMoon?'Moon':'Earth',surfaceGravity:this.activeGravity,
+      escapeVelocity:this.focusedMoon?2.38:11.2};
   }
 
   private terrainHeightKm(direction:THREE.Vector3){
@@ -131,16 +208,16 @@ export class PlanetViewport {
 
   private updateCameraMode(){
     if(!this.thirdPerson){
-      const altitude=this.camera.position.distanceTo(this.planetCenter)-this.radius;
+      const altitude=this.camera.position.distanceTo(this.activeCenter)-this.activeRadius;
       if(altitude>80) return;
 
       // Re-anchor the orbit target to the local ground without moving the camera.
-      const radial=this.camera.position.clone().sub(this.planetCenter).normalize();
+      const radial=this.camera.position.clone().sub(this.activeCenter).normalize();
       const worldNorth=new THREE.Vector3(0,1,0);
       const reference=Math.abs(radial.dot(worldNorth))>.995 ? new THREE.Vector3(0,0,1) : worldNorth;
       const north=new THREE.Vector3().crossVectors(radial,new THREE.Vector3().crossVectors(reference,radial)).normalize();
-      const terrainRadius=this.radius+this.terrainHeightKm(radial);
-      const surface=this.planetCenter.clone().addScaledVector(radial,terrainRadius);
+      const terrainRadius=this.activeRadius+(this.focusedMoon?0:this.terrainHeightKm(radial));
+      const surface=this.activeCenter.clone().addScaledVector(radial,terrainRadius);
 
       // The avatar's origin is at its feet; local up is the planet radial.
       this.avatar.position.copy(surface).addScaledVector(radial,-.000325);
@@ -192,6 +269,7 @@ export class PlanetViewport {
       // Move Earth around the fixed Sun and translate the camera rig by the
       // exact same world-space delta, preserving the current view and zoom.
       const previousCenter=this.planetCenter.clone();
+      const previousMoon=this.moonCenter.clone();
       this.orbitAngle+=this.orbitAngularSpeed*deltaTime;
       this.planetCenter.set(
         Math.cos(this.orbitAngle)*this.orbitRadius,
@@ -199,9 +277,13 @@ export class PlanetViewport {
         Math.sin(this.orbitAngle)*this.orbitRadius
       );
       const orbitDelta=this.planetCenter.clone().sub(previousCenter);
-      this.camera.position.add(orbitDelta);
-      this.controls.target.add(orbitDelta);
-      if(this.avatar.visible) this.avatar.position.add(orbitDelta);
+      this.moonOrbitAngle+=this.moonOrbitSpeed*deltaTime;
+      this.updateMoonPosition();
+      const moonDelta=this.moonCenter.clone().sub(previousMoon);
+      const activeDelta=this.focusedMoon?moonDelta:orbitDelta;
+      this.camera.position.add(activeDelta);
+      this.controls.target.add(activeDelta);
+      if(this.avatar.visible) this.avatar.position.add(activeDelta);
       this.updateCameraMode();
       if(this.settings.autoRotate && !this.thirdPerson){
         const offset=this.camera.position.clone().sub(this.controls.target);
@@ -213,18 +295,18 @@ export class PlanetViewport {
       if (this.thirdPerson) {
         // Keep local gravity aligned with the avatar's radial surface normal.
         // OrbitControls uses camera.up to constrain rotation, preventing roll.
-        const localUp=this.avatar.position.clone().sub(this.planetCenter).normalize();
+        const localUp=this.avatar.position.clone().sub(this.activeCenter).normalize();
         this.camera.up.copy(localUp);
         // Prevent the local camera from passing below the displaced ground.
-        const cameraOffset=this.camera.position.clone().sub(this.planetCenter);
+        const cameraOffset=this.camera.position.clone().sub(this.activeCenter);
         const cameraRadial=cameraOffset.clone().normalize();
-        const groundRadius=this.radius+this.terrainHeightKm(cameraRadial);
+        const groundRadius=this.activeRadius+(this.focusedMoon?0:this.terrainHeightKm(cameraRadial));
         const minCameraRadius=groundRadius+.0018;
         if (cameraOffset.length()<minCameraRadius) {
-          this.camera.position.copy(this.planetCenter).addScaledVector(cameraRadial,minCameraRadius);
+          this.camera.position.copy(this.activeCenter).addScaledVector(cameraRadial,minCameraRadius);
         }
 
-        const up=this.avatar.position.clone().sub(this.planetCenter).normalize();
+        const up=this.avatar.position.clone().sub(this.activeCenter).normalize();
         const forward=this.controls.target.clone().sub(this.camera.position);
         forward.addScaledVector(up,-forward.dot(up)).normalize();
         if (forward.lengthSq()>1e-8) {
@@ -235,6 +317,7 @@ export class PlanetViewport {
       }
       this.updateDepthRange();
       this.clipmap.update(this.camera,t,this.planetCenter);
+      this.moonClipmap.update(this.camera,t,this.moonCenter);
       this.renderer.render(this.scene,this.camera);
     };
     tick();
@@ -242,7 +325,7 @@ export class PlanetViewport {
 
   getTelemetry(){
     return{
-      altitude:this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.planetCenter)-this.radius),
+      altitude:this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.activeCenter)-this.activeRadius),
       rings:this.settings.rings,
       lod:this.clipmap.lod,
       levels:this.clipmap.activeLevels,
@@ -256,7 +339,7 @@ export class PlanetViewport {
     Object.assign(this.settings,patch);
     this.controls.zoomSpeed=Math.max(.1,Math.min(3,this.settings.zoomSpeed));
     if(!this.thirdPerson){
-      this.controls.minDistance=this.radius+1;
+      this.controls.minDistance=this.activeRadius+1;
       this.controls.maxDistance=this.radius+250000;
     }
     if(typeof patch.showGrid==='boolean') this.clipmap.setGridVisible(patch.showGrid);
@@ -276,6 +359,10 @@ export class PlanetViewport {
     this.scene.remove(this.avatar);
     this.resize.dispose();
     this.clipmap.dispose();
+    this.moonClipmap.dispose();
+    this.scene.remove(this.moonOrbitPath);
+    this.moonOrbitPath.geometry.dispose();
+    (this.moonOrbitPath.material as THREE.Material).dispose();
     this.scene.remove(this.orbitPath);
     this.orbitPath.geometry.dispose();
     (this.orbitPath.material as THREE.Material).dispose();
