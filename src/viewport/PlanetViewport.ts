@@ -99,7 +99,7 @@ export class PlanetViewport {
       const radial=this.camera.position.clone().normalize();
       const terrainRadius=this.radius+this.terrainHeightKm(radial);
       const surface=radial.clone().multiplyScalar(terrainRadius);
-      this.avatar.position.copy(surface).addScaledVector(radial,-.0003);
+      this.avatar.position.copy(surface).addScaledVector(radial,-.000325);
       this.avatar.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),radial);
       this.avatar.visible=true;
       const target=surface.clone().addScaledVector(radial,.0012);
