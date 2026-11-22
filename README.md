@@ -1,36 +1,49 @@
 # clipmap-from-zero
 
-A small, renderer-agnostic clipmap core with a Three.js adapter.
+A TypeScript clipmap core with a Three.js debug renderer.
 
-## Design
-
-- The core accepts camera position and world-space center as independent inputs.
-- The center can represent any anchor: terrain origin, planet center, streamed-world origin, etc.
-- Each level doubles its cell size and snaps its origin to a stable grid.
-- Rendering is an adapter; the core does not depend on Three.js or a terrain implementation.
-
-## Quick start
+## Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-## API
+## What the preview shows
+
+- Seven nested clipmap levels with square ring geometry (outer levels have a central hole).
+- A world-aligned checker texture. Checker tiles have a fixed world-space size and do not grow or shrink between levels.
+- A wireframe overlay to inspect the actual mesh topology.
+- Procedural hills and ridges so height continuity is visible.
+- An automatically moving camera to demonstrate snapped clipmap updates.
+
+## Seam handling
+
+- Adjacent level origins are snapped to compatible sample lattices.
+- Odd vertices along a fine level's outer boundary collapse onto the matching coarser boundary samples. This removes boundary T-junctions instead of merely hiding them with material.
+- An eight-cell transition band geo-morphs fine-level heights toward the coarser level's interpolated surface. At the shared boundary, both levels evaluate to the same coarse edge profile.
+- Coarser ring inner boundaries line up with the finer ring outer boundaries.
+
+## Core API
+
+The renderer-agnostic `Clipmap` accepts camera and world center independently:
 
 ```ts
-const clipmap = new Clipmap({ levels: 8, baseCellSize: 1, resolution: 128 });
-const frame = clipmap.update({
+const clipmap = new Clipmap({ levels: 7, baseCellSize: 1, resolution: 64 });
+
+clipmap.setCamera({ x: 120, y: 80, z: -45 });
+clipmap.setCenter({ x: 0, z: 0 });
+const frame = clipmap.refresh();
+
+// Or update both inputs atomically:
+clipmap.update({
   camera: { x: 120, y: 80, z: -45 },
   center: { x: 0, z: 0 }
 });
 ```
 
-Use `setCamera()`, `setCenter()` and `refresh()` when inputs arrive separately.
-Use `ThreeClipmap` to attach the state to a Three.js scene.
+Use `ThreeClipmap` to attach the generated levels to a Three.js scene. The debug height function and checker material are deliberately simple and can be replaced by a terrain/planet height source without changing the core API.
 
-## Scope
+## Current limitations
 
-The first iteration provides clipmap level layout and a basic 3D grid preview. Height sampling,
-geomorphing, ring stitching, streaming and model-specific integration are intentionally separate
-extension points.
+This is a diagnostic implementation of square clipmap rings, boundary stitching and height geomorphing. It is not yet a production planetary renderer: normals across morph zones, GPU height sampling, skirts/skirts-free edge cases for arbitrary resolutions, and large-world precision still need dedicated validation.
