@@ -571,17 +571,6 @@ function updatePlayer(frameDelta: number): void {
   }
   playerMesh.position.set(player.x, player.y, player.z);
   playerMesh.rotation.y = player.yaw;
-  const shadowGround = terrain.getGroundHeight(player.x, player.z, LOD0_CELL_SIZE);
-  const shadowHeight = Math.max(0, player.y - playerHeight * 0.5 - playerRadius - shadowGround);
-  const sunDir = new THREE.Vector3(Math.cos((dayTime - 0.25) * Math.PI * 2), Math.max(-0.12, Math.sin((dayTime - 0.25) * Math.PI * 2)), 0.28).normalize();
-  playerShadow.position.set(
-    player.x - sunDir.x * shadowHeight * 0.42,
-    shadowGround + 0.045,
-    player.z - sunDir.z * shadowHeight * 0.42
-  );
-  const shadowScale = 0.72 + Math.min(shadowHeight, 8) * 0.11;
-  playerShadow.scale.set(shadowScale * (1 + Math.abs(sunDir.x) * 0.45), shadowScale * (1 + Math.abs(sunDir.z) * 0.45), 1);
-  (playerShadow.material as THREE.MeshBasicMaterial).opacity = Math.max(0.06, 0.34 - shadowHeight * 0.032);
   if (physicsDebug.visible) updatePhysicsDebug();
 }
 function updateFollowCamera(): void {
