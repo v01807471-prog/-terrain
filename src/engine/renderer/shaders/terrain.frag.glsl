@@ -27,6 +27,9 @@ out vec4 terrainFragColor;
 __TERRAIN_HEIGHT_FUNCTION__
 void main() {
   if (!gl_FrontFacing) discard;
+  // The heightfield is only the visible upper planetary cap; the fallback sphere
+  // supplies the back side and prevents the camera from ever seeing an empty edge.
+  if (dot(vWorld.xz, vWorld.xz) >= TERRAIN_DOME_RADIUS * TERRAIN_DOME_RADIUS) discard;
   vec2 delta = abs(vWorld.xz-uCamera);
   // Ring masking is horizontal; altitude affects morphing, not ring ownership.
   float d = max(delta.x,delta.y);
