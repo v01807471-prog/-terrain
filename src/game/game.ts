@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './game.css';
 import { DEFAULT_PLANET, terrainHeight, terrainHeightGLSL } from './planet/blueprint.js';
-import { PLANET_RADIUS, DEG, frameAt, fromWorld, gravityAt, moveOnSurface, toWorld, type GeoPosition } from './planet/coordinates.js';
+import { PLANET_RADIUS, frameAt, fromWorld, gravityAt, moveOnSurface, toWorld, type GeoPosition } from './planet/coordinates.js';
 
 const root=document.querySelector<HTMLElement>('#game-root');
 if(!root) throw new Error('Game root not found');
@@ -125,13 +125,13 @@ const player=new THREE.Mesh(playerGeometry,playerMaterial);player.castShadow=fal
 
 let geo:GeoPosition={latitude:48.2,longitude:16.37,altitude:2};
 let worldPosition=toWorld(geo);
+worldPosition.setLength(surfaceRadius(worldPosition.clone().normalize())+1.15);
 let velocity=new THREE.Vector3();
 let onGround=true,flightMode=false;
 let yaw=0,pitch=-0.18,cameraDistance=7.5;
 let pointerLocked=false;
 const keys=new Set<string>();
 const upAxis=new THREE.Vector3(0,1,0);
-const scratch=new THREE.Vector3();
 const cameraTarget=new THREE.Vector3();
 const cameraOffset=new THREE.Vector3();
 const clock=new THREE.Clock();
@@ -147,7 +147,7 @@ function updatePlanetFrame():void {
  atmosphereMaterial.uniforms.uCamera.value.copy(camera.position);
  player.position.copy(worldPosition);
  player.quaternion.setFromUnitVectors(upAxis,f.up);
- const altitude=geo.altitude;
+ const altitude=worldPosition.length()-surfaceRadius(f.up);
  coordinates.textContent=`${Math.abs(geo.latitude).toFixed(3)}° ${geo.latitude>=0?'N':'S'} · ${Math.abs(geo.longitude).toFixed(3)}° ${geo.longitude>=0?'E':'W'}`;
  altitudeLabel.textContent=altitude>=1000?`${(altitude/1000).toFixed(2)} km`:`${Math.round(altitude)} m`;
  const atmosphereFactor=THREE.MathUtils.clamp(altitude/blueprint.atmosphereHeight,0,1);
@@ -159,7 +159,7 @@ function updatePlanetFrame():void {
 function updateCamera():void {
  const f=frameAt(geo.latitude,geo.longitude);
  const forward=f.north.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(f.east,Math.sin(yaw));
- const right=new THREE.Vector3().crossVectors(forward,f.up).normalize();
+ const right=new THREE.Vector3().crossVectors(f.up,forward).normalize();
  const look=forward.multiplyScalar(Math.cos(pitch)).addScaledVector(f.up,Math.sin(pitch)).normalize();
  cameraTarget.copy(worldPosition).addScaledVector(f.up,1.2);
  cameraOffset.copy(look).multiplyScalar(-cameraDistance).addScaledVector(f.up,Math.sin(-pitch)*cameraDistance*0.35);
@@ -191,7 +191,7 @@ function movePlayer(dt:number):void {
   const tangent=input.multiplyScalar(speed);
   if(onGround&&keys.has('Space')){velocity.addScaledVector(f.up,6.5);onGround=false;}
   if(onGround){
-   const moved=moveOnSurface(geo,tangent.x*dt,tangent.z*dt);
+   const moved=moveOnSurface(geo,tangent.dot(f.east)*dt,tangent.dot(f.north)*dt);
    geo=moved;
    worldPosition=toWorld({...geo,altitude:Math.max(0,geo.altitude)});
    velocity.set(0,0,0);
