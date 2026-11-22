@@ -4,7 +4,7 @@ import terrainFragmentShader from './shaders/terrain.frag.glsl?raw';
 import wireFragmentShader from './shaders/wire.frag.glsl?raw';
 import type { Terrain } from '../terrain/Terrain.js';
 import type { TerrainBlueprint } from '../blueprint/types.js';
-import { createBuiltinTexture } from '../textures/assets.js';
+import { BUILTIN_TEXTURE_ASSETS, createBuiltinTexture } from '../textures/assets.js';
 
 export interface TerrainClipmapOptions {
   levels?: number;
@@ -247,7 +247,7 @@ export class TerrainRenderer {
   }
 
   private getAssetTexture(id?: string): THREE.Texture {
-    if (!id) return this.fallbackAssetTexture;
+    if (!id || !BUILTIN_TEXTURE_ASSETS.some(asset => asset.id === id)) return this.fallbackAssetTexture;
     let texture = this.assetTextures.get(id);
     if (!texture) { texture = createBuiltinTexture(id); this.assetTextures.set(id, texture); }
     return texture;
