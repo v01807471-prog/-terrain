@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Terrain } from '../engine/terrain/Terrain.js';
-import { createDefaultTerrainGraph, compileTerrainGraph } from '../engine/blueprint/graph.js';
+import { createDefaultTerrainGraph, createTerrainPresetGraph, compileTerrainGraph } from '../engine/blueprint/graph.js';
 import { NODE_TYPES } from '../engine/graph/nodes.js';
 import { previewGraph } from '../engine/graph/compiler.js';
 import { BUILTIN_TEXTURE_ASSETS, createBuiltinTexture } from '../engine/textures/assets.js';
@@ -24,7 +24,7 @@ class BlueprintNodeEditor {
   private node(id:number):any{return this.graph.nodes.find(n=>n.id===id);}
   private shell():void{
     this.host.innerHTML=`<div class="v2-graph-window"><header class="v2-graph-toolbar">
-    <b>◈ Граф мира</b><label>Сид <input id="v2g-seed" type="number"></label><button data-a="random">🎲</button>
+    <b>◈ Граф мира</b><select id="v2g-preset"><option value="regions">🌍 Регионы</option><option value="plains">🌾 Равнины</option><option value="mountains">⛰️ Горы</option><option value="desert">🏜️ Пустыня</option><option value="islands">🏝️ Острова</option></select><button data-a="preset">Загрузить пресет</button><label>Сид <input id="v2g-seed" type="number"></label><button data-a="random">🎲</button>
     <select id="v2g-add"></select><button data-a="add">+ Узел</button><button data-a="fit">Уместить</button>
     <button data-a="minus">−</button><span id="v2g-zoom">100%</span><button data-a="plus">+</button>
     <button data-a="export">Экспорт</button><button data-a="import">Импорт</button><input id="v2g-file" type="file" accept=".json" hidden>
@@ -44,7 +44,7 @@ class BlueprintNodeEditor {
   private action(a:string):void{
     if(a==='close'){this.close();return;}
     if(a==='preview'){this.host.classList.toggle('preview-expanded');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
-    if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);
+    if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);\n    if(a==='preset'){const preset=this.el<HTMLSelectElement>('v2g-preset').value as any;this.graph=createTerrainPresetGraph(preset,this.graph.seed);this.graph.nodes.forEach((n,i)=>{n.x=30+(i%5)*250;n.y=30+Math.floor(i/5)*250;});this.selected=null;this.render();this.applyNow();}
     if(a==='apply')this.applyNow();
     if(a==='fit')this.fit();
     if(a==='plus')this.zoomAt(this.zoom*1.2);
@@ -251,7 +251,7 @@ root.innerHTML = `
         <button class="pv2-button primary" id="pv2-open-blueprint">Открыть визуальный редактор узлов</button>
         <p id="pv2-blueprint-status" class="pv2-note">Соединяй узлы мышью. Изменения автоматически компилируются для CPU и GPU.</p>
         <label class="pv2-toggle"><input id="pv2-water" type="checkbox" checked> Показывать процедурную воду</label>
-        <label class="pv2-toggle"><input id="pv2-water-hole" type="checkbox"> Пример сухой пещеры в центре</label>
+        <label class="pv2-toggle"><input id="pv2-water-hole" type="checkbox"> Пример сухой пещеры в центре</label>\n        <label class="pv2-toggle"><input id="pv2-day-cycle" type="checkbox" checked> Автоматическая смена дня и ночи</label>\n        <div class="pv2-control"><label for="pv2-time">Время суток <output id="pv2-time-value">12:00</output></label><input id="pv2-time" type="range" min="0" max="1" step="0.001" value="0.5"></div>
         <p class="pv2-footer">Отсечение тайлов выполняется по пирамиде видимости активной камеры. Обратные грани поверхности отсекаются материалом FrontSide и проверкой gl_FrontFacing.</p>
       </section>
     </aside>
@@ -304,7 +304,7 @@ const terrain = new Terrain(blueprint.heightAt, {
 const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
   levels: 8, gridSize: 128, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
 });
-const waterRenderer = new WaterRenderer(scene, { seaLevel: -6, extent: 8192 });
+const waterRenderer = new WaterRenderer(scene, { seaLevel: 8, extent: 8192 });
 waterRenderer.applyBlueprint(blueprint.water);
 const blueprintStatus = document.querySelector<HTMLParagraphElement>('#pv2-blueprint-status')!;
 const graphEditorHost = document.querySelector<HTMLDivElement>('#pv2-blueprint-editor')!;
@@ -328,7 +328,7 @@ document.querySelector<HTMLInputElement>('#pv2-water-hole')!.addEventListener('c
   const enabled = (event.currentTarget as HTMLInputElement).checked;
   waterRenderer.setExclusionCircles(enabled ? [{ x: 0, z: 0, radius: 18, feather: 5 }] : []);
 });
-const cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
+let dayTime = 0.5;\nlet dayCycle = true;\nconst dayNightToggle = document.querySelector<HTMLInputElement>('#pv2-day-cycle')!;\nconst dayTimeInput = document.querySelector<HTMLInputElement>('#pv2-time')!;\nconst dayTimeLabel = document.querySelector<HTMLOutputElement>('#pv2-time-value')!;\nfunction updateDayNight(delta: number): void {\n  if (dayCycle) dayTime = (dayTime + delta / 240) % 1;\n  const angle = (dayTime - 0.25) * Math.PI * 2;\n  const height = Math.sin(angle);\n  const daylight = THREE.MathUtils.smoothstep(height, -0.12, 0.28);\n  sun.position.set(Math.cos(angle) * 65, Math.max(-8, height * 65), 18);\n  sun.intensity = 0.06 + daylight * 3.0;\n  sun.color.set('#7189bd').lerp(new THREE.Color('#fff0d5'), daylight);\n  hemisphere.intensity = 0.25 + daylight * 1.55;\n  const sky = new THREE.Color('#071323').lerp(new THREE.Color(blueprint.fogColor), daylight);\n  scene.background = sky;\n  if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(sky);\n  terrainRenderer.setLighting(sun.position.clone().normalize(), sun.intensity);\n  const hours = Math.floor(dayTime * 24), minutes = Math.floor((dayTime * 24 - hours) * 60);\n  dayTimeLabel.textContent = String(hours).padStart(2,'0')+':'+String(minutes).padStart(2,'0');\n  if (document.activeElement !== dayTimeInput) dayTimeInput.value = String(dayTime);\n}\ndayNightToggle.addEventListener('change',()=>{dayCycle=dayNightToggle.checked;});\ndayTimeInput.addEventListener('input',()=>{dayTime=Number(dayTimeInput.value);updateDayNight(0);});\nconst cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
 
 const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1, terrainCellSize: LOD0_CELL_SIZE });
 const loop = new FixedStepLoop(world, 1 / 60, 10, 0.1);
@@ -643,7 +643,7 @@ function animate(now: number): void {
     document.querySelector('#pv2-fps')!.textContent = String(Math.round(fpsFrames / fpsElapsed));
     fpsFrames = 0; fpsElapsed = 0;
   }
-  updatePlayer(delta);
+  updateDayNight(delta);\n  updatePlayer(delta);
   if (cpuSurfaceDebug.group.visible) cpuSurfaceDebug.update(player.x, player.z);
   if (!paused) {
     const result = loop.advance(delta);
