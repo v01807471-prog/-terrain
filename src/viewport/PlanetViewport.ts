@@ -6,7 +6,7 @@ import { SphericalClipmap } from '../planet/SphericalClipmap';
 export class PlanetViewport {
   readonly renderer:THREE.WebGLRenderer;
   readonly scene=new THREE.Scene();
-  readonly camera=new THREE.PerspectiveCamera(48,1,.01,120000);
+  readonly camera=new THREE.PerspectiveCamera(48,1,.00005,120000);
   readonly clipmap:SphericalClipmap;
   private controls:ArcballControls;
   private resize:ResizeManager;
