@@ -122,7 +122,7 @@ export class SphericalClipmap {
         vec3 localPosition=radial*(uRadius+height+position.y);
         vec3 worldPosition=(modelMatrix*vec4(localPosition,1.0)).xyz;
         vHeight=height;
-        vRadial=worldRadial;
+        vRadial=planetRadial;
         vWorldPosition=worldPosition;
         // Compose camera-relative coordinates on the CPU before GPU upload.
         vec3 viewPosition=(modelViewMatrix*vec4(localPosition,1.0)).xyz;
@@ -210,7 +210,7 @@ export class SphericalClipmap {
           vec3 localPosition=radial*(uRadius+height);
           vec4 world=modelMatrix*vec4(localPosition,1.0);
           vec3 viewPosition=(modelViewMatrix*vec4(localPosition,1.0)).xyz;
-          vRadial=worldRadial;vHeight=height;vWorldPosition=world.xyz;
+          vRadial=planetRadial;vHeight=height;vWorldPosition=world.xyz;
           vViewPosition=viewPosition;
           vViewRadial=normalize(mat3(viewMatrix)*worldRadial);
           gl_Position=projectionMatrix*vec4(viewPosition,1.0);
