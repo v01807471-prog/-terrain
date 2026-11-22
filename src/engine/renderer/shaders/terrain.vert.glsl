@@ -13,6 +13,26 @@ out vec3 vNormal;
 out float vDistance;
 #include <shadowmap_pars_vertex>
 __TERRAIN_HEIGHT_FUNCTION__
+float terrainHeightAtLOD(vec2 sampleP, float stepSize, float halfSize) {
+  float distanceToCamera = max(max(abs(sampleP.x-uCamera.x), abs(sampleP.y-uCamera.y)), uAltitude);
+  float morphEnd = halfSize - 2.0 * stepSize;
+  float morphWidth = max(8.0 * stepSize, halfSize * 0.35);
+  float morph = smoothstep(morphEnd - morphWidth, morphEnd, distanceToCamera);
+  float fineHeight = terrainHeight(sampleP);
+  vec2 odd = mod(floor(sampleP / stepSize + 0.5), 2.0);
+  if (morph > 0.0 && odd.x + odd.y > 0.5) {
+    float coarseHeight;
+    if (odd.x > 0.5 && odd.y > 0.5) {
+      coarseHeight = 0.5 * (terrainHeight(sampleP + vec2(stepSize, -stepSize)) + terrainHeight(sampleP + vec2(-stepSize, stepSize)));
+    } else if (odd.x > 0.5) {
+      coarseHeight = 0.5 * (terrainHeight(sampleP + vec2(stepSize, 0.0)) + terrainHeight(sampleP - vec2(stepSize, 0.0)));
+    } else {
+      coarseHeight = 0.5 * (terrainHeight(sampleP + vec2(0.0, stepSize)) + terrainHeight(sampleP - vec2(0.0, stepSize)));
+    }
+    fineHeight = mix(fineHeight, coarseHeight, morph);
+  }
+  return fineHeight;
+}
 void main() {
   vec4 world;
   #ifdef USE_INSTANCING
@@ -31,27 +51,11 @@ void main() {
   #endif
   vCut = cutSize;
   float d = max(max(abs(p.x-uCamera.x), abs(p.y-uCamera.y)), uAltitude);
-  float morphEnd = halfSize - 2.0*stepSize;
-  float morphWidth = max(8.0*stepSize, halfSize*0.35);
-  float morph = smoothstep(morphEnd-morphWidth, morphEnd, d);
-  float h0 = terrainHeight(p);
-  float h = h0;
-  vec2 odd = mod(floor(p/stepSize + 0.5), 2.0);
-  if (morph > 0.0 && odd.x + odd.y > 0.5) {
-    float coarse;
-    if (odd.x > 0.5 && odd.y > 0.5) {
-      coarse = 0.5*(terrainHeight(p+vec2(stepSize,-stepSize))+terrainHeight(p+vec2(-stepSize,stepSize)));
-    } else if (odd.x > 0.5) {
-      coarse = 0.5*(terrainHeight(p+vec2(stepSize,0.0))+terrainHeight(p-vec2(stepSize,0.0)));
-    } else {
-      coarse = 0.5*(terrainHeight(p+vec2(0.0,uStep))+terrainHeight(p-vec2(0.0,uStep)));
-    }
-    h = mix(h0, coarse, morph);
-  }
-  float e = 0.5*stepSize*(1.0+morph);
-  float hx = terrainHeight(p+vec2(e,0.0));
-  float hz = terrainHeight(p+vec2(0.0,e));
-  vNormal = normalize(vec3(-(hx-h0)/e, 1.0, -(hz-h0)/e));
+  float h = terrainHeightAtLOD(p, stepSize, halfSize);
+  float e = max(0.5 * stepSize, 0.05);
+  float hx = terrainHeightAtLOD(p + vec2(e, 0.0), stepSize, halfSize);
+  float hz = terrainHeightAtLOD(p + vec2(0.0, e), stepSize, halfSize);
+  vNormal = normalize(vec3(-(hx-h)/e, 1.0, -(hz-h)/e));
   vWorld = vec3(p.x,h + uWireLift,p.y);
   vDistance = d;
   vec3 transformed = vWorld;
