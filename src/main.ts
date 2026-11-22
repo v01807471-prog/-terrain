@@ -9,7 +9,7 @@ viewport.start();
 const readout = document.querySelector<HTMLDivElement>('#readout')!;
 function updateReadout() {
   const state = viewport.getTelemetry();
-  readout.textContent = `ALT ${state.altitude.toFixed(0)} km  ·  RING ${state.rings}  ·  CAMERA LOD ${state.lod}`;
+  readout.textContent = `ALT ${state.altitude.toFixed(0)} km  ·  LEVELS ${state.levels}  ·  LOD ${state.lod}  ·  TRIANGLES ${state.triangles.toLocaleString()}`;
   requestAnimationFrame(updateReadout);
 }
 updateReadout();
