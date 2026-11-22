@@ -1,6 +1,8 @@
 import { TerrainEditStore } from './TerrainEditStore.js';
 import { Terrain } from './Terrain.js';
 import { TerrainUpdateQueue } from './TerrainUpdateQueue.js';
+import { PRESET_GRAPHS, defaultGraph } from '../legacy/graphPresets.js';
+import { compileGraph } from '../graph/compiler.js';
 
 export interface TerrainSelfTestResult {
   passed: string[];
@@ -53,6 +55,27 @@ export function runTerrainSelfTests(): TerrainSelfTestResult {
     'CPU-высота Blueprint-графа детерминирована');
   assert(Math.abs(graphHeight - graphC.getBaseHeight(-73.25, 119.5)) > 1e-6,
     'seed Blueprint-графа влияет на процедурную высоту');
+
+  const presetNames = ['hills', 'mountains', 'islands', 'plains', 'terraces'] as const;
+  for (const presetName of presetNames) {
+    const presetA = PRESET_GRAPHS[presetName](41);
+    const presetB = PRESET_GRAPHS[presetName](41);
+    const compiledA = compileGraph(presetA);
+    const compiledB = compileGraph(presetB);
+    const heightA = compiledA.js(-73.25, 119.5);
+    assert(Number.isFinite(heightA), 'legacy-пресет ' + presetName + ' компилируется в конечную CPU-высоту');
+    assert(heightA === compiledB.js(-73.25, 119.5),
+      'legacy-пресет ' + presetName + ' сохраняет детерминизм при одинаковом seed');
+    assert(['out_height', 'out_color', 'out_water', 'out_fog'].every(type =>
+      presetA.nodes.some(node => node.type === type)),
+    'legacy-пресет ' + presetName + ' сохраняет выходы высоты, цвета, воды и тумана');
+  }
+  const defaultPreset = defaultGraph();
+  assert(defaultPreset.seed === 0 && defaultPreset.nodes.length === PRESET_GRAPHS.hills(0).nodes.length,
+    'граф по умолчанию остаётся прежним hills-пресетом с seed 0');
+  const islandGraph = PRESET_GRAPHS.islands(41);
+  const islandWater = islandGraph.nodes.find(node => node.type === 'out_water');
+  assert(islandWater?.d.level === -1, 'островной пресет сохраняет исходный уровень воды');
 
   const edits = new TerrainEditStore(1, 8);
   assert(edits.allocatedChunkCount === 0 && edits.allocatedBytes === 0,
