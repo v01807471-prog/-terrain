@@ -165,7 +165,7 @@ export class PlanetViewport {
           if(other===entry)continue;
           const toOccluder=other.center.clone().sub(camera.position);
           const occluderRadius=other.radius+other.clipmap.settings.amplitude;
-          if(toOccluder.length()<occluderRadius*1.02)continue;
+          if(toOccluder.length()<other.radius*1.001)continue;
           const along=toOccluder.dot(rayDirection);
           if(along<=0||along>=targetDistance-radius)continue;
           const closest=toOccluder.addScaledVector(rayDirection,-along).length();
@@ -386,8 +386,9 @@ export class PlanetViewport {
       altitude:this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.activeCenter)-this.activeRadius),
       rings:this.settings.rings,
       lod:this.clipmap.lod,
-      levels:this.clipmap.activeLevels,
-      triangles:this.clipmap.triangleCount
+      levels:this.activeClipmap.activeLevels,
+      triangles:this.planets.reduce((sum,planet)=>sum+(planet.clipmap.group.visible?planet.clipmap.triangleCount:0),0),
+      visiblePlanets:this.planets.filter(planet=>planet.clipmap.group.visible).map(planet=>planet.name)
     };
   }
 
