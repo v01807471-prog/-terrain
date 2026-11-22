@@ -170,7 +170,7 @@ export class WaterRenderer {
     scene.add(this.mesh);
   }
 
-  applyBlueprint(settings: unknown, heightFunctionGLSL?: string, fog?: { color?: string; near?: number; far?: number }): void {
+  applyBlueprint(settings: unknown, heightFunctionGLSL?: string, fog?: { color?: string; near?: number; far?: number } | null): void {
     if (!settings || typeof settings !== 'object') {
       this.mesh.visible = false;
       return;
