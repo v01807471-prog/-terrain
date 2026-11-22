@@ -5,7 +5,7 @@ import wireFragmentShader from './shaders/wire.frag.glsl?raw';
 import type { Terrain } from '../terrain/Terrain.js';
 import type { TerrainBounds } from '../terrain/types.js';
 import type { TerrainBlueprint } from '../blueprint/types.js';
-import { BUILTIN_TEXTURE_ASSETS, createBuiltinTexture } from '../textures/assets.js';
+import { BUILTIN_TEXTURE_ASSETS, createBuiltinTextureAsync } from '../textures/assets.js';
 import { DOME_RADIUS } from '../terrain/DomeProjection.js';
 
 export interface TerrainClipmapOptions {
@@ -60,6 +60,8 @@ export class TerrainRenderer {
   private readonly projectionView = new THREE.Matrix4();
   private readonly tileBounds = new THREE.Box3();
   private readonly assetTextures = new Map<string, THREE.DataTexture>();
+  private readonly pendingAssetTextures = new Set<string>();
+  private readonly fallbackPlanet: THREE.Mesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>;
   private activeVertexShader = '';
   private activeFragmentShader = '';
   private activeTextureIds: string[] = [];
@@ -76,7 +78,7 @@ export class TerrainRenderer {
     this.terrain = terrain;
     this.baseFogNear = blueprint.fogNear;
     this.baseFogFar = blueprint.fogFar;
-    this.levels = options.levels ?? 8;
+    this.levels = options.levels ?? 20;
     this.gridSize = options.gridSize ?? 96;
     this.tileSize = options.tileSize ?? 32;
     this.baseCellSize = options.baseCellSize ?? 1;
@@ -95,7 +97,15 @@ export class TerrainRenderer {
       uSunDirection: { value: new THREE.Vector3(-0.45, 0.78, 0.42).normalize() },
       uSunIntensity: { value: 1 }
     };
+    const planetGeometry = new THREE.SphereGeometry(DOME_RADIUS, 128, 64);
+    planetGeometry.translate(0, -DOME_RADIUS, 0);
+    const planetMaterial = new THREE.MeshStandardMaterial({ color: '#607d55', roughness: 1, metalness: 0, side: THREE.FrontSide });
+    this.fallbackPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
+    this.fallbackPlanet.frustumCulled = false;
+    this.fallbackPlanet.renderOrder = -10;
+    this.fallbackPlanet.receiveShadow = true;
     this.build(blueprint);
+    this.scene.add(this.fallbackPlanet);
     this.scene.add(this.group);
     this.scene.add(this.localEditGroup);
     this.unsubscribe = terrain.subscribeChanges((change) => {
@@ -112,6 +122,7 @@ export class TerrainRenderer {
   /** Hides only the generated procedural surface; Terrain and physics stay active. */
   setBaseVisible(visible: boolean): void {
     this.group.visible = visible;
+    this.fallbackPlanet.visible = visible;
   }
 
   /** Shows or hides the sparse local-edit overlay independently of the base surface. */
@@ -280,9 +291,8 @@ export class TerrainRenderer {
         this.frustum.setFromProjectionMatrix(this.projectionView);
       }
     }
-    const baseCoverage = this.gridSize * 0.5 * this.baseCellSize * 2 ** (this.levels - 1);
-    // Keep world-space tile spacing stable. Altitude expands the camera horizon,
-    // but must not stretch the existing clipmap geometry.
+    // Near rings retain their exact world-space spacing. Far coverage comes from
+    // additional preallocated LOD rings, never from stretching the near field.
     const lodScale = 1;
     const lodScaleChanged = Math.abs(this.uniforms.uLodScale.value - lodScale) > 0.0005;
     this.uniforms.uLodScale.value = lodScale;
@@ -369,9 +379,13 @@ export class TerrainRenderer {
     this.unsubscribe();
     this.clearLocalEditPatches();
     this.scene.remove(this.localEditGroup);
+    this.scene.remove(this.fallbackPlanet);
+    this.fallbackPlanet.geometry.dispose();
+    this.fallbackPlanet.material.dispose();
     this.localEditMaterial.dispose();
     for (const texture of this.assetTextures.values()) texture.dispose();
     this.assetTextures.clear();
+    this.pendingAssetTextures.clear();
     this.fallbackAssetTexture.dispose();
     const shared = this.rings[0];
     if (shared) {
@@ -488,7 +502,8 @@ export class TerrainRenderer {
         const tx = i % this.tilesPerSide, tz = Math.floor(i / this.tilesPerSide);
         const ox = tx * this.tileSize - halfGrid, oz = tz * this.tileSize - halfGrid;
         const instanceIndex = instanceOffset + i;
-        tiles.push({ ready: false, visible: false, dirty: true, instanceIndex, wire: null, ox, oz });
+        // Tile transforms are cheap instance data; make every ring available on frame one.
+        tiles.push({ ready: true, visible: false, dirty: true, instanceIndex, wire: null, ox, oz });
         steps[instanceIndex] = step;
         halves[instanceIndex] = half;
         cuts[instanceIndex] = cut;
@@ -501,19 +516,40 @@ export class TerrainRenderer {
     tileGeometry.getAttribute('aHalf').needsUpdate = true;
     tileGeometry.getAttribute('aCut').needsUpdate = true;
     this.group.add(sharedInstances);
-    // Within each LOD, create central tiles first; outer rings are queued later.
-    for (let ringIndex = 0; ringIndex < this.rings.length; ringIndex++) {
-      const ring = this.rings[ringIndex];
-      const order = ring.tiles.map((tile, tileIndex) => ({ tileIndex, distance: Math.hypot(tile.ox + this.tileSize / 2, tile.oz + this.tileSize / 2) }))
-        .sort((a, b) => a.distance - b.distance);
-      for (const item of order) this.creationQueue.push({ ringIndex, tileIndex: item.tileIndex });
-    }
+    // All tiles reuse one geometry and are ready immediately; only instance transforms move.
   }
 
   private getAssetTexture(id?: string): THREE.Texture {
     if (!id || !BUILTIN_TEXTURE_ASSETS.some(asset => asset.id === id)) return this.fallbackAssetTexture;
     let texture = this.assetTextures.get(id);
-    if (!texture) { texture = createBuiltinTexture(id); this.assetTextures.set(id, texture); }
+    if (!texture) {
+      const colors: Record<string, [number, number, number]> = {
+        b_grass: [52, 106, 36], b_rock: [112, 106, 98], b_sand: [214, 190, 140],
+        b_dirt: [112, 80, 52], b_snow: [238, 244, 250], b_gravel: [130, 126, 120]
+      };
+      const color = colors[id] ?? [128, 128, 128];
+      texture = new THREE.DataTexture(new Uint8Array([...color, 255]), 1, 1, THREE.RGBAFormat);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      this.assetTextures.set(id, texture);
+      this.pendingAssetTextures.add(id);
+      void createBuiltinTextureAsync(id, 128).then((generated) => {
+        const target = this.assetTextures.get(id);
+        this.pendingAssetTextures.delete(id);
+        if (!target) { generated.dispose(); return; }
+        target.image = generated.image;
+        target.minFilter = THREE.LinearMipmapLinearFilter;
+        target.generateMipmaps = true;
+        target.needsUpdate = true;
+        generated.dispose();
+      }).catch((error) => {
+        this.pendingAssetTextures.delete(id);
+        console.error('Не удалось подготовить текстуру', id, error);
+      });
+    }
     return texture;
   }
 
