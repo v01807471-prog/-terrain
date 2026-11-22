@@ -5,3 +5,6 @@
 .character-test-status{position:fixed;left:18px;top:18px;z-index:10;max-width:calc(100vw - 36px);padding:10px 14px;border:1px solid #71849a66;border-radius:8px;background:#101a27dd;color:#edf4ff;font:12px/1.5 system-ui,sans-serif;box-shadow:0 8px 30px #0005;pointer-events:none}
 
 .character-test-animation-select{position:fixed;left:18px;top:76px;z-index:11;max-width:min(420px,calc(100vw - 36px));padding:9px 12px;border:1px solid #71849a88;border-radius:8px;background:#101a27;color:#edf4ff;font:12px system-ui,sans-serif;box-shadow:0 8px 30px #0005}.character-test-animation-select:disabled{opacity:.6}
+
+.character-test-status{top:auto;bottom:58px;left:18px;}
+.character-test-animation-select{top:auto;bottom:18px;left:18px;max-width:min(520px,calc(100vw - 36px));}
