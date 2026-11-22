@@ -240,6 +240,10 @@ root.innerHTML = `
           <div><span>Физика CPU</span><b id="pv2-diag-physics">—</b></div>
           <div><span>Рендер submit</span><b id="pv2-diag-render">—</b></div>
           <div><span>Шаги физики</span><b id="pv2-diag-steps">—</b></div>
+          <div><span>Проб физики по Terrain</span><b id="pv2-diag-samples">—</b></div>
+          <div><span>Контакты Terrain</span><b id="pv2-diag-terrain-contacts">—</b></div>
+          <div><span>Проверки пар сфер</span><b id="pv2-diag-pair-tests">—</b></div>
+          <div><span>Контакты сфер</span><b id="pv2-diag-sphere-contacts">—</b></div>
           <div><span>Draw calls</span><b id="pv2-diag-calls">—</b></div>
           <div><span>Треугольники</span><b id="pv2-diag-tris">—</b></div>
           <div><span>GPU-программы</span><b id="pv2-diag-programs">—</b></div>
@@ -694,6 +698,10 @@ function updateDiagnostics(culling: ReturnType<TerrainRenderer['update']>): void
   setDiagnostic('pv2-diag-physics', `${physicsCpuMs.toFixed(2)} ms`);
   setDiagnostic('pv2-diag-render', `${renderSubmitMs.toFixed(2)} ms`);
   setDiagnostic('pv2-diag-steps', `${physicsStepsLastFrame} / кадр`);
+  setDiagnostic('pv2-diag-samples', String(world.diagnostics.terrainSamples));
+  setDiagnostic('pv2-diag-terrain-contacts', String(world.diagnostics.terrainContacts));
+  setDiagnostic('pv2-diag-pair-tests', String(world.diagnostics.spherePairTests));
+  setDiagnostic('pv2-diag-sphere-contacts', String(world.diagnostics.sphereContacts));
   setDiagnostic('pv2-diag-calls', String(info.render.calls));
   setDiagnostic('pv2-diag-tris', info.render.triangles.toLocaleString('ru-RU'));
   setDiagnostic('pv2-diag-programs', String(programs));
