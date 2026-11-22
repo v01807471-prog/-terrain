@@ -9,7 +9,6 @@ export class PlanetViewport {
   readonly clipmap:SphericalClipmap;
   private resize:ResizeManager;
   private target=new THREE.Vector3();
-  private planetRotation=new THREE.Quaternion();
   private radius=6371;
   private distance=15000;
   private azimuth=.7;
@@ -42,9 +41,18 @@ export class PlanetViewport {
       this.lastX=e.clientX;
       this.lastY=e.clientY;
       if(this.panning){
-        // Right mouse / Shift-drag remains a camera pan.
+        this.azimuth-=dx*.003;
         this.target.y+=dy*this.distance*.00035;
-        this.updateCamera();
+      }else{
+        // Orbit the camera around the stationary planet.
+        this.azimuth-=dx*.005*this.settings.rotationSpeed;
+        this.polar=THREE.MathUtils.clamp(
+          this.polar+dy*.005*this.settings.rotationSpeed,
+          .025,
+          Math.PI-.025
+        );
+      }
+      this.updateCamera();
       }else{
         // Rotate the planet itself; the camera position and orientation stay fixed.
         const cameraRight=new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld,0).normalize();
@@ -67,7 +75,7 @@ export class PlanetViewport {
     const sin=Math.sin(this.polar);this.camera.position.set(this.target.x+this.distance*sin*Math.sin(this.azimuth),this.target.y+this.distance*Math.cos(this.polar),this.target.z+this.distance*sin*Math.cos(this.azimuth));
     this.camera.lookAt(this.target);this.camera.near=Math.max(.02,this.distance/100000);this.camera.far=Math.max(120000,this.distance*5);this.camera.updateProjectionMatrix();
   }
-  start(){if(this.running)return;this.running=true;const tick=()=>{if(!this.running)return;this.frame=requestAnimationFrame(tick);const t=this.clock.getElapsedTime();if(this.settings.autoRotate&&!this.dragging){this.planetRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),-.0007)).normalize();}this.clipmap.update(this.camera,t,this.planetRotation);this.renderer.render(this.scene,this.camera);};tick();}
+  start(){if(this.running)return;this.running=true;const tick=()=>{if(!this.running)return;this.frame=requestAnimationFrame(tick);const t=this.clock.getElapsedTime();if(this.settings.autoRotate&&!this.dragging){this.azimuth-=.0007;this.updateCamera();}this.clipmap.update(this.camera,t);this.renderer.render(this.scene,this.camera);};tick();}
   getTelemetry(){return{altitude:Math.max(0,this.camera.position.length()-this.radius),rings:this.settings.rings,lod:this.clipmap.lod};}
   getConfig(){return this.settings;}
   updateConfig(patch:Record<string,number|boolean>){Object.assign(this.settings,patch);this.clipmap.setSettings({rings:this.settings.rings,baseSegments:this.settings.baseSegments,amplitude:this.settings.amplitude,frequency:this.settings.frequency,ringGrowth:this.settings.ringGrowth});this.updateCamera();}
