@@ -88,6 +88,8 @@ export class SphericalClipmap {
   readonly group=new THREE.Group();
   private levels:Level[]=[];
   private material:THREE.ShaderMaterial;
+  private globe:THREE.Mesh;
+  private globeMaterial:THREE.ShaderMaterial;
   private gridVisible=true;
   private lastAltitude=-1;
   private currentExtent=0;
@@ -197,6 +199,55 @@ export class SphericalClipmap {
       depthTest:true,
       depthWrite:true
     });
+
+    // A complete low-frequency globe provides the round planetary silhouette.
+    // The clipmap patches are only local high-detail overlays, never the whole planet.
+    this.globeMaterial=new THREE.ShaderMaterial({
+      uniforms:{
+        uTime:{value:0},
+        uAmplitude:{value:settings.amplitude},
+        uFrequency:{value:settings.frequency},
+        uRadius:{value:settings.radius},
+        uDetailFade:{value:1}
+      },
+      vertexShader:`
+        uniform float uRadius;
+        varying vec3 vGlobeRadial;
+        varying float vGlobeHeight;
+        ${terrainBlueprint.shader}
+        void main(){
+          vec3 radial=normalize(position);
+          vec3 displaced=displacePlanet(radial*uRadius,uRadius);
+          vGlobeRadial=radial;
+          vGlobeHeight=length(displaced)-uRadius;
+          vec3 worldPosition=radial*length(displaced);
+          gl_Position=projectionMatrix*modelViewMatrix*vec4(worldPosition,1.0);
+        }
+      `,
+      fragmentShader:`
+        varying vec3 vGlobeRadial;
+        varying float vGlobeHeight;
+        void main(){
+          float h=clamp(vGlobeHeight/max(uAmplitude*.001,.001),-1.0,1.0);
+          float land=smoothstep(-.08,.12,h);
+          vec3 ocean=vec3(.018,.075,.12);
+          vec3 lowland=vec3(.12,.25,.12);
+          vec3 highland=vec3(.32,.30,.22);
+          vec3 color=mix(ocean,lowland,land);
+          color=mix(color,highland,smoothstep(.35,.8,h));
+          float light=.28+.72*max(dot(normalize(vGlobeRadial),normalize(vec3(.4,.8,.3))),0.0);
+          gl_FragColor=vec4(color*light,1.0);
+        }
+      `,
+      side:THREE.FrontSide,
+      depthTest:true,
+      depthWrite:true
+    });
+    const globeGeometry=new THREE.SphereGeometry(settings.radius,256,128);
+    this.globe=new THREE.Mesh(globeGeometry,this.globeMaterial);
+    this.globe.frustumCulled=false;
+    this.globe.renderOrder=-10;
+    this.scene.add(this.globe);
 
     this.scene.add(this.group);
     this.rebuild(this.calculateExtent(15000-this.settings.radius),4);
@@ -313,6 +364,9 @@ export class SphericalClipmap {
     this.material.uniforms.uAmplitude.value=this.settings.amplitude;
     this.material.uniforms.uFrequency.value=this.settings.frequency;
     this.material.uniforms.uRadius.value=this.settings.radius;
+    this.globeMaterial.uniforms.uAmplitude.value=this.settings.amplitude;
+    this.globeMaterial.uniforms.uFrequency.value=this.settings.frequency;
+    this.globeMaterial.uniforms.uRadius.value=this.settings.radius;
 
     if (rebuild) {
       this.rebuild(this.calculateExtent(Math.max(0,this.lastAltitude)),this.activeRingCount);
@@ -346,6 +400,9 @@ export class SphericalClipmap {
       level.gridMaterial.dispose();
     }
     this.material.dispose();
+    this.globe.geometry.dispose();
+    this.globeMaterial.dispose();
+    this.scene.remove(this.globe);
     this.scene.remove(this.group);
   }
 }
