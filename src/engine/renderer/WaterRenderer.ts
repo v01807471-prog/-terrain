@@ -52,6 +52,7 @@ const fragmentShader = [
   'uniform vec3 uDeepColor;',
   'uniform float uOpacity;',
   'uniform float uWaveScale;',
+  'uniform float uClarity;',
   'uniform float uFoamStrength;',
   'uniform vec4 uExclusions[16];',
   'uniform int uExclusionCount;',
@@ -71,6 +72,7 @@ const fragmentShader = [
   '  float ripple = 0.5 + 0.5 * sin((vWorld.x + vWorld.z) * uWaveScale * 2.1 + uTime * 1.7);',
   '  float crest = smoothstep(0.45, 0.95, ripple + vWave * 0.08);',
   '  vec3 color = mix(uDeepColor, uShallowColor, clamp(0.24 + ripple * 0.32 + crest * 0.18, 0.0, 1.0));',
+  '  color = mix(color, uShallowColor, clamp(uClarity * 0.12, 0.0, 0.12));',
   '  color = mix(color, vec3(0.78, 0.91, 0.9), clamp(edgeFoam * uFoamStrength, 0.0, 0.85));',
   '  waterColor = vec4(color, uOpacity);',
   '}'
@@ -92,6 +94,7 @@ export class WaterRenderer {
       uSeaLevel: { value: this.seaLevel },
       uWaveAmplitude: { value: options.waveAmplitude ?? 0.22 },
       uWaveScale: { value: options.waveScale ?? 0.035 },
+      uClarity: { value: 0.35 },
       uWaveSpeed: { value: options.waveSpeed ?? 0.8 },
       uShallowColor: { value: new THREE.Color(options.shallowColor ?? '#087f86') },
       uDeepColor: { value: new THREE.Color(options.deepColor ?? '#041c35') },
@@ -117,6 +120,31 @@ export class WaterRenderer {
     this.mesh.renderOrder = 2;
     this.mesh.position.y = this.seaLevel;
     scene.add(this.mesh);
+  }
+
+  applyBlueprint(settings: unknown): void {
+    if (!settings || typeof settings !== 'object') {
+      this.mesh.visible = false;
+      return;
+    }
+    const water = settings as {
+      on?: number; level?: number; clarity?: number; wave?: number; wscale?: number;
+      wspeed?: number; foam?: number; opacity?: number; shallow?: number[]; deep?: number[];
+    };
+    this.mesh.visible = water.on !== 0;
+    if (Number.isFinite(water.level)) this.setSeaLevel(Number(water.level));
+    this.uniforms.uClarity.value = THREE.MathUtils.clamp(water.clarity ?? 0.35, 0, 1);
+    this.uniforms.uWaveAmplitude.value = 0.22 * Math.max(0, water.wave ?? 1);
+    this.uniforms.uWaveScale.value = 0.035 * Math.max(0.05, water.wscale ?? 1);
+    this.uniforms.uWaveSpeed.value = Math.max(0, water.wspeed ?? 1);
+    this.uniforms.uFoamStrength.value = THREE.MathUtils.clamp(water.foam ?? 0.75, 0, 2);
+    this.uniforms.uOpacity.value = THREE.MathUtils.clamp(water.opacity ?? 0.92, 0, 1);
+    if (water.shallow?.length === 3) {
+      (this.uniforms.uShallowColor.value as THREE.Color).setRGB(water.shallow[0], water.shallow[1], water.shallow[2], THREE.LinearSRGBColorSpace);
+    }
+    if (water.deep?.length === 3) {
+      (this.uniforms.uDeepColor.value as THREE.Color).setRGB(water.deep[0], water.deep[1], water.deep[2], THREE.LinearSRGBColorSpace);
+    }
   }
 
   setSeaLevel(level: number): void {
