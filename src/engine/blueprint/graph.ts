@@ -43,7 +43,7 @@ export function createTerrainPresetGraph(preset: TerrainPreset = 'regions', seed
     { id: 27, type: 'smooth', p: { e0: 24, e1: 42 }, in: { a: 26 } },
     { id: 28, type: 'cmix', in: { a: 24, b: 25, t: 27 } },
     { id: 29, type: 'out_color', in: { c: 28 } },
-    { id: 30, type: 'out_water', d: { level: preset === 'islands' ? 1 : 8 } },
+    { id: 30, type: 'out_water', p: { on: 1 }, d: { level: preset === 'islands' ? 1 : 8 } },
     { id: 31, type: 'out_fog', p: { on: 1, color: preset === 'desert' ? '#e6c89a' : '#9dc7e1' } }
   ];
   return { seed, nodes };
