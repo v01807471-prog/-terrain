@@ -112,7 +112,7 @@ const terrain = new Terrain(blueprint.heightAt, {
   seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
 });
 const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
-  levels: 8, gridSize: 96, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
+  levels: 8, gridSize: 128, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
 });
 const cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
 
