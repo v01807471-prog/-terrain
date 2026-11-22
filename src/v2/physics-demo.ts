@@ -218,9 +218,9 @@ root.innerHTML = `
           <button class="pv2-button" id="pv2-camera">◎ Камера за героем</button>
           <label class="pv2-toggle"><input id="pv2-wire" type="checkbox"> Сетка рельефа по уровням LOD</label>
           <label class="pv2-toggle"><input id="pv2-physics-debug" type="checkbox"> Контакты физики героя</label>
-          <label class="pv2-toggle"><input id="pv2-cpu-surface" type="checkbox"> CPU-поверхность столкновений</label>
+          <label class="pv2-toggle"><input id="pv2-cpu-surface" type="checkbox"> Показать CPU-сетку столкновений (только диагностика)</label>
         </div>
-        <p class="pv2-note">Фиолетовая сетка — отдельная CPU-поверхность столкновений с теми же треугольниками, что использует физика. Зелёные точки — опорные пробы капсулы, жёлтые отрезки — зазор до CPU-рельефа. Сравнивай фиолетовую сетку с цветным GPU-рельефом.</p>
+        <p class="pv2-note">В обычной игре CPU-сетка не рисуется: физика вычисляет высоту напрямую из Terrain, а GPU строит видимую поверхность шейдером. Включай сетку только для сравнения CPU и GPU.</p>
       </section>
       <section class="pv2-panel">
         <h2>Показания</h2>
@@ -232,6 +232,24 @@ root.innerHTML = `
           <div class="pv2-stat"><span>FPS рендера</span><b id="pv2-fps">—</b></div>
           <div class="pv2-stat"><span>Видимых тайлов</span><b id="pv2-tiles">—</b></div>
         </div>
+      </section>
+      <section class="pv2-panel">
+        <h2>Диагностика движка</h2>
+        <div class="pv2-diagnostic-grid">
+          <div><span>Кадр CPU</span><b id="pv2-diag-frame">—</b></div>
+          <div><span>Физика CPU</span><b id="pv2-diag-physics">—</b></div>
+          <div><span>Рендер submit</span><b id="pv2-diag-render">—</b></div>
+          <div><span>Шаги физики</span><b id="pv2-diag-steps">—</b></div>
+          <div><span>Draw calls</span><b id="pv2-diag-calls">—</b></div>
+          <div><span>Треугольники</span><b id="pv2-diag-tris">—</b></div>
+          <div><span>GPU-программы</span><b id="pv2-diag-programs">—</b></div>
+          <div><span>Геометрии / текстуры</span><b id="pv2-diag-resources">—</b></div>
+          <div><span>Тайлы готовы / очередь</span><b id="pv2-diag-queue">—</b></div>
+          <div><span>Память правок</span><b id="pv2-diag-edits">—</b></div>
+          <div><span>Потерянное время</span><b id="pv2-diag-dropped">—</b></div>
+          <div><span>Состояние</span><b id="pv2-diag-health">—</b></div>
+        </div>
+        <p class="pv2-note">Время CPU — замер JavaScript, не точное время выполнения GPU. Draw calls и треугольники берутся из счётчиков Three.js.</p>
       </section>
       <section class="pv2-panel">
         <h2>Физика шара</h2>
@@ -663,8 +681,32 @@ const resizeObserver = new ResizeObserver(resize);
 resizeObserver.observe(viewport); resize();
 
 let previousTime = performance.now(), fpsFrames = 0, fpsElapsed = 0;
+let physicsCpuMs = 0, renderSubmitMs = 0, frameCpuMs = 0, droppedPhysicsTime = 0, physicsStepsLastFrame = 0;
+let diagnosticElapsed = 0;
+function setDiagnostic(id: string, value: string): void {
+  const element = document.querySelector<HTMLElement>(`#${id}`);
+  if (element) element.textContent = value;
+}
+function updateDiagnostics(culling: ReturnType<TerrainRenderer['update']>): void {
+  const info = renderer.info;
+  const programs = info.programs?.length ?? 0;
+  setDiagnostic('pv2-diag-frame', `${frameCpuMs.toFixed(2)} ms`);
+  setDiagnostic('pv2-diag-physics', `${physicsCpuMs.toFixed(2)} ms`);
+  setDiagnostic('pv2-diag-render', `${renderSubmitMs.toFixed(2)} ms`);
+  setDiagnostic('pv2-diag-steps', `${physicsStepsLastFrame} / кадр`);
+  setDiagnostic('pv2-diag-calls', String(info.render.calls));
+  setDiagnostic('pv2-diag-tris', info.render.triangles.toLocaleString('ru-RU'));
+  setDiagnostic('pv2-diag-programs', String(programs));
+  setDiagnostic('pv2-diag-resources', `${info.memory.geometries} / ${info.memory.textures}`);
+  setDiagnostic('pv2-diag-queue', `${culling.readyTiles} / ${culling.totalTiles} · ${culling.queuedTiles} в очереди`);
+  setDiagnostic('pv2-diag-edits', `${(terrain.allocatedEditBytes / 1024).toFixed(1)} КБ`);
+  setDiagnostic('pv2-diag-dropped', `${(droppedPhysicsTime * 1000).toFixed(1)} ms`);
+  const slow = frameCpuMs > 24 || physicsCpuMs > 8 || droppedPhysicsTime > 0.02;
+  const warming = culling.queuedTiles > 0 || programs < 8;
+  setDiagnostic('pv2-diag-health', slow ? 'Есть нагрузка' : warming ? 'Загрузка по очереди' : 'Норма');
+}
 function animate(now: number): void {
-  requestAnimationFrame(animate);
+  const frameStart = performance.now();
   const delta = Math.min((now - previousTime) / 1000, 0.05);
   previousTime = now; fpsFrames++; fpsElapsed += delta;
   if (fpsElapsed >= 0.5) {
@@ -674,8 +716,13 @@ function animate(now: number): void {
   updateDayNight(delta);
   updatePlayer(delta);
   if (cpuSurfaceDebug.group.visible) cpuSurfaceDebug.update(player.x, player.z);
+  const physicsStart = performance.now();
+  physicsStepsLastFrame = 0;
+  droppedPhysicsTime = 0;
   if (!paused) {
     const result = loop.advance(delta);
+    physicsStepsLastFrame = result.steps;
+    droppedPhysicsTime = result.droppedTime;
     totalSteps += result.steps;
     for (const [id, mesh] of sphereMeshes) {
       const body = world.bodies.get(id);
@@ -685,12 +732,19 @@ function animate(now: number): void {
       mesh.quaternion.set(body.orientation.x, body.orientation.y, body.orientation.z, body.orientation.w);
     }
   }
+  physicsCpuMs = performance.now() - physicsStart;
   updateFollowCamera();
   waterRenderer.update(camera, now / 1000);
   const culling = terrainRenderer.update(camera);
   document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
   updateStats();
+  const renderStart = performance.now();
   renderer.render(scene, camera);
+  renderSubmitMs = performance.now() - renderStart;
+  frameCpuMs = performance.now() - frameStart;
+  diagnosticElapsed += delta;
+  if (diagnosticElapsed >= 0.5) { updateDiagnostics(culling); diagnosticElapsed = 0; }
+  requestAnimationFrame(animate);
 }
 resetPlayer();
 updateFollowCamera();
