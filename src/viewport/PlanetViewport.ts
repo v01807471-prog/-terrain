@@ -61,7 +61,8 @@ export class PlanetViewport {
     this.controls.zoomSpeed=this.settings.zoomSpeed;
     this.controls.minDistance=this.radius+1;
     this.controls.maxDistance=this.radius+250000;
-    this.controls.setGizmosVisible(false);
+    // OrbitControls has no setGizmosVisible method; gizmo visibility is not
+    // part of its API. Keep the standard controls without this unsupported call.
     this.controls.update();
     this.updateDepthRange();
 
