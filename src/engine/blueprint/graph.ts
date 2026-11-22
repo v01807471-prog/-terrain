@@ -1,5 +1,5 @@
 import { compileGraph } from '../graph/compiler.js';
-import { NOISE_GLSL } from '../shaders/noise.glsl.js';
+import noiseShader from '../shaders/noise.glsl?raw';
 import type { TerrainBlueprint } from './types.js';
 
 export interface TerrainGraph {
@@ -52,7 +52,7 @@ export function compileTerrainGraph(graph: TerrainGraph): TerrainBlueprint {
   const fogNear = compiled.fog?.near > 0 ? compiled.fog.near : 100;
   const fogFar = compiled.fog?.far > fogNear ? compiled.fog.far : 320;
   const heightFunctionGLSL = `
-    ${NOISE_GLSL}
+    ${noiseShader}
     float terrainHeight(vec2 p) {
       vec2 pw = p;
       ${compiled.glHeight}
