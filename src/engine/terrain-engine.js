@@ -7,6 +7,7 @@ import { F, oc, lin, NODE_TYPES } from "./graph/nodes.js";
 import { compileGraph, previewGraph } from "./graph/compiler.js";
 import { QUALITY_PRESETS } from "./config/quality.js";
 import { f32ToB64, b64ToF32 } from "./persistence/float32.js";
+import { PRESET_GRAPHS, defaultGraph, ensureEnv } from "./legacy/graphPresets.js";
 
 (async()=>{
 try{
@@ -178,100 +179,6 @@ const uniforms={
 
 
 
-
-// [тип,x,y,параметры,значения входов,связи {вход:номер узла в списке (с 1)}]
-function G(seed,list){
- return {seed,nodes:list.map((r,i)=>({id:i+1,type:r[0],x:r[1],y:r[2],p:r[3]||{},d:r[4]||{},in:r[5]||{}}))};
-}
-
-function colorSpec(o){
- return [
-  ["grass",30,440],
-  ["rock",30,510],
-  ["slope",30,580],
-  ["smooth",260,580,{e0:.42,e1:.68},{},{a:o+3}],
-  ["cmix",480,470,{},{},{a:o+1,b:o+2,t:o+4}],
-  ["height",30,650],
-  ["smooth",260,650,{e0:30,e1:48},{},{a:o+6}],
-  ["mul",480,650,{},{b:.8},{a:o+7}],
-  ["color",480,560,{col:"#76726c"}],
-  ["cmix",720,500,{},{},{a:o+5,b:o+9,t:o+8}],
-  ["out_color",960,500,{},{},{c:o+10}]
- ];
-}
-
-function ensureEnv(g){
- const nid=()=>g.nodes.reduce((m,n)=>Math.max(m,n.id),0)+1;
- if(!g.nodes.some(n=>n.type==="out_water"))g.nodes.push({id:nid(),type:"out_water",x:1180,y:40,p:{},d:{},in:{}});
- if(!g.nodes.some(n=>n.type==="out_fog"))g.nodes.push({id:nid(),type:"out_fog",x:1180,y:330,p:{},d:{},in:{}});
- return g;
-}
-
-function makeGraph(seed,h){
- return ensureEnv(G(seed,[...h,...colorSpec(h.length)]));
-}
-
-const PRESET_GRAPHS={
- hills:seed=>makeGraph(seed,[
-  ["noise",30,30,{scale:.0048,oct:4}],
-  ["mul",260,30,{},{b:42},{a:1}],
-  ["noise",30,130,{scale:.018,ox:31,oz:-17,oct:4}],
-  ["mul",260,130,{},{b:12},{a:3}],
-  ["noise",30,230,{scale:.065,ox:-13,oz:42,oct:4}],
-  ["mul",260,230,{},{b:1.8},{a:5}],
-  ["add",480,60,{},{},{a:2,b:4}],
-  ["add",480,160,{},{},{a:7,b:6}],
-  ["add",690,100,{},{b:6},{a:8}],
-  ["out_height",900,100,{},{},{h:9}]
- ]),
- mountains:seed=>makeGraph(seed,[
-  ["ridged",30,30,{scale:.004,oct:6}],
-  ["mul",260,30,{},{b:90},{a:1}],
-  ["noise",30,130,{scale:.02,ox:31,oz:-17,oct:4}],
-  ["mul",260,130,{},{b:8},{a:3}],
-  ["noise",30,230,{scale:.07,ox:-13,oz:42,oct:3}],
-  ["mul",260,230,{},{b:1.2},{a:5}],
-  ["add",480,60,{},{},{a:2,b:4}],
-  ["add",480,160,{},{},{a:7,b:6}],
-  ["add",690,100,{},{b:4},{a:8}],
-  ["out_height",900,100,{},{},{h:9}]
- ]),
- islands:seed=>makeGraph(seed,[
-  ["noise",30,30,{scale:.0035,oct:5}],
-  ["mul",260,30,{},{b:55},{a:1}],
-  ["add",470,30,{},{b:-8},{a:2}],
-  ["noise",30,130,{scale:.03,ox:7,oz:3,oct:4}],
-  ["mul",260,130,{},{b:3},{a:4}],
-  ["add",690,80,{},{},{a:3,b:5}],
-  ["out_height",900,80,{},{},{h:6}]
- ]),
- plains:seed=>makeGraph(seed,[
-  ["noise",30,30,{scale:.01,oct:3}],
-  ["mul",260,30,{},{b:2},{a:1}],
-  ["add",470,30,{},{b:3},{a:2}],
-  ["out_height",700,30,{},{},{h:3}]
- ]),
- terraces:seed=>makeGraph(seed,[
-  ["noise",30,30,{scale:.005,oct:5}],
-  ["mul",260,30,{},{b:40},{a:1}],
-  ["terrace",470,30,{step:5,sharp:.85},{},{a:2}],
-  ["add",690,30,{},{b:6},{a:3}],
-  ["out_height",900,30,{},{},{h:4}]
- ])
-};
-
-{
- const isl=PRESET_GRAPHS.islands;
- PRESET_GRAPHS.islands=seed=>{
-  const g=isl(seed);
-  g.nodes.find(n=>n.type==="out_water").d.level=-1;
-  return g;
- };
-}
-
-function defaultGraph(){
- return PRESET_GRAPHS.hills(0);
-}
 
 // GRAPH INSTALL
 
