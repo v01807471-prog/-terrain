@@ -9,7 +9,12 @@ out vec3 vNormal;
 out float vDistance;
 __TERRAIN_HEIGHT_FUNCTION__
 void main() {
-  vec4 world = modelMatrix * vec4(position, 1.0);
+  vec4 world;
+  #ifdef USE_INSTANCING
+    world = modelMatrix * instanceMatrix * vec4(position, 1.0);
+  #else
+    world = modelMatrix * vec4(position, 1.0);
+  #endif
   vec2 p = world.xz;
   float d = max(max(abs(p.x-uCamera.x), abs(p.y-uCamera.y)), uAltitude);
   float morphEnd = uHalf - 2.0*uStep;
