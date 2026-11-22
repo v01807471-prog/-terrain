@@ -156,12 +156,13 @@ export class TerrainRenderer {
 
     const cx = cameraPosition.x, cz = cameraPosition.z;
     const groundY = this.terrain.getGroundHeight(cx, cz, this.baseCellSize);
-    const altitude = Math.max(0, cameraPosition.y - groundY - 4);
+    const cameraHeight = Math.max(1, cameraPosition.y - groundY);
+    const altitude = Math.max(0, cameraHeight - 4);
     this.uniforms.uCamera.value.set(cx, cz);
     this.uniforms.uAltitude.value = altitude;
     // The dome is a fixed spherical cap. Camera altitude only reveals more of it
     // and expands the reused clipmap rings; it never deforms the physics surface.
-    const horizonDistance = Math.sqrt(2 * DOME_RADIUS * altitude + altitude * altitude);
+    const horizonDistance = Math.sqrt(2 * DOME_RADIUS * cameraHeight + cameraHeight * cameraHeight);
     const baseCoverage = this.gridSize * 0.5 * this.baseCellSize * 2 ** (this.levels - 1);
     const lodScale = THREE.MathUtils.clamp(Math.max(1, horizonDistance / baseCoverage), 1, 256);
     const lodScaleChanged = Math.abs(this.uniforms.uLodScale.value - lodScale) > 0.0005;
@@ -176,8 +177,8 @@ export class TerrainRenderer {
       const ax = cx - Math.round(cx / sa) * sa, az = cz - Math.round(cz / sa) * sa;
       const bx = cx - Math.round(cx / sb) * sb, bz = cz - Math.round(cz / sb) * sb;
       const ta = ra.tiles[a.tileIndex], tb = rb.tiles[b.tileIndex];
-      const da = Math.hypot((ta.ox + this.tileSize / 2) * ra.step - ax, (ta.oz + this.tileSize / 2) * ra.step - az);
-      const db = Math.hypot((tb.ox + this.tileSize / 2) * rb.step - bx, (tb.oz + this.tileSize / 2) * rb.step - bz);
+      const da = Math.hypot((ta.ox + this.tileSize / 2) * ra.step * lodScale - ax, (ta.oz + this.tileSize / 2) * ra.step * lodScale - az);
+      const db = Math.hypot((tb.ox + this.tileSize / 2) * rb.step * lodScale - bx, (tb.oz + this.tileSize / 2) * rb.step * lodScale - bz);
       return da - db;
     });
     // Create only a few tiles per frame; never build the full clipmap in one blocking burst.
@@ -276,7 +277,7 @@ export class TerrainRenderer {
       this.wireGeometries[tileIndex] = wireGeometry;
     }
     const wire = new THREE.LineSegments(wireGeometry, ring.wireMaterial);
-    wire.scale.set(ring.step, 1, ring.step);
+    wire.scale.set(ring.step * this.uniforms.uLodScale.value, 1, ring.step * this.uniforms.uLodScale.value);
     wire.frustumCulled = false;
     wire.position.set(ring.centerX, 0, ring.centerZ);
     wire.visible = this.showWireframe && tile.visible;
@@ -339,6 +340,7 @@ export class TerrainRenderer {
         ...Object.fromEntries(Object.entries(sharedMaterial.uniforms).filter(([key]) => key.startsWith('uAsset'))),
         uCamera: this.uniforms.uCamera,
         uAltitude: this.uniforms.uAltitude,
+        uLodScale: this.uniforms.uLodScale,
         uStep: { value: step },
         uHalf: { value: half },
         uCut: { value: cut },
