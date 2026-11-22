@@ -16,7 +16,7 @@ out float vDistance;
 #include <shadowmap_pars_vertex>
 __TERRAIN_HEIGHT_FUNCTION__
 float terrainHeightAtLOD(vec2 sampleP, float stepSize, float halfSize) {
-  float distanceToCamera = max(max(abs(sampleP.x-uCamera.x), abs(sampleP.y-uCamera.y)), uAltitude);
+  float distanceToCamera = max(abs(sampleP.x-uCamera.x), abs(sampleP.y-uCamera.y));
   float morphEnd = halfSize - 2.0 * stepSize;
   float morphWidth = max(8.0 * stepSize, halfSize * 0.35);
   float morph = smoothstep(morphEnd - morphWidth, morphEnd, distanceToCamera);
@@ -52,7 +52,7 @@ void main() {
     cutSize = aCut;
   #endif
   vCut = cutSize * uLodScale;
-  float d = max(max(abs(p.x-uCamera.x), abs(p.y-uCamera.y)), uAltitude);
+  float d = max(abs(p.x-uCamera.x), abs(p.y-uCamera.y));
   float h = terrainHeightAtLOD(p, stepSize, halfSize);
   float e = max(0.5 * stepSize, 0.05);
   float hx = terrainHeightAtLOD(p + vec2(e, 0.0), stepSize, halfSize);
