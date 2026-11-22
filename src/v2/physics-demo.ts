@@ -501,7 +501,7 @@ window.addEventListener('beforeunload', () => {
 class BlueprintNodeEditor {
   private graph: ReturnType<typeof createDefaultTerrainGraph>;
   private host: HTMLElement; private apply: (g: ReturnType<typeof createDefaultTerrainGraph>) => void;
-  private zoom=1; private selected:number|null=null; private pending:number|null=null; private timer=0;
+  private zoom=1; private selected:number|null=null; private pending:number|null=null; private timer=0; private previewTimer=0;
   constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void){
     this.host=host;this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
   }
@@ -625,7 +625,7 @@ class BlueprintNodeEditor {
     this.zoomAt(Math.min(1.2,Math.max(.35,Math.min(sc.clientWidth/(x1-x0+80),sc.clientHeight/(y1-y0+80)))));sc.scrollLeft=Math.max(0,(x0-40)*this.zoom);sc.scrollTop=Math.max(0,(y0-40)*this.zoom);
   }
   private preview():void{
-    window.clearTimeout(this.timer);this.timer=window.setTimeout(()=>{try{
+    window.clearTimeout(this.previewTimer);this.previewTimer=window.setTimeout(()=>{try{
       const r=previewGraph(this.graph,0,0,400,40,null);
       for(const cv of this.host.querySelectorAll<HTMLCanvasElement>('.v2-gnode-preview')){
         const n=this.node(Number(cv.parentElement?.dataset.id)),s=n&&r.map.get(n.id),ctx=cv.getContext('2d')!;ctx.clearRect(0,0,80,80);
@@ -634,7 +634,7 @@ class BlueprintNodeEditor {
       }
     }catch(e){this.status(e instanceof Error?e.message:'Ошибка превью');}},180);
   }
-  private schedule():void{this.status('Изменения…');window.clearTimeout(this.timer);this.timer=window.setTimeout(()=>this.applyNow(),450);}
+  private schedule():void{this.status('Изменения…');this.preview();window.clearTimeout(this.timer);this.timer=window.setTimeout(()=>this.applyNow(),450);}
   private applyNow():void{try{this.apply(structuredClone(this.graph));this.status('Применено ✔');}catch(e){this.status(e instanceof Error?e.message:'Ошибка компиляции');}}
   private status(s:string):void{this.el('v2g-status').textContent=s;}
   private async importFile(input:HTMLInputElement):Promise<void>{const file=input.files?.[0];if(!file)return;try{const g=JSON.parse(await file.text());if(!g||!Array.isArray(g.nodes))throw new Error('Неверный граф');this.graph=g;this.render();this.applyNow();}catch(e){this.status(e instanceof Error?e.message:'Ошибка импорта');}input.value='';}
