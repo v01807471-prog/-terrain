@@ -5,6 +5,7 @@ import wireFragmentShader from './shaders/wire.frag.glsl?raw';
 import type { Terrain } from '../terrain/Terrain.js';
 import type { TerrainBlueprint } from '../blueprint/types.js';
 import { BUILTIN_TEXTURE_ASSETS, createBuiltinTexture } from '../textures/assets.js';
+import { DOME_RADIUS } from '../terrain/DomeProjection.js';
 
 export interface TerrainClipmapOptions {
   levels?: number;
@@ -41,6 +42,7 @@ export class TerrainRenderer {
   private readonly uniforms: {
     uCamera: { value: THREE.Vector2 };
     uAltitude: { value: number };
+    uLodScale: { value: number };
     uFogColor: { value: THREE.Color };
     uFogNear: { value: number };
     uFogFar: { value: number };
@@ -78,6 +80,7 @@ export class TerrainRenderer {
     this.uniforms = {
       uCamera: { value: new THREE.Vector2() },
       uAltitude: { value: 0 },
+      uLodScale: { value: 1 },
       uFogColor: { value: new THREE.Color(blueprint.fogColor) },
       uFogNear: { value: blueprint.fogNear },
       uFogFar: { value: blueprint.fogFar },
@@ -144,7 +147,7 @@ export class TerrainRenderer {
     this.uniforms.uSunIntensity.value = Math.max(0, intensity);
   }
 
-  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; readyTiles: number; queuedTiles: number; altitude: number } {
+  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; readyTiles: number; queuedTiles: number; altitude: number; horizonDistance: number; lodScale: number } {
     camera.updateMatrixWorld(true);
     const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
     camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
@@ -156,13 +159,20 @@ export class TerrainRenderer {
     const altitude = Math.max(0, cameraPosition.y - groundY - 4);
     this.uniforms.uCamera.value.set(cx, cz);
     this.uniforms.uAltitude.value = altitude;
+    // The dome is a fixed spherical cap. Camera altitude only reveals more of it
+    // and expands the reused clipmap rings; it never deforms the physics surface.
+    const horizonDistance = Math.sqrt(2 * DOME_RADIUS * altitude + altitude * altitude);
+    const baseCoverage = this.gridSize * 0.5 * this.baseCellSize * 2 ** (this.levels - 1);
+    const lodScale = THREE.MathUtils.clamp(Math.max(1, horizonDistance / baseCoverage), 1, 256);
+    const lodScaleChanged = Math.abs(this.uniforms.uLodScale.value - lodScale) > 0.0005;
+    this.uniforms.uLodScale.value = lodScale;
 
     // Re-prioritize unfinished tiles around the camera every frame: inner LOD first,
     // then nearest tile centers. This keeps the visible center responsive while moving.
     this.creationQueue.sort((a, b) => {
       if (a.ringIndex !== b.ringIndex) return a.ringIndex - b.ringIndex;
       const ra = this.rings[a.ringIndex], rb = this.rings[b.ringIndex];
-      const sa = 2 * ra.step, sb = 2 * rb.step;
+      const sa = 2 * ra.step * lodScale, sb = 2 * rb.step * lodScale;
       const ax = cx - Math.round(cx / sa) * sa, az = cz - Math.round(cz / sa) * sa;
       const bx = cx - Math.round(cx / sb) * sb, bz = cz - Math.round(cz / sb) * sb;
       const ta = ra.tiles[a.tileIndex], tb = rb.tiles[b.tileIndex];
@@ -182,7 +192,7 @@ export class TerrainRenderer {
     let visibleTiles = 0;
     for (let level = 0; level < this.rings.length; level++) {
       const ring = this.rings[level];
-      const snap = 2 * ring.step;
+      const snap = 2 * ring.step * lodScale;
       const centerX = Math.round(cx / snap) * snap;
       const centerZ = Math.round(cz / snap) * snap;
       const last = level === this.rings.length - 1;
@@ -194,9 +204,9 @@ export class TerrainRenderer {
         const tile = ring.tiles[tileIndex];
         if (!tile.ready) continue;
         if (tile.wire && (tile.wire.position.x !== centerX || tile.wire.position.z !== centerZ)) tile.wire.position.set(centerX, 0, centerZ);
-        const size = this.tileSize * ring.step;
-        const x0 = centerX + tile.ox * ring.step, x1 = x0 + size;
-        const z0 = centerZ + tile.oz * ring.step, z1 = z0 + size;
+        const size = this.tileSize * ring.step * lodScale;
+        const x0 = centerX + tile.ox * ring.step * lodScale, x1 = x0 + size;
+        const z0 = centerZ + tile.oz * ring.step * lodScale, z1 = z0 + size;
         const minDistance = Math.max(
           Math.max(x0 - cx, 0, cx - x1),
           Math.max(z0 - cz, 0, cz - z1), altitude
@@ -206,15 +216,18 @@ export class TerrainRenderer {
           Math.abs(z0 - cz), Math.abs(z1 - cz), altitude
         );
         // Conservative vertical bounds include procedural peaks and valleys.
-        this.tileBounds.min.set(x0, -512, z0);
+        this.tileBounds.min.set(x0, -DOME_RADIUS, z0);
         this.tileBounds.max.set(x1, 512, z1);
         const inCameraFrustum = this.frustum.intersectsBox(this.tileBounds);
-        const inRing = maxDistance >= ring.cut && (last || minDistance < ring.outer);
-        const visible = inCameraFrustum && inRing;
-        if (tile.dirty || centerChanged || visible !== tile.visible) {
-          this.instanceTransform.position.set(centerX + tile.ox * ring.step, 0, centerZ + tile.oz * ring.step);
+        const inRing = maxDistance >= ring.cut * lodScale && (last || minDistance < ring.outer * lodScale);
+        const nearestDx = Math.max(x0 - cx, 0, cx - x1);
+        const nearestDz = Math.max(z0 - cz, 0, cz - z1);
+        const beforeHorizon = Math.hypot(nearestDx, nearestDz) <= horizonDistance * 1.03;
+        const visible = inCameraFrustum && inRing && beforeHorizon;
+        if (tile.dirty || centerChanged || lodScaleChanged || visible !== tile.visible) {
+          this.instanceTransform.position.set(centerX + tile.ox * ring.step * lodScale, 0, centerZ + tile.oz * ring.step * lodScale);
           this.instanceTransform.rotation.set(0, 0, 0);
-          this.instanceTransform.scale.set(visible ? ring.step : 0, visible ? 1 : 0, visible ? ring.step : 0);
+          this.instanceTransform.scale.set(visible ? ring.step * lodScale : 0, visible ? 1 : 0, visible ? ring.step * lodScale : 0);
           this.instanceTransform.updateMatrix();
           ring.instances.setMatrixAt(tile.instanceIndex, this.instanceTransform.matrix);
           tile.dirty = false;
@@ -225,8 +238,9 @@ export class TerrainRenderer {
         if (visible) visibleTiles++;
       }
       if (instanceBufferChanged) ring.instances.instanceMatrix.needsUpdate = true;
+      if (lodScaleChanged) for (const tile of ring.tiles) if (tile.wire) tile.wire.scale.set(ring.step * lodScale, 1, ring.step * lodScale);
     }
-    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.ready).length, 0), queuedTiles: this.creationQueue.length, altitude };
+    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.ready).length, 0), queuedTiles: this.creationQueue.length, altitude, horizonDistance, lodScale };
   }
 
   dispose(): void {
@@ -294,6 +308,7 @@ export class TerrainRenderer {
       ...assetUniforms,
       uCamera: this.uniforms.uCamera,
       uAltitude: this.uniforms.uAltitude,
+      uLodScale: this.uniforms.uLodScale,
       uFogColor: this.uniforms.uFogColor,
       uFogNear: this.uniforms.uFogNear,
       uFogFar: this.uniforms.uFogFar,
