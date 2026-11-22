@@ -285,7 +285,7 @@ renderer.toneMappingExposure = 1.15;
 renderer.domElement.tabIndex = 0;
 viewport.prepend(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight('#e5f5f1', '#38464a', 2.0));
+const hemisphere = new THREE.HemisphereLight('#e5f5f1', '#38464a', 1.8);\nscene.add(hemisphere);
 const sun = new THREE.DirectionalLight('#fff0d5', 3.1);
 sun.position.set(-25, 42, 18);
 sun.castShadow = true;
