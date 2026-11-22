@@ -16,7 +16,7 @@ export class PlanetViewport {
   private clock=new THREE.Clock();
   private thirdPerson=false;
   private avatar=new THREE.Group();
-  private settings={rings:16,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.35,rotationSpeed:1,autoRotate:false,showGrid:true};
+  private settings={rings:16,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
 
   constructor(private canvas:HTMLCanvasElement) {
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
@@ -34,8 +34,6 @@ export class PlanetViewport {
     this.clipmap=new SphericalClipmap(this.scene,this.settings);
     this.createAvatar();
 
-    // Arcball always rotates the camera around the planet center.
-    // Its target is the planet origin, not a point on the camera's tangent plane.
     this.camera.position.set(this.radius+8629,0,0);
     this.camera.up.set(0,1,0);
     this.camera.lookAt(0,0,0);
@@ -89,15 +87,17 @@ export class PlanetViewport {
   }
 
   private updateDepthRange(){
-    // Keep the perspective depth buffer useful at both planetary and human scales.
-    // A single 5 cm -> 120,000 km range destroys depth precision near the ground.
-    this.camera.near=this.thirdPerson ? .0005 : .5;
-    this.camera.far=this.thirdPerson ? 100 : Math.max(20000,this.camera.position.length()+this.radius*1.5);
+    // Keep enough depth precision close to the player without clipping the
+    // planet or distant orbit while zooming continuously between both modes.
+    const targetDistance=this.camera.position.distanceTo(this.controls.target);
+    this.camera.near=this.thirdPerson
+      ? Math.max(.0005,targetDistance*.000001)
+      : Math.max(.05,targetDistance*.00001);
+    this.camera.far=Math.max(200000,targetDistance+this.radius*2);
     this.camera.updateProjectionMatrix();
   }
 
   private createAvatar(){
-    // Simple scale-correct placeholder (metres converted to planet kilometres).
     const skin=new THREE.MeshStandardMaterial({color:0xe0a16a,roughness:.85});
     const suit=new THREE.MeshStandardMaterial({color:0x263b58,roughness:.8});
     const body=new THREE.Mesh(new THREE.CylinderGeometry(.00028,.00034,.00105,8),suit);
@@ -113,6 +113,8 @@ export class PlanetViewport {
     if(!this.thirdPerson){
       const altitude=this.camera.position.distanceTo(this.controls.target)-this.radius;
       if(altitude>80) return;
+
+      // Re-anchor the orbit target to the local ground without moving the camera.
       const radial=this.camera.position.clone().normalize();
       const worldUp=new THREE.Vector3(0,1,0);
       const reference=Math.abs(radial.dot(worldUp))>.995 ? new THREE.Vector3(0,0,1) : worldUp;
@@ -125,29 +127,28 @@ export class PlanetViewport {
       this.avatar.visible=true;
       const target=surface.clone().addScaledVector(radial,.0012);
       this.controls.target.copy(target);
-      this.camera.position.copy(target).addScaledVector(radial,.006).addScaledVector(north,-.012);
       this.camera.up.copy(radial);
       this.camera.lookAt(target);
       this.controls.minDistance=.003;
       this.controls.maxDistance=150000;
-      this.controls.update();
       this.thirdPerson=true;
+      this.controls.update();
       this.updateDepthRange();
       return;
     }
 
     if(this.camera.position.distanceTo(this.controls.target)<150) return;
-    // Leaving local third-person orbit: restore a planet-centred orbit target.
-    const radial=this.camera.position.clone().normalize();
+
+    // Switch back to planet-centred orbit by changing only the target.
+    // Preserve camera position and orientation: no teleport or zoom snap.
     this.controls.target.set(0,0,0);
-    this.camera.position.copy(radial).multiplyScalar(this.radius+250);
     this.camera.up.set(0,1,0);
     this.camera.lookAt(0,0,0);
     this.controls.minDistance=this.radius+1;
     this.controls.maxDistance=this.radius+90000;
-    this.controls.update();
     this.avatar.visible=false;
     this.thirdPerson=false;
+    this.controls.update();
     this.updateDepthRange();
   }
 
@@ -160,7 +161,6 @@ export class PlanetViewport {
       const t=this.clock.getElapsedTime();
       this.updateCameraMode();
       if(this.settings.autoRotate && !this.thirdPerson){
-        // Rotate the orbit camera around the planet, keeping its target at origin.
         const offset=this.camera.position.clone().sub(this.controls.target);
         offset.applyAxisAngle(new THREE.Vector3(0,1,0),.0008*this.settings.rotationSpeed);
         this.camera.position.copy(this.controls.target).add(offset);
@@ -168,17 +168,14 @@ export class PlanetViewport {
       }
       this.controls.update();
       if (this.thirdPerson) {
-        // Keep the local camera above the displaced ground while Arcball
-        // supplies shooter-like mouse look around the stationary character.
+        // Prevent the local camera from passing below the displaced ground.
         const cameraRadial=this.camera.position.clone().normalize();
         const groundRadius=this.radius+this.terrainHeightKm(cameraRadial);
-        const minCameraRadius=groundRadius+0.0018;
+        const minCameraRadius=groundRadius+.0018;
         if (this.camera.position.length()<minCameraRadius) {
           this.camera.position.copy(cameraRadial.multiplyScalar(minCameraRadius));
         }
 
-        // Turn the character toward the horizontal view direction and keep
-        // its up axis aligned with the local surface normal.
         const up=this.avatar.position.clone().normalize();
         const forward=this.controls.target.clone().sub(this.camera.position);
         forward.addScaledVector(up,-forward.dot(up)).normalize();
@@ -188,6 +185,7 @@ export class PlanetViewport {
           this.avatar.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,back));
         }
       }
+      this.updateDepthRange();
       this.clipmap.update(this.camera,t);
       this.renderer.render(this.scene,this.camera);
     };
@@ -208,7 +206,7 @@ export class PlanetViewport {
 
   updateConfig(patch:Record<string,number|boolean>){
     Object.assign(this.settings,patch);
-    this.controls.scaleFactor=this.settings.zoomSpeed;
+    this.controls.scaleFactor=Math.max(1.02,Math.min(1.25,this.settings.zoomSpeed));
     if(!this.thirdPerson){
       this.controls.minDistance=this.radius+1;
       this.controls.maxDistance=this.radius+90000;
