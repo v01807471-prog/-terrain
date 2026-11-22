@@ -109,6 +109,12 @@ export class PlanetViewport {
     // part of its API. Keep the standard controls without this unsupported call.
     this.controls.update();
     this.player=new PlanetPlayerController(this.canvas,this.camera,this.controls,this.avatar,(direction)=>this.activeTerrainHeightKm(direction));
+
+    // Start in playable surface mode instead of leaving the camera in orbit.
+    // The player controller places the avatar on the same procedural height
+    // field used by the terrain shader and owns the third-person camera.
+    this.player.enter(this.planetCenter,this.radius,new THREE.Vector3(1,0,0));
+    this.thirdPerson=true;
     this.updateDepthRange();
 
     this.resize=new ResizeManager(canvas,(w,h,dpr)=>{
