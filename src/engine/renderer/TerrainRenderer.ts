@@ -37,7 +37,7 @@ export class TerrainRenderer {
     uAltitude: { value: number };
     uFogColor: { value: THREE.Color };
     uFogNear: { value: number };
-    uFogFar: { value: number };
+    uFogFar: { value: number };\n    uSunDirection: { value: THREE.Vector3 };\n    uSunIntensity: { value: number };
   };
   private readonly unsubscribe: () => void;
   private showWireframe: boolean;
@@ -69,7 +69,7 @@ export class TerrainRenderer {
       uAltitude: { value: 0 },
       uFogColor: { value: new THREE.Color(blueprint.fogColor) },
       uFogNear: { value: blueprint.fogNear },
-      uFogFar: { value: blueprint.fogFar }
+      uFogFar: { value: blueprint.fogFar },\n      uSunDirection: { value: new THREE.Vector3(-0.45, 0.78, 0.42).normalize() },\n      uSunIntensity: { value: 1 }
     };
     this.build(blueprint);
     this.scene.add(this.group);
@@ -109,7 +109,7 @@ export class TerrainRenderer {
     }
   }
 
-  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; altitude: number } {
+  setLighting(direction: THREE.Vector3, intensity: number): void {\n    this.uniforms.uSunDirection.value.copy(direction).normalize();\n    this.uniforms.uSunIntensity.value = Math.max(0, intensity);\n  }\n\n  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; altitude: number } {
     camera.updateMatrixWorld(true);
     const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
     camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
@@ -203,13 +203,13 @@ export class TerrainRenderer {
         uOuter: { value: level === this.levels - 1 ? 1e9 : outer },
         uFogColor: this.uniforms.uFogColor,
         uFogNear: this.uniforms.uFogNear,
-        uFogFar: this.uniforms.uFogFar,
+        uFogFar: this.uniforms.uFogFar,\n        uSunDirection: this.uniforms.uSunDirection,\n        uSunIntensity: this.uniforms.uSunIntensity,
         uBaseColor: { value: new THREE.Color(blueprint.terrainColor) },
         // Контрастный цвет для каждого LOD, чтобы было видно границы уровней.
         uWireColor: { value: new THREE.Color().setHSL(0.48 + level * 0.075, 0.88, 0.62) }
       };
       const material = new THREE.ShaderMaterial({
-        uniforms: { ...common, uWireLift: { value: 0 } }, vertexShader, fragmentShader: terrainFragmentShader.replace('__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;'),
+        uniforms: { ...common, uWireLift: { value: 0 } }, vertexShader, fragmentShader: terrainFragmentShader.replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL).replace('__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;'),
         glslVersion: THREE.GLSL3, side: THREE.FrontSide
       });
       const wireMaterial = new THREE.ShaderMaterial({
