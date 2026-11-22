@@ -156,10 +156,20 @@ export class PlanetViewport {
   private get activeRadius(){return this.focusedMoon?this.moonRadius:this.radius;}
   private get activeClipmap(){return this.focusedMoon?this.moonClipmap:this.clipmap;}
   private get activeGravity(){return this.focusedMoon?1.62:9.81;}
-  private activeTerrainHeightKm(direction:THREE.Vector3){
+  private activePlanetLocalDirection(worldDirection:THREE.Vector3){
+    const body=this.focusedMoon?this.solar.moon:this.solar.earth;
+    const bodyWorldRotation=new THREE.Quaternion();
+    body.getWorldQuaternion(bodyWorldRotation);
+    return worldDirection.clone().applyQuaternion(bodyWorldRotation.invert()).normalize();
+  }
+
+  private activeTerrainHeightKm(worldDirection:THREE.Vector3){
+    // The shader samples the height field in the celestial body's local frame.
+    // Collision and avatar placement must use that exact same direction.
+    const localDirection=this.activePlanetLocalDirection(worldDirection);
     return this.focusedMoon
-      ?terrainBlueprint.heightKm(direction,this.moonTerrainSettings,0)
-      :this.terrainHeightKm(direction);
+      ?terrainBlueprint.heightKm(localDirection,this.moonTerrainSettings,0)
+      :this.terrainHeightKm(localDirection);
   }
 
 
