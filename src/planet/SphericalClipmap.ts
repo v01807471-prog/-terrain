@@ -60,7 +60,7 @@ export class SphericalClipmap {
     this.rings=[];
     const count=THREE.MathUtils.clamp(Math.round(this.settings.rings),1,16);
     const growth=this.settings.ringGrowth;
-    const baseAngle=.006;
+    const baseAngle=.045;
     for(let i=0;i<count;i++){
       const inner=i===0?0:baseAngle*Math.pow(growth,i-1)*this.settings.radius;
       const outer=baseAngle*Math.pow(growth,i)*this.settings.radius;
