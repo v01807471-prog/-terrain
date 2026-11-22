@@ -24,20 +24,50 @@ class BlueprintNodeEditor {
     this.el('v2g-preview-slot').append(this.viewport);
     this.viewport.classList.add('v2g-live-preview');
     const side=document.querySelector<HTMLElement>('.pv2-side');
-    if(side)this.el('v2g-diagnostics-slot').append(side);
+    if(side)this.el('v2g-preview-inspector-slot').append(side);
     requestAnimationFrame(()=>{this.fit();window.dispatchEvent(new Event('resize'));});
   }
   private close():void{this.viewport.classList.remove('v2g-live-preview');this.viewportMarker.parentNode?.insertBefore(this.viewport,this.viewportMarker);this.host.classList.remove('open','preview-expanded');window.dispatchEvent(new Event('resize'));}
   private node(id:number):any{return this.graph.nodes.find(n=>n.id===id);}
   private shell():void{
-    this.host.innerHTML=`<div class="v2-graph-window"><header class="v2-graph-toolbar">
-    <b>◈ Граф мира</b><select id="v2g-preset"><option value="regions">🌍 Регионы</option><option value="plains">🌾 Равнины</option><option value="mountains">⛰️ Горы</option><option value="desert">🏜️ Пустыня</option><option value="islands">🏝️ Острова</option></select><button data-a="preset" title="Загрузить пресет" aria-label="Загрузить пресет">⟳</button><label>Сид <input id="v2g-seed" type="number"></label><button data-a="random" title="Новый seed" aria-label="Новый seed">⚄</button>
-    <select id="v2g-add"></select><button data-a="add" title="Добавить узел" aria-label="Добавить узел">＋</button><button data-a="assets" title="Библиотека материалов" aria-label="Библиотека материалов">◈</button><button data-a="diagnostics" title="Статистика и диагностика" aria-label="Статистика и диагностика">▤</button><button data-a="physics" title="Отладка физики" aria-label="Отладка физики">⚙</button><button data-a="wire" title="Показать сетку" aria-label="Показать сетку">▦</button><label class="v2g-sun-control">☀ <input id="v2g-sun-time" type="range" min="0" max="1" step="0.001" value="0.36"></label><button data-a="fit" title="Уместить все узлы" aria-label="Уместить все узлы">⌖</button>
-    <button data-a="minus">−</button><span id="v2g-zoom">100%</span><button data-a="plus">+</button>
-    <button data-a="export" title="Экспорт Blueprint" aria-label="Экспорт Blueprint">⇧</button><button data-a="import" title="Импорт Blueprint" aria-label="Импорт Blueprint">⇩</button><input id="v2g-file" type="file" accept=".json" hidden>
-    <span id="v2g-status">Граф готов</span><button data-a="apply" title="Применить изменения">✓ Применить</button><button data-a="close">← В игру</button></header>
-    <div class="v2-graph-preview-dock"><div class="v2-graph-preview-caption"><b>Живой предпросмотр</b><span>Нажми, чтобы увеличить</span><button data-a="preview" aria-label="Увеличить предпросмотр">⤢</button></div><div id="v2g-preview-slot"></div><aside class="v2g-preview-inspector"><div class="v2g-preview-inspector-title">Инспектор сцены</div><div id="v2g-diagnostics-slot"></div></aside></div>
-    <div class="v2g-asset-drawer"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Выбери текстуру и добавь её узлом в граф</span></div><div id="v2g-assets-list"></div></div><div class="v2g-diagnostics-drawer"><div id="v2g-diagnostics-slot"></div></div><div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world"><svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div></div></div>`;
+    this.host.innerHTML=`<div class="v2-graph-window">
+      <header class="v2-graph-toolbar">
+        <div class="v2g-brand"><span class="v2g-brand-mark">◈</span><div><b>Terrain</b><small>WORLD GRAPH</small></div></div>
+        <div class="v2g-toolbar-separator"></div>
+        <select id="v2g-preset" aria-label="Пресет мира"><option value="regions">Регионы</option><option value="plains">Равнины</option><option value="mountains">Горы</option><option value="desert">Пустыня</option><option value="islands">Острова</option></select>
+        <button data-a="preset" title="Загрузить пресет" aria-label="Загрузить пресет">⟳</button>
+        <label class="v2g-seed-label">SEED <input id="v2g-seed" type="number"></label>
+        <button data-a="random" title="Случайный seed" aria-label="Случайный seed">⚄</button>
+        <div class="v2g-toolbar-separator"></div>
+        <select id="v2g-add" aria-label="Тип нового узла"></select><button data-a="add" title="Добавить узел" aria-label="Добавить узел">＋</button>
+        <button data-a="assets" title="Библиотека текстур" aria-label="Библиотека текстур">▧</button>
+        <button data-a="diagnostics" title="Предпросмотр и инспектор" aria-label="Предпросмотр и инспектор">◫</button>
+        <button data-a="physics" title="Отладка физики" aria-label="Отладка физики">⚙</button>
+        <button data-a="wire" title="Показать сетку" aria-label="Показать сетку">▦</button>
+        <label class="v2g-sun-control" title="Время суток">☼ <input id="v2g-sun-time" type="range" min="0" max="1" step="0.001" value="0.36"></label>
+        <div class="v2g-toolbar-spacer"></div>
+        <button data-a="fit" title="Уместить все узлы" aria-label="Уместить все узлы">⌖</button>
+        <button data-a="minus" title="Уменьшить масштаб">−</button><span id="v2g-zoom">100%</span><button data-a="plus" title="Увеличить масштаб">＋</button>
+        <div class="v2g-toolbar-separator"></div>
+        <button data-a="export" title="Экспорт Blueprint" aria-label="Экспорт Blueprint">⇧</button>
+        <button data-a="import" title="Импорт Blueprint" aria-label="Импорт Blueprint">⇩</button><input id="v2g-file" type="file" accept=".json" hidden>
+        <span id="v2g-status">Граф готов</span>
+        <button data-a="apply" class="v2g-apply-button">Применить</button>
+        <button data-a="close" title="Вернуться в сцену" aria-label="Вернуться в сцену">↗</button>
+      </header>
+      <main class="v2-graph-body">
+        <div id="v2g-scroll" class="v2-graph-scroll">
+          <div id="v2g-world" class="v2-graph-world"><svg id="v2g-links"></svg><div id="v2g-nodes"></div></div>
+          <div class="v2g-canvas-help">Колесо + Ctrl — масштаб · перетаскивание фона — перемещение · выход → вход — связь · Delete — удалить узел</div>
+        </div>
+      </main>
+      <section class="v2-graph-preview-dock">
+        <div class="v2-graph-preview-caption"><b>ПРЕДПРОСМОТР СЦЕНЫ</b><span>Живой рендер</span><button data-a="preview" aria-label="Открыть окно предпросмотра">⤢</button></div>
+        <div id="v2g-preview-slot"></div>
+        <aside class="v2g-preview-inspector"><div class="v2g-preview-inspector-title">ИНСПЕКТОР СЦЕНЫ</div><div id="v2g-preview-inspector-slot"></div></aside>
+      </section>
+      <aside class="v2g-asset-drawer"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Выберите материал, чтобы добавить его в граф</span></div><div id="v2g-assets-list"></div></aside>
+    </div>`;
     const sel=this.el<HTMLSelectElement>('v2g-add');
     for(const [type,t] of Object.entries(NODE_TYPES)){const o=document.createElement('option');o.value=type;o.textContent=(t as any).t;sel.append(o);}
     this.host.querySelectorAll<HTMLButtonElement>('[data-a]').forEach(b=>b.onclick=()=>this.action(b.dataset.a||''));
@@ -50,7 +80,7 @@ class BlueprintNodeEditor {
     if(a==='close'){this.close();return;}
     if(a==='preview'){this.host.classList.toggle('preview-expanded');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
     if(a==='assets'){this.host.classList.toggle('assets-open');this.host.classList.remove('diagnostics-open');return;}
-    if(a==='diagnostics'){this.host.classList.toggle('diagnostics-open');this.host.classList.remove('assets-open');return;}
+    if(a==='diagnostics'){this.host.classList.add('preview-expanded');this.host.classList.toggle('preview-inspector-open');this.host.classList.remove('assets-open');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
     if(a==='physics'){const input=document.querySelector<HTMLInputElement>('#pv2-physics-debug')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
     if(a==='wire'){const input=document.querySelector<HTMLInputElement>('#pv2-wire')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
     if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);
