@@ -339,7 +339,7 @@ editorToggle.addEventListener('click', () => {
 });
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#91aeb4');
-scene.fog = new THREE.Fog('#91aeb4', 100, 320);
+scene.fog = null;
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2400);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7));
@@ -374,7 +374,7 @@ let blueprintCompileMs = 0;
 let blueprintGraph = createDefaultTerrainGraph(17);
 let blueprint = compileTerrainGraph(blueprintGraph);
 scene.background = new THREE.Color(blueprint.fogColor);
-scene.fog = new THREE.Fog(blueprint.fogColor, blueprint.fogNear, blueprint.fogFar);
+scene.fog = null;
 const terrain = new Terrain(blueprint.heightAt, {
   seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
 });
@@ -395,7 +395,7 @@ const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (ne
   blueprintGraph = nextGraph;
   blueprint = nextBlueprint;
   scene.background = new THREE.Color(nextBlueprint.fogColor);
-  scene.fog = new THREE.Fog(nextBlueprint.fogColor, nextBlueprint.fogNear, nextBlueprint.fogFar);
+  scene.fog = null;
   blueprintStatus.textContent = 'Blueprint применён: CPU, физика и GPU обновлены без перезапуска.';
   blueprintStatus.style.color = '#8affc1';
 }, viewport);
@@ -665,7 +665,8 @@ renderer.domElement.addEventListener('pointermove', (event) => {
   const dx = event.clientX - previousPointerX, dy = event.clientY - previousPointerY;
   previousPointerX = event.clientX; previousPointerY = event.clientY;
   cameraYaw -= dx * 0.006;
-  cameraPitch = THREE.MathUtils.clamp(cameraPitch + dy * 0.004, -0.05, 0.85);
+  // Allow almost the full vertical range: inspect the ground below and the sky above.
+  cameraPitch = THREE.MathUtils.clamp(cameraPitch + dy * 0.004, -1.52, 1.52);
 });
 renderer.domElement.addEventListener('pointerup', () => { draggingCamera = false; });
 renderer.domElement.addEventListener('pointercancel', () => { draggingCamera = false; });
@@ -849,10 +850,6 @@ function animate(now: number): void {
   const terrainStart = performance.now();
   const culling = terrainRenderer.update(camera);
   waterRenderer.update(camera, now / 1000, culling.horizonScale, culling.fogScale);
-  if (scene.fog instanceof THREE.Fog) {
-    scene.fog.near = blueprint.fogNear * culling.fogScale;
-    scene.fog.far = blueprint.fogFar * culling.fogScale;
-  }
   terrainUpdateCpuMs = performance.now() - terrainStart;
   document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
   updateStats();
