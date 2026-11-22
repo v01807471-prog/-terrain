@@ -1,0 +1,119 @@
+import { TerrainEditStore } from './TerrainEditStore.js';
+import { Terrain } from './Terrain.js';
+
+export interface TerrainSelfTestResult {
+  passed: string[];
+}
+
+export function runTerrainSelfTests(): TerrainSelfTestResult {
+  const passed: string[] = [];
+  const assert = (condition: boolean, message: string): void => {
+    if (!condition) throw new Error('Terrain self-test: ' + message);
+    passed.push(message);
+  };
+  const near = (actual: number, expected: number, epsilon = 1e-6): boolean =>
+    Math.abs(actual - expected) <= epsilon;
+
+  const coordinates = [
+    [-1200.5, -340.25],
+    [-31, 18],
+    [0, 0],
+    [128.75, -92.5],
+    [4096, 2048]
+  ] as const;
+  const first = new Terrain(undefined, { seed: 173 });
+  const second = new Terrain(undefined, { seed: 173 });
+  const otherSeed = new Terrain(undefined, { seed: 174 });
+  const firstSamples = coordinates.map(([x, z]) => first.getBaseHeight(x, z));
+  const secondSamples = coordinates.map(([x, z]) => second.getBaseHeight(x, z));
+  const otherSamples = coordinates.map(([x, z]) => otherSeed.getBaseHeight(x, z));
+
+  assert(firstSamples.every((value, index) => value === secondSamples[index]),
+    'одинаковые seed и координаты дают побитово одинаковую CPU-высоту');
+  assert(firstSamples.every(Number.isFinite), 'процедурная высота конечна на отрицательных и больших координатах');
+  assert(firstSamples.some((value, index) => Math.abs(value - otherSamples[index]) > 1e-6),
+    'изменение seed меняет процедурный рельеф');
+  assert(first.edits.allocatedChunkCount === 0 && first.allocatedEditBytes === 0,
+    'нетронутый мир не выделяет память под heightmap или блоки правок');
+
+  const graph = {
+    seed: 29,
+    nodes: [
+      { id: 1, type: 'noise', p: { scale: 0.012, oct: 3, ns: 4 } },
+      { id: 2, type: 'mul', d: { b: 18 }, in: { a: 1 } },
+      { id: 3, type: 'out_height', in: { h: 2 } }
+    ]
+  };
+  const graphA = Terrain.fromGraph(graph);
+  const graphB = Terrain.fromGraph(graph);
+  const graphC = Terrain.fromGraph({ ...graph, seed: 30 });
+  const graphHeight = graphA.getBaseHeight(-73.25, 119.5);
+  assert(graphHeight === graphB.getBaseHeight(-73.25, 119.5),
+    'CPU-высота Blueprint-графа детерминирована');
+  assert(Math.abs(graphHeight - graphC.getBaseHeight(-73.25, 119.5)) > 1e-6,
+    'seed Blueprint-графа влияет на процедурную высоту');
+
+  const edits = new TerrainEditStore(1, 8);
+  assert(edits.allocatedChunkCount === 0 && edits.allocatedBytes === 0,
+    'TerrainEditStore создаётся без предварительного выделения блоков');
+  edits.addRadial(2, 2, 1.5, 2);
+  const firstChunkCount = edits.allocatedChunkCount;
+  assert(firstChunkCount === 1, 'первый мазок лениво создаёт только затронутый блок');
+  edits.addRadial(3, 2, 1.5, 1);
+  assert(edits.allocatedChunkCount === firstChunkCount,
+    'повторный мазок в той же области использует существующий блок');
+  edits.addRadial(8, 2, 1.5, 1);
+  assert(edits.allocatedChunkCount === 2,
+    'мазок через границу блока выделяет только соседний блок');
+  assert(edits.sample(2, 2) > 2, 'разреженная дельта корректно читается в точке мазка');
+
+  const negativeEdits = new TerrainEditStore(1, 8);
+  negativeEdits.addRadial(-1, -1, 1.5, 1);
+  assert(negativeEdits.sample(-1, -1) > 0,
+    'индексация разреженных блоков корректна для отрицательных координат');
+
+  const reversibleEdits = new TerrainEditStore(1, 8);
+  reversibleEdits.addRadial(2, 2, 1.5, 2);
+  reversibleEdits.addRadial(2, 2, 1.5, -2);
+  assert(reversibleEdits.allocatedChunkCount === 0 && reversibleEdits.allocatedBytes === 0,
+    'обнулённые блоки освобождаются после обратного мазка');
+
+  const editedTerrain = new Terrain(() => 12, { editCellSize: 1, editChunkSize: 8 });
+  const originalBase = editedTerrain.getBaseHeight(2, 2);
+  const originalHeight = editedTerrain.getHeight(2, 2);
+  const changes: Array<{ version: number; minX: number; minZ: number; maxX: number; maxZ: number }> = [];
+  const unsubscribe = editedTerrain.subscribeChanges(change => changes.push(change));
+  const editChange = editedTerrain.applyEdit(2, 2, 1.5, 3);
+  assert(editedTerrain.getBaseHeight(2, 2) === originalBase,
+    'локальная правка не меняет процедурную основу');
+  assert(editedTerrain.getHeight(2, 2) > originalHeight + 2.9,
+    'getHeight возвращает процедурную основу с локальной дельтой');
+  assert(editChange.version === 1 && changes[0]?.version === 1,
+    'изменение Terrain публикует возрастающую версию и событие');
+  assert(near(editChange.bounds.minX, 0.5) && near(editChange.bounds.maxX, 3.5),
+    'событие кисти содержит ограниченную dirty-область');
+  const clearChange = editedTerrain.clearEdits();
+  assert(clearChange?.version === 2 && editedTerrain.edits.allocatedChunkCount === 0,
+    'очистка правок освобождает sparse store и увеличивает версию');
+  assert(clearChange?.bounds.minX === -Infinity && clearChange.bounds.maxX === Infinity,
+    'полный сброс явно помечает всю область мира изменённой');
+  assert(editedTerrain.clearEdits() === null, 'повторная очистка пустого store не создаёт ложное событие');
+  unsubscribe();
+  editedTerrain.applyEdit(2, 2, 1.5, 1);
+  assert(changes.length === 2, 'отписка прекращает получение событий Terrain');
+
+  const plane = new Terrain((x, z) => 2 * x + 3 * z, { normalSampleDistance: 0.25 });
+  const firstTriangle = plane.sampleGround(0.25, 0.5, 1);
+  const secondTriangle = plane.sampleGround(0.75, 0.75, 1);
+  const normalLength = Math.sqrt(14);
+  assert(near(firstTriangle.height, 2) && near(secondTriangle.height, 3.75),
+    'выборка поверхности совпадает с обоими треугольниками сетки LOD0');
+  assert(near(firstTriangle.normal.x, -2 / normalLength)
+    && near(firstTriangle.normal.y, 1 / normalLength)
+    && near(firstTriangle.normal.z, -3 / normalLength),
+  'нормаль плоскости вычисляется из той же треугольной поверхности');
+  assert(near(plane.getSlope(0.25, 0.5), 1 - 1 / normalLength),
+    'уклон согласован с нормалью поверхности');
+
+  return { passed };
+}
