@@ -55,7 +55,12 @@ export class PlanetViewport {
     // Diagnostic-only flat clipmap: fixed topology, no terrain shader, no LOD.
     const flatGeometry=new THREE.PlaneGeometry(200,200,256,256);
     flatGeometry.rotateX(-Math.PI/2);
-    const flatSurface=new THREE.Mesh(flatGeometry,new THREE.MeshBasicMaterial({color:0x9fc8e8,wireframe:true}));
+    const flatMaterial=new THREE.ShaderMaterial({
+      vertexShader:`void main(){vec4 worldPosition=modelMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*worldPosition;}`,
+      fragmentShader:`void main(){gl_FragColor=vec4(0.62,0.79,0.91,1.0);}`,
+      wireframe:true
+    });
+    const flatSurface=new THREE.Mesh(flatGeometry,flatMaterial);
     const flatGrid=new THREE.GridHelper(200,40,0x22d3ee,0x36516a);
     flatGrid.position.y=0.015;
     this.flatTestGroup.add(flatSurface,flatGrid);
