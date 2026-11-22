@@ -17,6 +17,11 @@ export class PlanetViewport {
   private clock=new THREE.Clock();
   private thirdPerson=false;
   private avatar=new THREE.Group();
+  // World-space center of the Earth. The Sun remains fixed at the origin.
+  private planetCenter=new THREE.Vector3(30000,0,0);
+  private orbitAngle=0;
+  private orbitRadius=30000;
+  private orbitAngularSpeed=0.00005;
   private settings={rings:16,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
 
   constructor(private canvas:HTMLCanvasElement) {
@@ -32,14 +37,22 @@ export class PlanetViewport {
     sun.position.set(1,2,1);
     this.scene.add(sun);
 
+    // A visible, stationary Sun at the world origin. Earth orbits around it.
+    const sunMesh=new THREE.Mesh(
+      new THREE.SphereGeometry(3500,32,24),
+      new THREE.MeshBasicMaterial({color:0xffc45c})
+    );
+    sunMesh.position.set(0,0,0);
+    this.scene.add(sunMesh);
+
     this.clipmap=new SphericalClipmap(this.scene,this.settings);
     this.createAvatar();
 
-    this.camera.position.set(this.radius+8629,0,0);
+    this.camera.position.copy(this.planetCenter).add(new THREE.Vector3(this.radius+8629,0,0));
     this.camera.up.set(0,1,0);
-    this.camera.lookAt(0,0,0);
+    this.camera.lookAt(this.planetCenter);
     this.controls=new OrbitControls(this.camera,this.canvas);
-    this.controls.target.set(0,0,0);
+    this.controls.target.copy(this.planetCenter);
     this.controls.enableRotate=true;
     this.controls.enablePan=false;
     this.controls.enableZoom=true;
@@ -93,16 +106,16 @@ export class PlanetViewport {
 
   private updateCameraMode(){
     if(!this.thirdPerson){
-      const altitude=this.camera.position.distanceTo(this.controls.target)-this.radius;
+      const altitude=this.camera.position.distanceTo(this.planetCenter)-this.radius;
       if(altitude>80) return;
 
       // Re-anchor the orbit target to the local ground without moving the camera.
-      const radial=this.camera.position.clone().normalize();
+      const radial=this.camera.position.clone().sub(this.planetCenter).normalize();
       const worldNorth=new THREE.Vector3(0,1,0);
       const reference=Math.abs(radial.dot(worldNorth))>.995 ? new THREE.Vector3(0,0,1) : worldNorth;
       const north=new THREE.Vector3().crossVectors(radial,new THREE.Vector3().crossVectors(reference,radial)).normalize();
       const terrainRadius=this.radius+this.terrainHeightKm(radial);
-      const surface=radial.clone().multiplyScalar(terrainRadius);
+      const surface=this.planetCenter.clone().addScaledVector(radial,terrainRadius);
 
       // The avatar's origin is at its feet; local up is the planet radial.
       this.avatar.position.copy(surface).addScaledVector(radial,-.000325);
@@ -132,9 +145,9 @@ export class PlanetViewport {
 
     // Switch back to planet-centred orbit by changing only the target.
     // Preserve camera position and orientation: no teleport or zoom snap.
-    this.controls.target.set(0,0,0);
+    this.controls.target.copy(this.planetCenter);
     this.camera.up.set(0,1,0);
-    this.camera.lookAt(0,0,0);
+    this.camera.lookAt(this.planetCenter);
     this.controls.minDistance=this.radius+1;
     this.controls.maxDistance=this.radius+250000;
     this.avatar.visible=false;
@@ -149,7 +162,21 @@ export class PlanetViewport {
     const tick=()=>{
       if(!this.running)return;
       this.frame=requestAnimationFrame(tick);
-      const t=this.clock.getElapsedTime();
+      const deltaTime=Math.min(this.clock.getDelta(),0.05);
+      const t=this.clock.elapsedTime;
+      // Move Earth around the fixed Sun and translate the camera rig by the
+      // exact same world-space delta, preserving the current view and zoom.
+      const previousCenter=this.planetCenter.clone();
+      this.orbitAngle+=this.orbitAngularSpeed*deltaTime;
+      this.planetCenter.set(
+        Math.cos(this.orbitAngle)*this.orbitRadius,
+        0,
+        Math.sin(this.orbitAngle)*this.orbitRadius
+      );
+      const orbitDelta=this.planetCenter.clone().sub(previousCenter);
+      this.camera.position.add(orbitDelta);
+      this.controls.target.add(orbitDelta);
+      if(this.avatar.visible) this.avatar.position.add(orbitDelta);
       this.updateCameraMode();
       if(this.settings.autoRotate && !this.thirdPerson){
         const offset=this.camera.position.clone().sub(this.controls.target);
@@ -161,17 +188,18 @@ export class PlanetViewport {
       if (this.thirdPerson) {
         // Keep local gravity aligned with the avatar's radial surface normal.
         // OrbitControls uses camera.up to constrain rotation, preventing roll.
-        const localUp=this.avatar.position.clone().normalize();
+        const localUp=this.avatar.position.clone().sub(this.planetCenter).normalize();
         this.camera.up.copy(localUp);
         // Prevent the local camera from passing below the displaced ground.
-        const cameraRadial=this.camera.position.clone().normalize();
+        const cameraOffset=this.camera.position.clone().sub(this.planetCenter);
+        const cameraRadial=cameraOffset.clone().normalize();
         const groundRadius=this.radius+this.terrainHeightKm(cameraRadial);
         const minCameraRadius=groundRadius+.0018;
-        if (this.camera.position.length()<minCameraRadius) {
-          this.camera.position.copy(cameraRadial.multiplyScalar(minCameraRadius));
+        if (cameraOffset.length()<minCameraRadius) {
+          this.camera.position.copy(this.planetCenter).addScaledVector(cameraRadial,minCameraRadius);
         }
 
-        const up=this.avatar.position.clone().normalize();
+        const up=this.avatar.position.clone().sub(this.planetCenter).normalize();
         const forward=this.controls.target.clone().sub(this.camera.position);
         forward.addScaledVector(up,-forward.dot(up)).normalize();
         if (forward.lengthSq()>1e-8) {
@@ -181,7 +209,7 @@ export class PlanetViewport {
         }
       }
       this.updateDepthRange();
-      this.clipmap.update(this.camera,t);
+      this.clipmap.update(this.camera,t,this.planetCenter);
       this.renderer.render(this.scene,this.camera);
     };
     tick();
@@ -189,7 +217,7 @@ export class PlanetViewport {
 
   getTelemetry(){
     return{
-      altitude:this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.controls.target)-this.radius),
+      altitude:this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.planetCenter)-this.radius),
       rings:this.settings.rings,
       lod:this.clipmap.lod,
       levels:this.clipmap.activeLevels,
