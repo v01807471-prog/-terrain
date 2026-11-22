@@ -39,7 +39,7 @@ void main() {
   if (morph > 0.0 && odd.x + odd.y > 0.5) {
     float coarse;
     if (odd.x > 0.5 && odd.y > 0.5) {
-      coarse = 0.5*(terrainHeight(p+vec2(stepSize,-uStep))+terrainHeight(p+vec2(-uStep,uStep)));
+      coarse = 0.5*(terrainHeight(p+vec2(stepSize,-stepSize))+terrainHeight(p+vec2(-stepSize,stepSize)));
     } else if (odd.x > 0.5) {
       coarse = 0.5*(terrainHeight(p+vec2(stepSize,0.0))+terrainHeight(p-vec2(stepSize,0.0)));
     } else {
