@@ -16,7 +16,7 @@ class BlueprintNodeEditor {
   private host: HTMLElement; private viewport: HTMLElement; private viewportMarker: Comment; private apply: (g: ReturnType<typeof createDefaultTerrainGraph>) => void;
   private zoom=1; private assetCanvases=new Map<string,HTMLCanvasElement>(); private selected:number|null=null; private pending:number|null=null; private timer=0; private previewTimer=0;
   constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void,viewport:HTMLElement){
-    this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
+    this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*300;n.y??=30+Math.floor(i/5)*300;});this.apply=apply;this.shell();this.render();
   }
   private el<T extends Element=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
   open():void{
@@ -36,7 +36,7 @@ class BlueprintNodeEditor {
     <button data-a="minus">−</button><span id="v2g-zoom">100%</span><button data-a="plus">+</button>
     <button data-a="export">Экспорт</button><button data-a="import">Импорт</button><input id="v2g-file" type="file" accept=".json" hidden>
     <span id="v2g-status">Граф готов</span><button data-a="apply">Применить</button><button data-a="close">← В игру</button></header>
-    <div class="v2-graph-preview-dock"><div class="v2-graph-preview-caption"><b>Живой предпросмотр</b><span>Нажми, чтобы увеличить</span><button data-a="preview" aria-label="Увеличить предпросмотр">⤢</button></div><div id="v2g-preview-slot"></div></div>
+    <div class="v2-graph-preview-dock"><div class="v2-graph-preview-caption"><b>Живой предпросмотр</b><span>Нажми, чтобы увеличить</span><button data-a="preview" aria-label="Увеличить предпросмотр">⤢</button></div><div id="v2g-preview-slot"></div><aside class="v2g-preview-inspector"><div class="v2g-preview-inspector-title">Инспектор сцены</div><div id="v2g-diagnostics-slot"></div></aside></div>
     <div class="v2g-asset-drawer"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Выбери текстуру и добавь её узлом в граф</span></div><div id="v2g-assets-list"></div></div><div class="v2g-diagnostics-drawer"><div id="v2g-diagnostics-slot"></div></div><div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world"><svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div></div></div>`;
     const sel=this.el<HTMLSelectElement>('v2g-add');
     for(const [type,t] of Object.entries(NODE_TYPES)){const o=document.createElement('option');o.value=type;o.textContent=(t as any).t;sel.append(o);}
@@ -429,15 +429,7 @@ playerMesh.castShadow = true;
 playerMesh.receiveShadow = true;
 scene.add(playerMesh);
 
-// Мягкая динамическая тень персонажа на процедурном terrain shader.
-// Положение и вытяжка тени следуют направлению солнца и высоте героя.
-const playerShadow = new THREE.Mesh(
-  new THREE.CircleGeometry(1, 40),
-  new THREE.MeshBasicMaterial({ color: '#080b0d', transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide })
-);
-playerShadow.rotation.x = -Math.PI / 2;
-playerShadow.renderOrder = 2;
-scene.add(playerShadow);
+// Убрана фальшивая круглая тень-спрайт; персонаж использует shadow casting Three.js.
 
 // Диагностика опоры капсулы: зелёные точки — высота земли,
 // вертикальные отрезки — зазор до нижней поверхности капсулы.
@@ -820,7 +812,7 @@ resetPlayer();
 updateFollowCamera();
 requestAnimationFrame(animate);
 window.addEventListener('beforeunload', () => {
-  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); waterRenderer.dispose(scene); cpuSurfaceDebug.dispose(); playerShadow.geometry.dispose(); (playerShadow.material as THREE.Material).dispose();
+  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); waterRenderer.dispose(scene); cpuSurfaceDebug.dispose(); 
   sphereGeometry.dispose(); sphereMaterial.dispose();
 });
 
