@@ -181,12 +181,12 @@ export class CharacterTest {
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.y = -0.012;
+      mesh.position.y = -0.001;
       this.scene.add(mesh);
       const gridGeometry = new THREE.BufferGeometry();
       gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
       const grid = new THREE.LineSegments(gridGeometry, lineMaterial);
-      grid.position.y = -0.009;
+      grid.position.y = 0.001;
       this.scene.add(grid);
     };
     addRing(8, 0, 128);
@@ -201,26 +201,27 @@ export class CharacterTest {
     new GLTFLoader().load(url, (gltf) => {
       const meshes: THREE.SkinnedMesh[] = [];
       gltf.scene.traverse((object) => { if (object instanceof THREE.SkinnedMesh) meshes.push(object); });
-      if (!meshes.length || !this.targetMesh) return;
-      const targetNames = new Set(this.targetMesh.skeleton.bones.map((bone) => bone.name));
+      const target = this.targetMesh;
+      if (!meshes.length || !target) return;
+      const targetNames = new Set(target.skeleton.bones.map((bone) => bone.name));
       const source = meshes.map((mesh) => ({
         mesh,
         overlap: mesh.skeleton.bones.filter((bone) => targetNames.has(bone.name)).length
       })).sort((a, b) => b.overlap - a.overlap)[0].mesh;
       const sourceNames = new Set(source.skeleton.bones.map((bone) => bone.name));
       const names: Record<string, string> = {};
-      for (const bone of this.targetMesh.skeleton.bones) if (sourceNames.has(bone.name)) names[bone.name] = bone.name;
+      for (const bone of target.skeleton.bones) if (sourceNames.has(bone.name)) names[bone.name] = bone.name;
       if (Object.keys(names).length < 5) {
         this.status.textContent += ' · ' + label + ': несовместимый скелет';
         return;
       }
-      const rootNames = this.targetMesh.skeleton.bones
-        .filter((bone) => !this.targetMesh!.skeleton.bones.includes(bone.parent as THREE.Bone))
+      const rootNames = target.skeleton.bones
+        .filter((bone) => !target.skeleton.bones.includes(bone.parent as THREE.Bone))
         .map((bone) => bone.name);
       let count = 0;
       for (const clip of gltf.animations) {
         try {
-          const converted = SkeletonUtils.retargetClip(this.targetMesh, source, clip, {
+          const converted = SkeletonUtils.retargetClip(target, source, clip, {
             names, fps: 30, preserveBoneMatrix: true, preserveBonePositions: true
           });
           converted.tracks = converted.tracks.filter((track) =>
