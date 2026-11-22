@@ -76,7 +76,8 @@ export class SphericalClipmap {
   private material:THREE.ShaderMaterial;
   private gridMaterial:THREE.ShaderMaterial;
   private lastAltitude=-1;
-  private currentExtent=0;\n  private activeRingCount=4;
+  private currentExtent=0;
+  private activeRingCount=4;
 
   constructor(private readonly scene:THREE.Scene,public settings:ClipmapSettings) {
     const uniforms={
@@ -209,7 +210,8 @@ export class SphericalClipmap {
     }
     this.levels=[];
 
-    const count=THREE.MathUtils.clamp(Math.round(requestedCount),1,Math.min(8,Math.round(this.settings.rings)));\n    this.activeRingCount=count;
+    const count=THREE.MathUtils.clamp(Math.round(requestedCount),1,Math.min(8,Math.round(this.settings.rings)));
+    this.activeRingCount=count;
     const maxLevel=count-1;
     const baseExtent=totalExtent/Math.pow(2,maxLevel);
 
