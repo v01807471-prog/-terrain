@@ -18,7 +18,7 @@ class BlueprintNodeEditor {
   constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void,viewport:HTMLElement){
     this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
   }
-  private el<T extends HTMLElement=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
+  private el<T extends Element=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
   open():void{this.host.classList.add('open');this.el('v2g-preview-slot').append(this.viewport);this.viewport.classList.add('v2g-live-preview');requestAnimationFrame(()=>{this.fit();window.dispatchEvent(new Event('resize'));});}
   private close():void{this.viewport.classList.remove('v2g-live-preview');this.viewportMarker.parentNode?.insertBefore(this.viewport,this.viewportMarker);this.host.classList.remove('open','preview-expanded');window.dispatchEvent(new Event('resize'));}
   private node(id:number):any{return this.graph.nodes.find(n=>n.id===id);}
@@ -61,7 +61,7 @@ class BlueprintNodeEditor {
   }
   private remove(id:number):void{
     this.graph.nodes=this.graph.nodes.filter(n=>n.id!==id);
-    for(const n of this.graph.nodes)for(const k of Object.keys(n.in||{}))if(n.in[k]===id)delete n.in[k];
+    for(const n of this.graph.nodes){const inputs=n.in;if(!inputs)continue;for(const k of Object.keys(inputs))if(inputs[k]===id)delete inputs[k];}
     this.selected=null;this.pending=null;this.render();this.schedule();
   }
   private cycle(from:number,to:number,seen=new Set<number>()):boolean{
@@ -79,7 +79,7 @@ class BlueprintNodeEditor {
     this.el<HTMLInputElement>('v2g-seed').value=String(this.graph.seed||0);
     const host=this.el('v2g-nodes');host.innerHTML='';
     for(const n of this.graph.nodes){
-      const t=(NODE_TYPES as any)[n.type];if(!t)continue;n.p||={};n.d||={};n.in||={};
+      const t=(NODE_TYPES as any)[n.type];if(!t)continue;const nodeParams=n.p??(n.p={}),nodeDefaults=n.d??(n.d={}),nodeInputs=n.in??(n.in={});
       const card=document.createElement('section');card.className='v2-gnode'+(t.o==='c'?' color':'')+(this.selected===n.id?' selected':'');card.dataset.id=String(n.id);card.style.left=(n.x||0)+'px';card.style.top=(n.y||0)+'px';
       const head=document.createElement('header');head.textContent=t.t;head.onpointerdown=e=>this.drag(e,n,card);card.append(head);
       const cv=document.createElement('canvas');cv.width=cv.height=80;cv.className='v2-gnode-preview';card.append(cv);
@@ -87,16 +87,16 @@ class BlueprintNodeEditor {
         const row=document.createElement('div');row.className='v2-gport';
         const dot=document.createElement('button');dot.className='v2-gdot v2-gin'+(ty==='c'?' color':'');dot.dataset.node=String(n.id);dot.dataset.port=port;dot.onclick=()=>{
           if(this.pending!==null)this.connect(this.pending,n.id,port);
-          else if(n.in[port]!=null){delete n.in[port];this.render();this.schedule();}
+          else if(nodeInputs[port]!=null){delete n.in[port];this.render();this.schedule();}
         };
         const label=document.createElement('span');label.textContent=port;row.append(dot,label);
-        if(def!==null&&ty==='f'&&n.in[port]==null){const input=document.createElement('input');input.type='number';input.step='any';input.value=String(n.d[port]??def);input.onchange=()=>{n.d[port]=Number(input.value);this.schedule();};row.append(input);}
+        if(def!==null&&ty==='f'&&n.in[port]==null){const input=document.createElement('input');input.type='number';input.step='any';input.value=String(nodeDefaults[port]??def);input.onchange=()=>{n.d[port]=Number(input.value);this.schedule();};row.append(input);}
         card.append(row);
       }
       for(const [key,def,kind] of t.p){
         const row=document.createElement('div');row.className='v2-gparam';const label=document.createElement('label');label.textContent=key;row.append(label);
         if(kind==='asset'){
-          const select=document.createElement('select');for(const asset of BUILTIN_TEXTURE_ASSETS){const option=document.createElement('option');option.value=asset.id;option.textContent=asset.name;select.append(option);}select.value=String(n.p[key]??def);select.onchange=()=>{n.p[key]=select.value;this.schedule();};row.append(select);
+          const select=document.createElement('select');for(const asset of BUILTIN_TEXTURE_ASSETS){const option=document.createElement('option');option.value=asset.id;option.textContent=asset.name;select.append(option);}select.value=String(nodeParams[key]??def);select.onchange=()=>{n.p[key]=select.value;this.schedule();};row.append(select);
         }else{
           const input=document.createElement('input');input.type=kind==='color'?'color':'number';input.step='any';input.value=String(n.p[key]??def);
           input.onchange=()=>{n.p[key]=kind==='color'?input.value:Number(input.value);this.schedule();};row.append(input);
