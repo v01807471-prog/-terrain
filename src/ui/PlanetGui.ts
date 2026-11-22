@@ -6,6 +6,13 @@ export class PlanetGui {
   constructor(viewport:PlanetViewport,container:HTMLElement){
     this.gui=new GUI({container,title:'PLANET CONTROLS',width:300});
     const config=viewport.getConfig();
+    const navigation=this.gui.addFolder('00 · SOLAR SYSTEM');
+    const destinations={
+      'Focus Earth':()=>viewport.focusEarth(),
+      'Focus Moon':()=>viewport.focusMoon()
+    };
+    navigation.add(destinations,'Focus Earth').name('Go to Earth');
+    navigation.add(destinations,'Focus Moon').name('Go to Moon');
     const camera=this.gui.addFolder('01 · CAMERA');
     camera.add(config,'zoomSpeed',.25,3,.05).name('Zoom velocity').onChange((v:number)=>viewport.updateConfig({zoomSpeed:v}));
     camera.add(config,'rotationSpeed',.1,3,.05).name('Orbit speed').onChange((v:number)=>viewport.updateConfig({rotationSpeed:v}));
@@ -18,7 +25,7 @@ export class PlanetGui {
     const terrain=this.gui.addFolder('03 · TERRAIN');
     terrain.add(config,'amplitude',0,2200,10).name('Relief amplitude').onChange((v:number)=>viewport.updateConfig({amplitude:v}));
     terrain.add(config,'frequency',1,14,.1).name('Noise frequency').onChange((v:number)=>viewport.updateConfig({frequency:v}));
-    camera.open();clip.open();terrain.open();
+    navigation.open();camera.open();clip.open();terrain.open();
   }
   destroy(){this.gui.destroy();}
 }
