@@ -235,8 +235,15 @@ export class SphericalClipmap {
   update(camera:THREE.PerspectiveCamera,time:number) {
     this.material.uniforms.uTime.value=time;
 
-    // Keep the terrain patch fixed in world space. The camera orbits it;
-    // the patch must not rotate to face the camera on every frame.
+    // Keep the clipmap centered beneath the camera's ground footprint.
+    // This rotates the local tangent frame to the camera's radial direction,
+    // while the sun and world lighting remain fixed in scene coordinates.
+    const direction=camera.position.clone().normalize();
+    const orientation=new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0,1,0),
+      direction
+    );
+    this.group.quaternion.copy(orientation);
 
     const altitude=Math.max(0,camera.position.length()-this.settings.radius);
     const nextExtent=this.calculateExtent(altitude);
