@@ -227,9 +227,8 @@ export class TerrainRenderer {
         if (visible) visibleTiles++;
       }
       ring.instances.instanceMatrix.needsUpdate = true;
-      }
     }
-    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.mesh !== null).length, 0), queuedTiles: this.creationQueue.length, altitude };
+    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.ready).length, 0), queuedTiles: this.creationQueue.length, altitude };
   }
 
   dispose(): void {
@@ -267,7 +266,7 @@ export class TerrainRenderer {
     wire.scale.set(ring.step, 1, ring.step);
     wire.frustumCulled = false;
     wire.position.set(ring.centerX, 0, ring.centerZ);
-    wire.visible = this.showWireframe && !!tile.mesh?.visible;
+    wire.visible = this.showWireframe && tile.visible;
     tile.wire = wire;
     this.group.add(wire);
   }
@@ -278,11 +277,9 @@ export class TerrainRenderer {
     this.activeVertexShader = vertexShader;
     this.activeFragmentShader = fragmentShader;
     this.activeTextureIds = Array.from({ length: 8 }, (_, i) => blueprint.textureAssets?.[i] ?? '');
-    for (let tz = 0; tz < this.tilesPerSide; tz++) {
-    this.geometries.push(this.createTileGeometry());
     // Одна локальная геометрия повторно используется всеми экземплярами всех LOD.
     // Диагностическая проволочная сетка остаётся отдельным необязательным overlay.
-    }
+    this.geometries.push(this.createTileGeometry());
     const halfGrid = this.gridSize / 2;
     for (let level = 0; level < this.levels; level++) {
       const step = this.baseCellSize * 2 ** level;
