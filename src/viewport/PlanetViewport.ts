@@ -313,7 +313,7 @@ export class PlanetViewport {
     for(const side of [-1,1]){
       const arm=add(new THREE.CapsuleGeometry(.000065,.00040,4,8),suit,side*.000255,.00102,0);
       arm.rotation.z=side*-.16;
-      const hand=add(new THREE.SphereGeometry(.00007,8,6),skin,side*.00030,.00072,-.000015);
+      add(new THREE.SphereGeometry(.00007,8,6),skin,side*.00030,.00072,-.000015);
       const leg=add(new THREE.CapsuleGeometry(.00009,.00043,4,8),suit,side*.000095,.00031,0);
       leg.rotation.z=side*-.025;
       add(new THREE.BoxGeometry(.00019,.00011,.00034),boot,side*.000095,.000075,-.000065);
