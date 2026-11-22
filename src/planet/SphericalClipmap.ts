@@ -106,19 +106,24 @@ export class SphericalClipmap {
       uniform float uRadius;
       varying vec3 vRadial;
       varying vec3 vWorldPosition;
+      varying vec3 vViewPosition;
       ${terrainBlueprint.shader}
       void main(){
         vec2 plane=position.xz;
         vec3 radial=normalize(vec3(plane.x,uRadius,plane.y));
         vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
-        vec3 displaced=displacePlanet(worldRadial*uRadius,uRadius);
+        // Sample terrain in planet-local coordinates so body motion cannot change the terrain direction.
+        vec3 displaced=displacePlanet(radial*uRadius,uRadius);
         float height=length(displaced)-uRadius;
         vec3 localPosition=radial*(uRadius+height+position.y);
         vec3 worldPosition=(modelMatrix*vec4(localPosition,1.0)).xyz;
         vHeight=height;
         vRadial=worldRadial;
         vWorldPosition=worldPosition;
-        gl_Position=projectionMatrix*viewMatrix*vec4(worldPosition,1.0);
+        // Compose camera-relative coordinates on the CPU before GPU upload.
+        vec3 viewPosition=(modelViewMatrix*vec4(localPosition,1.0)).xyz;
+        vViewPosition=viewPosition;
+        gl_Position=projectionMatrix*vec4(viewPosition,1.0);
       }`;
     const fragmentShader=`
       varying vec3 vRadial;
@@ -142,7 +147,8 @@ export class SphericalClipmap {
         return mix(mix(a,b,f.y),mix(c,d,f.y),f.z);
       }
       void main(){
-        vec3 n=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
+        // Derivatives in camera-relative view space avoid precision loss at large world coordinates.
+        vec3 n=normalize(cross(dFdx(vViewPosition),dFdy(vViewPosition)));
         if(dot(n,vRadial)<0.0)n=-n;
         vec3 toSun=normalize(uSunPosition-vWorldPosition);
         float light=max(dot(n,toSun),0.0);
@@ -186,13 +192,16 @@ export class SphericalClipmap {
         varying vec3 vWorldPosition;
         ${terrainBlueprint.shader}
         void main(){
-          vec3 worldRadial=normalize(mat3(modelMatrix)*normalize(position));
-          vec3 displaced=displacePlanet(worldRadial*uRadius,uRadius);
+          vec3 radial=normalize(position);
+          vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
+          vec3 displaced=displacePlanet(radial*uRadius,uRadius);
           float height=length(displaced)-uRadius;
-          vec3 localPosition=normalize(position)*(uRadius+height);
+          vec3 localPosition=radial*(uRadius+height);
           vec4 world=modelMatrix*vec4(localPosition,1.0);
+          vec3 viewPosition=(modelViewMatrix*vec4(localPosition,1.0)).xyz;
           vRadial=worldRadial;vHeight=height;vWorldPosition=world.xyz;
-          gl_Position=projectionMatrix*viewMatrix*world;
+          vViewPosition=viewPosition;
+          gl_Position=projectionMatrix*vec4(viewPosition,1.0);
         }`,
       fragmentShader,
       side:THREE.FrontSide,depthTest:true,depthWrite:true
