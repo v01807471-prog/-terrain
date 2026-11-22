@@ -76,7 +76,7 @@ export class SphericalClipmap {
   private material:THREE.ShaderMaterial;
   private gridMaterial:THREE.ShaderMaterial;
   private lastAltitude=-1;
-  private currentExtent=0;
+  private currentExtent=0;\n  private activeRingCount=4;
 
   constructor(private readonly scene:THREE.Scene,public settings:ClipmapSettings) {
     const uniforms={
@@ -121,16 +121,50 @@ export class SphericalClipmap {
       vertexShader,
       fragmentShader:`
         varying vec3 vWorldNormal;
+        varying vec3 vRadial;
         varying float vHeight;
+
+        float hash3(vec3 p) {
+          p=fract(p*.3183099+vec3(.13,.17,.11));
+          p*=17.0;
+          return fract(p.x*p.y*p.z*(p.x+p.y+p.z));
+        }
+        float noise3(vec3 p) {
+          vec3 i=floor(p), f=fract(p);
+          f=f*f*(3.0-2.0*f);
+          float a=mix(hash3(i),hash3(i+vec3(1,0,0)),f.x);
+          float b=mix(hash3(i+vec3(0,1,0)),hash3(i+vec3(1,1,0)),f.x);
+          float c=mix(hash3(i+vec3(0,0,1)),hash3(i+vec3(1,0,1)),f.x);
+          float d=mix(hash3(i+vec3(0,1,1)),hash3(i+vec3(1,1,1)),f.x);
+          return mix(mix(a,b,f.y),mix(c,d,f.y),f.z);
+        }
+
         void main() {
-          vec3 lightDirection=normalize(vec3(.4,.8,.3));
-          float light=max(dot(normalize(vWorldNormal),lightDirection),0.0);
-          vec3 ocean=vec3(.025,.10,.17);
-          vec3 land=vec3(.16,.31,.17);
-          vec3 rock=vec3(.55,.54,.46);
-          vec3 color=mix(ocean,land,smoothstep(-90.0,40.0,vHeight));
-          color=mix(color,rock,smoothstep(420.0,850.0,vHeight));
-          color*=.3+light*.85;
+          vec3 n=normalize(vWorldNormal);
+          float light=max(dot(n,normalize(vec3(.4,.8,.3))),0.0);
+          float macro=noise3(vRadial*34.0);
+          float detail=noise3(vRadial*180.0);
+          float micro=noise3(vRadial*720.0);
+          float h=vHeight/1100.0;
+
+          vec3 deepOcean=vec3(.012,.045,.085);
+          vec3 shallowOcean=vec3(.025,.19,.23);
+          vec3 lowland=vec3(.12,.27,.12);
+          vec3 forest=vec3(.16,.34,.16);
+          vec3 dryland=vec3(.39,.34,.20);
+          vec3 highRock=vec3(.43,.42,.38);
+          vec3 snow=vec3(.82,.84,.80);
+
+          vec3 color=mix(deepOcean,shallowOcean,smoothstep(-.72,-.25,h));
+          color=mix(color,lowland,smoothstep(-.28,-.12,h));
+          color=mix(color,forest,smoothstep(-.10,.12,h)*(.65+macro*.35));
+          color=mix(color,dryland,smoothstep(.18,.38,h)*(.65+detail*.35));
+          color=mix(color,highRock,smoothstep(.42,.62,h));
+          color=mix(color,snow,smoothstep(.72,.95,h));
+
+          float textureMix=(macro-.5)*.22+(detail-.5)*.12+(micro-.5)*.055;
+          color*=1.0+textureMix;
+          color*=.24+light*.96;
           gl_FragColor=vec4(color,1.0);
         }
       `,
@@ -152,7 +186,7 @@ export class SphericalClipmap {
     });
 
     this.scene.add(this.group);
-    this.rebuild(this.calculateExtent(15000-this.settings.radius));
+    this.rebuild(this.calculateExtent(15000-this.settings.radius),4);
   }
 
   private calculateExtent(altitude:number) {
@@ -166,7 +200,7 @@ export class SphericalClipmap {
     );
   }
 
-  private rebuild(totalExtent:number) {
+  private rebuild(totalExtent:number, requestedCount=this.activeRingCount) {
     for (const level of this.levels) {
       this.group.remove(level.mesh);
       this.group.remove(level.lines);
@@ -175,7 +209,7 @@ export class SphericalClipmap {
     }
     this.levels=[];
 
-    const count=THREE.MathUtils.clamp(Math.round(this.settings.rings),1,16);
+    const count=THREE.MathUtils.clamp(Math.round(requestedCount),1,Math.min(8,Math.round(this.settings.rings)));\n    this.activeRingCount=count;
     const maxLevel=count-1;
     const baseExtent=totalExtent/Math.pow(2,maxLevel);
 
@@ -213,7 +247,7 @@ export class SphericalClipmap {
     const altitudeChanged=this.lastAltitude<0 ||
       Math.abs(altitude-this.lastAltitude)>Math.max(25,this.lastAltitude*.08);
 
-    if (extentChanged || altitudeChanged) this.rebuild(nextExtent);
+    if (extentChanged || altitudeChanged || desiredRings!==this.activeRingCount) this.rebuild(nextExtent,desiredRings);
     this.lastAltitude=altitude;
   }
 
@@ -229,7 +263,7 @@ export class SphericalClipmap {
     this.material.uniforms.uRadius.value=this.settings.radius;
 
     if (rebuild) {
-      this.rebuild(this.calculateExtent(Math.max(0,this.lastAltitude)));
+      this.rebuild(this.calculateExtent(Math.max(0,this.lastAltitude)),this.activeRingCount);
     }
   }
 
