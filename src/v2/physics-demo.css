@@ -219,3 +219,13 @@ html,body.physics-v2-page,#physics-v2-root{height:100%;min-height:0;overflow:hid
  .v2-graph-preview-dock{width:210px;height:155px}
  .v2-graph-toolbar{max-height:118px;overflow:auto}
 }
+
+
+/* Asset and diagnostics drawers replace the fixed right inspector. */
+.v2g-diagnostics-drawer{display:none;position:absolute;z-index:1008;right:16px;top:68px;width:min(430px,calc(100vw - 32px));max-height:65vh;overflow:auto;padding:12px;border:1px solid #48636c;border-radius:13px;background:#101d25f7;box-shadow:0 18px 50px #000b}
+#pv2-blueprint-editor.diagnostics-open .v2g-diagnostics-drawer{display:block}
+.v2g-diagnostics-drawer .pv2-side{display:flex!important;flex-direction:column;gap:9px;padding:0;overflow:visible}
+.v2g-diagnostics-drawer .pv2-panel{padding:11px;background:#14232b;border-radius:10px}
+.v2g-diagnostics-drawer .pv2-panel h2{font-size:12px;margin-bottom:8px}
+.v2g-diagnostics-drawer .pv2-note{font-size:10px}
+.v2g-diagnostics-drawer .pv2-panel:nth-child(5){display:none}
