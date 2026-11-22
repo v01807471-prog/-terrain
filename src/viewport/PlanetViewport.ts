@@ -31,7 +31,8 @@ export class PlanetViewport {
 
     this.clipmap=new SphericalClipmap(this.scene,this.settings);
 
-    this.camera.position.set(15000*Math.sin(1.12)*Math.sin(.7),15000*Math.cos(1.12),15000*Math.sin(1.12)*Math.cos(.7));
+    // Start at the equator for a true side-on view of the planet.
+    this.camera.position.set(15000,0,0);
     this.controls=new OrbitControls(this.camera,this.canvas);
     this.controls.target.set(0,0,0);
     this.controls.enableDamping=true;
