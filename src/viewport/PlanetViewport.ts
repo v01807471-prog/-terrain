@@ -247,11 +247,11 @@ export class PlanetViewport {
 
     // Switch back to planet-centred orbit by changing only the target.
     // Preserve camera position and orientation: no teleport or zoom snap.
-    this.controls.target.copy(this.planetCenter);
+    this.controls.target.copy(this.activeCenter);
     this.camera.up.set(0,1,0);
-    this.camera.lookAt(this.planetCenter);
-    this.controls.minDistance=this.radius+1;
-    this.controls.maxDistance=this.radius+250000;
+    this.camera.lookAt(this.activeCenter);
+    this.controls.minDistance=this.activeRadius+1;
+    this.controls.maxDistance=this.activeRadius+250000;
     this.avatar.visible=false;
     this.thirdPerson=false;
     this.controls.update();
@@ -340,7 +340,7 @@ export class PlanetViewport {
     this.controls.zoomSpeed=Math.max(.1,Math.min(3,this.settings.zoomSpeed));
     if(!this.thirdPerson){
       this.controls.minDistance=this.activeRadius+1;
-      this.controls.maxDistance=this.radius+250000;
+      this.controls.maxDistance=this.activeRadius+250000;
     }
     if(typeof patch.showGrid==='boolean') this.clipmap.setGridVisible(patch.showGrid);
     this.clipmap.setSettings({
