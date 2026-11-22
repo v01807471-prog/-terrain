@@ -61,7 +61,7 @@ function makeSquareLevel(extent:number, level:number) {
     }
   }
 
-  const surface=new THREE.BufferGeometry();
+  // Add a short inward skirt along every inner LOD boundary. The next finer\n  // patch has twice the edge resolution, so this overlap hides residual\n  // sub-pixel cracks caused by nonlinear vertex displacement.\n  if (level>0) {\n    const segments=GRID_SEGMENTS/2;\n    const skirtDepth=0.012; // 12 metres in planet-kilometre units\n    for (let side=0; side<4; side++) {\n      for (let i=0; i<segments; i++) {\n        const a=-inner+i*(2*inner/segments);\n        const b=a+2*inner/segments;\n        let ax:number,az:number,bx:number,bz:number;\n        if (side===0) { ax=a; az=-inner; bx=b; bz=-inner; }\n        else if (side===1) { ax=inner; az=a; bx=inner; bz=b; }\n        else if (side===2) { ax=b; az=inner; bx=a; bz=inner; }\n        else { ax=-inner; az=b; bx=-inner; bz=a; }\n        const base=positions.length/3;\n        positions.push(ax,0,az, bx,0,bz, bx,-skirtDepth,bz, ax,-skirtDepth,az);\n        indices.push(base,base+1,base+2, base,base+2,base+3);\n      }\n    }\n  }\n\n  const surface=new THREE.BufferGeometry();
   surface.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   surface.setIndex(indices);
   surface.computeVertexNormals();
@@ -113,7 +113,7 @@ export class SphericalClipmap {
         vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
         vec3 displaced=displacePlanet(worldRadial*uRadius,uRadius);
         float height=length(displaced)-uRadius;
-        vec3 worldPosition=worldRadial*(uRadius+height);
+        vec3 worldPosition=worldRadial*(uRadius+height+position.y);
 
         vHeight=height;
         vRadial=worldRadial;
