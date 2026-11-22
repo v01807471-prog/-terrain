@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DOME_RADIUS } from '../terrain/DomeProjection.js';
 
 export interface WaterExclusionCircle {
   x: number;
@@ -27,8 +28,11 @@ const MAX_EXCLUSIONS = 16;
 const vertexShader = [
   'precision highp float;',
   'out vec3 vWorld;',
+  'uniform float uDomeRadius;',
+  'float waterDomeOffset(vec2 p) { float r2 = dot(p,p); return sqrt(max(0.0,uDomeRadius*uDomeRadius-r2))-uDomeRadius; }',
   'void main() {',
   '  vec4 world = modelMatrix * vec4(position, 1.0);',
+  '  world.y += waterDomeOffset(world.xz);',
   '  vWorld = world.xyz;',
   '  gl_Position = projectionMatrix * viewMatrix * world;',
   '}'
@@ -71,7 +75,7 @@ float waterNoise(vec2 q, float t, float fade) {
 void main() {
   vec2 p = vWorld.xz;
   float ground = terrainHeight(p);
-  float depth = uSeaLevel - ground;
+  float depth = vWorld.y - ground;
 
   // Ключевой принцип: шейдер не рисует воду над сушей.
   if (depth <= 0.0) discard;
@@ -98,7 +102,7 @@ void main() {
   vec3 viewDirection = normalize(cameraPosition - vWorld);
   float shore = smoothstep(0.0, max(0.01, uShoreWidth * 0.5), depth);
 
-  if (cameraPosition.y < uSeaLevel) {
+  if (cameraPosition.y < uSeaLevel + domeHeightOffset(cameraPosition.xz)) {
     vec3 underwater = pow(mix(uShallowColor, uDeepColor, 0.35), vec3(1.0 / 2.2));
     underwater *= 0.6 + 0.4 * smoothstep(-0.3, 0.4, normal.y);
     underwater = mix(underwater, uFogColor, smoothstep(uFogNear, uFogFar, distanceToCamera));
@@ -141,6 +145,7 @@ export class WaterRenderer {
     this.extent = options.extent ?? 8192;
     this.uniforms = {
       uTime: { value: 0 },
+      uDomeRadius: { value: DOME_RADIUS },
       uSeaLevel: { value: this.seaLevel },
       uWaveAmplitude: { value: options.waveAmplitude ?? 0.22 },
       uWaveScale: { value: options.waveScale ?? 0.035 },
