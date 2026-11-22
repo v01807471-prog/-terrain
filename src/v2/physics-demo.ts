@@ -848,10 +848,10 @@ function animate(now: number): void {
   cameraCpuMs = performance.now() - cameraStart;
   const terrainStart = performance.now();
   const culling = terrainRenderer.update(camera);
-  waterRenderer.update(camera, now / 1000, culling.lodScale);
+  waterRenderer.update(camera, now / 1000, culling.horizonScale, culling.fogScale);
   if (scene.fog instanceof THREE.Fog) {
-    scene.fog.near = blueprint.fogNear * culling.lodScale;
-    scene.fog.far = blueprint.fogFar * culling.lodScale;
+    scene.fog.near = blueprint.fogNear * culling.fogScale;
+    scene.fog.far = blueprint.fogFar * culling.fogScale;
   }
   terrainUpdateCpuMs = performance.now() - terrainStart;
   document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
