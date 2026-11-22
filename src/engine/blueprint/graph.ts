@@ -56,8 +56,8 @@ export function createDefaultTerrainGraph(seed = 17): TerrainGraph {
 export function compileTerrainGraph(graph: TerrainGraph): TerrainBlueprint {
   const compiled = compileGraph(graph);
   const fogColor = compiled.fog?.color ?? '#91aeb4';
-  const fogNear = compiled.fog?.near > 0 ? compiled.fog.near : 100;
-  const fogFar = compiled.fog?.far > fogNear ? compiled.fog.far : 320;
+  const fogNear = compiled.fog?.near > 0 ? compiled.fog.near : 420;
+  const fogFar = compiled.fog?.far > fogNear ? compiled.fog.far : 1800;
   const heightFunctionGLSL = `
     ${noiseShader}
     float terrainHeight(vec2 p) {
