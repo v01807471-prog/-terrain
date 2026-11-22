@@ -121,6 +121,7 @@ const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
   levels: 8, gridSize: 128, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
 });
 const waterRenderer = new WaterRenderer(scene, { seaLevel: -6, extent: 8192 });
+waterRenderer.applyBlueprint(blueprint.water);
 const blueprintJsonInput = document.querySelector<HTMLTextAreaElement>('#pv2-blueprint-json')!;
 const blueprintStatus = document.querySelector<HTMLParagraphElement>('#pv2-blueprint-status')!;
 blueprintJsonInput.value = JSON.stringify(blueprintGraph, null, 2);
@@ -130,6 +131,7 @@ document.querySelector('#pv2-apply-blueprint')!.addEventListener('click', () => 
     const nextBlueprint = compileTerrainGraph(nextGraph);
     terrain.setBaseHeight(nextBlueprint.heightAt);
     terrainRenderer.setBlueprint(nextBlueprint);
+    waterRenderer.applyBlueprint(nextBlueprint.water);
     blueprintGraph = nextGraph;
     blueprint = nextBlueprint;
     scene.background = new THREE.Color(nextBlueprint.fogColor);
