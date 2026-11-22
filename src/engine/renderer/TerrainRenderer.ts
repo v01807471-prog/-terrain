@@ -300,7 +300,7 @@ export class TerrainRenderer {
         glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, side: THREE.FrontSide,
         polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
       });
-      const tiles: Array<{ mesh: THREE.Mesh; wire: THREE.LineSegments; ox: number; oz: number }> = [];
+      const tiles: Array<{ mesh: THREE.Mesh | null; wire: THREE.LineSegments | null; ox: number; oz: number }> = [];
       for (let i = 0; i < this.geometries.length; i++) {
         const tx = i % this.tilesPerSide, tz = Math.floor(i / this.tilesPerSide);
         const ox = tx * this.tileSize - halfGrid, oz = tz * this.tileSize - halfGrid;
