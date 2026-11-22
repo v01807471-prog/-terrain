@@ -35,7 +35,7 @@ export class SphericalClipmap {
   constructor(private readonly scene:THREE.Scene,public settings:ClipmapSettings){
     this.material=new THREE.ShaderMaterial({
       uniforms:{uTime:{value:0},uAmplitude:{value:settings.amplitude},uFrequency:{value:settings.frequency}},
-      vertexShader:`uniform float uAmplitude;uniform float uFrequency;varying vec3 vWorldNormal;
+      vertexShader:`varying vec3 vWorldNormal;
         ${terrainBlueprint.shader}
         void main(){
           vec3 radial=normalize(vec3(position.x,${settings.radius.toFixed(1)},position.z));
