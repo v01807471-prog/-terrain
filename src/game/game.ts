@@ -67,19 +67,21 @@ const planet=new THREE.Mesh(new THREE.SphereGeometry(1,256,160),planetMaterial);
 planet.frustumCulled=false;scene.add(planet);
 
 const patchVertex=`
- uniform float uRadius;uniform vec3 uUp;uniform vec3 uEast;uniform vec3 uNorth;
- varying vec3 vDirection;varying float vHeight;varying vec3 vWorld;
+ uniform float uRadius;uniform float uPatchScale;uniform vec3 uUp;uniform vec3 uEast;uniform vec3 uNorth;
+ varying vec3 vDirection;varying float vHeight;varying vec3 vWorld;varying vec2 vLocal;
  ${terrainGLSL}
  void main(){
-  vec3 direction=normalize(uUp+uEast*(position.x/uRadius)+uNorth*(position.y/uRadius));
+  vec2 local=position.xy*uPatchScale;vLocal=local;
+  vec3 direction=normalize(uUp+uEast*(local.x/uRadius)+uNorth*(local.y/uRadius));
   float h=planetHeight(direction);
   vec3 world=direction*(uRadius+h+1.5);
   vDirection=direction;vHeight=h;vWorld=world;
   gl_Position=projectionMatrix*viewMatrix*vec4(world,1.0);
  }`;
 const patchFragment=`
- varying vec3 vDirection;varying float vHeight;varying vec3 vWorld;uniform vec3 uSun;
+ varying vec3 vDirection;varying float vHeight;varying vec3 vWorld;varying vec2 vLocal;uniform vec3 uSun;uniform float uInnerRadius;uniform float uOuterRadius;
  void main(){
+  float localRadius=length(vLocal);if(localRadius<uInnerRadius||localRadius>uOuterRadius)discard;
   vec3 n=normalize(vDirection);float h=vHeight;
   vec3 grass=mix(vec3(0.075,0.20,0.095),vec3(0.29,0.35,0.17),clamp((h+500.0)/2600.0,0.0,1.0));
   vec3 rock=mix(vec3(0.27,0.25,0.21),vec3(0.56,0.53,0.47),clamp((h-1200.0)/2600.0,0.0,1.0));
@@ -89,12 +91,20 @@ const patchFragment=`
   float light=0.24+0.76*max(0.0,dot(n,normalize(uSun)));
   gl_FragColor=vec4(color*light,1.0);
  }`;
-const patchMaterial=new THREE.ShaderMaterial({
- uniforms:{uRadius:{value:blueprint.radius},uUp:{value:new THREE.Vector3(1,0,0)},uEast:{value:new THREE.Vector3(0,0,1)},uNorth:{value:new THREE.Vector3(0,1,0)},uSun:{value:new THREE.Vector3(-0.4,0.7,0.5).normalize()}},
- vertexShader:patchVertex,fragmentShader:patchFragment,side:THREE.DoubleSide
+const patchGeometry=new THREE.PlaneGeometry(2,2,256,256);
+const patchRings=[
+ {scale:1_000,inner:0,outer:1_000},
+ {scale:4_000,inner:900,outer:4_000},
+ {scale:16_000,inner:3_600,outer:16_000},
+ {scale:64_000,inner:14_400,outer:64_000}
+].map(ring=>{
+ const material=new THREE.ShaderMaterial({
+  uniforms:{uRadius:{value:blueprint.radius},uPatchScale:{value:ring.scale},uInnerRadius:{value:ring.inner},uOuterRadius:{value:ring.outer},uUp:{value:new THREE.Vector3(1,0,0)},uEast:{value:new THREE.Vector3(0,0,1)},uNorth:{value:new THREE.Vector3(0,1,0)},uSun:{value:new THREE.Vector3(-0.4,0.7,0.5).normalize()}},
+  vertexShader:patchVertex,fragmentShader:patchFragment,side:THREE.DoubleSide
+ });
+ const mesh=new THREE.Mesh(patchGeometry,material);mesh.frustumCulled=false;scene.add(mesh);
+ return {material,mesh};
 });
-const patch=new THREE.Mesh(new THREE.PlaneGeometry(180_000,180_000,320,320),patchMaterial);
-patch.frustumCulled=false;scene.add(patch);
 
 const atmosphereMaterial=new THREE.ShaderMaterial({
  transparent:true,depthWrite:false,side:THREE.BackSide,
@@ -140,10 +150,7 @@ function surfaceRadius(direction:THREE.Vector3):number{return blueprint.radius+t
 function updatePlanetFrame():void {
  geo=fromWorld(worldPosition);
  const f=frameAt(geo.latitude,geo.longitude);
- patchMaterial.uniforms.uUp.value.copy(f.up);
- patchMaterial.uniforms.uEast.value.copy(f.east);
- patchMaterial.uniforms.uNorth.value.copy(f.north);
- patch.position.copy(f.up).multiplyScalar(blueprint.radius);
+ for(const ring of patchRings){ring.material.uniforms.uUp.value.copy(f.up);ring.material.uniforms.uEast.value.copy(f.east);ring.material.uniforms.uNorth.value.copy(f.north);}
  atmosphereMaterial.uniforms.uCamera.value.copy(camera.position);
  player.position.copy(worldPosition);
  player.quaternion.setFromUnitVectors(upAxis,f.up);
@@ -241,4 +248,4 @@ flightButton.addEventListener('click',()=>{flightMode=!flightMode;onGround=false
 document.addEventListener('pointerlockchange',()=>{if(!pointerLocked)keys.clear();});
 window.addEventListener('blur',()=>keys.clear());
 updatePlanetFrame();updateCamera();requestAnimationFrame(animate);
-window.addEventListener('beforeunload',()=>{observer.disconnect();renderer.dispose();planet.geometry.dispose();planetMaterial.dispose();patch.geometry.dispose();patchMaterial.dispose();atmosphere.geometry.dispose();atmosphereMaterial.dispose();starGeometry.dispose();playerGeometry.dispose();playerMaterial.dispose();});
+window.addEventListener('beforeunload',()=>{observer.disconnect();renderer.dispose();planet.geometry.dispose();planetMaterial.dispose();patchGeometry.dispose();for(const ring of patchRings){scene.remove(ring.mesh);ring.material.dispose();}atmosphere.geometry.dispose();atmosphereMaterial.dispose();starGeometry.dispose();playerGeometry.dispose();playerMaterial.dispose();});
