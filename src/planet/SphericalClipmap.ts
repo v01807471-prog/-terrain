@@ -15,6 +15,7 @@ type Level = {
   lines:THREE.LineSegments;
   extent:number;
   level:number;
+  gridMaterial:THREE.ShaderMaterial;
 };
 
 const GRID_SEGMENTS = 64;
@@ -74,7 +75,7 @@ export class SphericalClipmap {
   readonly group=new THREE.Group();
   private levels:Level[]=[];
   private material:THREE.ShaderMaterial;
-  private gridMaterial:THREE.ShaderMaterial;
+  private gridVisible=true;
   private lastAltitude=-1;
   private currentExtent=0;
   private activeRingCount=4;
@@ -85,7 +86,8 @@ export class SphericalClipmap {
       uAmplitude:{value:settings.amplitude},
       uFrequency:{value:settings.frequency},
       uRadius:{value:settings.radius},
-      uDetailFade:{value:0}
+      uDetailFade:{value:0},
+      uGridColor:{value:new THREE.Color(0x22d3ee)}
     };
 
     const vertexShader=`
@@ -177,20 +179,6 @@ export class SphericalClipmap {
       side:THREE.DoubleSide
     });
 
-    this.gridMaterial=new THREE.ShaderMaterial({
-      uniforms,
-      vertexShader,
-      fragmentShader:`
-        void main() {
-          gl_FragColor=vec4(0.18,0.82,1.0,0.82);
-        }
-      `,
-      transparent:true,
-      opacity:.82,
-      depthWrite:false,
-      side:THREE.DoubleSide
-    });
-
     this.scene.add(this.group);
     this.rebuild(this.calculateExtent(15000-this.settings.radius),4);
   }
@@ -212,6 +200,7 @@ export class SphericalClipmap {
       this.group.remove(level.lines);
       level.mesh.geometry.dispose();
       level.lines.geometry.dispose();
+      level.gridMaterial.dispose();
     }
     this.levels=[];
 
@@ -227,12 +216,27 @@ export class SphericalClipmap {
       mesh.frustumCulled=false;
       mesh.renderOrder=i;
 
-      const lines=new THREE.LineSegments(geometry.grid,this.gridMaterial);
+      const palette=[0x22d3ee,0xf59e0b,0xa78bfa,0x4ade80,0xfb7185,0xfacc15,0x60a5fa,0xe879f9];
+      const gridMaterial=new THREE.ShaderMaterial({
+        uniforms:{...uniforms,uGridColor:{value:new THREE.Color(palette[i%palette.length])}},
+        vertexShader,
+        fragmentShader:`
+          uniform vec3 uGridColor;
+          void main() {
+            gl_FragColor=vec4(uGridColor,0.86);
+          }
+        `,
+        transparent:true,
+        depthWrite:false,
+        side:THREE.DoubleSide
+      });
+      const lines=new THREE.LineSegments(geometry.grid,gridMaterial);
       lines.frustumCulled=false;
       lines.renderOrder=100+i;
+      lines.visible=this.gridVisible;
 
       this.group.add(mesh,lines);
-      this.levels.push({mesh,lines,extent,level:i});
+      this.levels.push({mesh,lines,extent,level:i,gridMaterial});
     }
     this.currentExtent=totalExtent;
   }
@@ -292,6 +296,11 @@ export class SphericalClipmap {
     }
   }
 
+  setGridVisible(visible:boolean) {
+    this.gridVisible=visible;
+    for(const level of this.levels) level.lines.visible=visible;
+  }
+
   get lod() {
     return GRID_SEGMENTS;
   }
@@ -313,7 +322,6 @@ export class SphericalClipmap {
       level.lines.geometry.dispose();
     }
     this.material.dispose();
-    this.gridMaterial.dispose();
     this.scene.remove(this.group);
   }
 }
