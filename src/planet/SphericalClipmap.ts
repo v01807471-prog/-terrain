@@ -144,6 +144,7 @@ export class SphericalClipmap {
         varying vec3 vWorldPosition;
         varying float vHeight;
         uniform float uAmplitude;
+        uniform float uRadius;
 
         float hash3(vec3 p) {
           p=fract(p*.3183099+vec3(.13,.17,.11));
@@ -167,9 +168,12 @@ export class SphericalClipmap {
           vec3 n=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
           if(dot(n,vRadial)<0.0) n=-n;
           float light=max(dot(n,normalize(vec3(.4,.8,.3))),0.0);
-          float macro=noise3(vRadial*34.0);
-          float detail=noise3(vRadial*180.0);
-          float micro=noise3(vRadial*720.0);
+          // Texture coordinates are measured in planet-space kilometres,
+          // not in normalized radial coordinates. Therefore texel scale is
+          // independent of clipmap ring extent and mesh resolution.
+          float macro=noise3(vRadial*uRadius*0.025);
+          float detail=noise3(vRadial*uRadius*0.12);
+          float micro=noise3(vRadial*uRadius*0.48);
           float h=vHeight/max(uAmplitude*.001,0.001);
 
           vec3 deepOcean=vec3(.012,.045,.085);
