@@ -148,7 +148,7 @@ export class PlanetPlayerController {
     this.controls.enabled = true;
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     const radial = this.position.clone().sub(this.center).normalize();
-    this.camera.position.copy(this.center).addScaledVector(radial, this.radius + Math.max(200, this.cameraDistance));
+    this.camera.position.copy(this.center).addScaledVector(radial, this.radius + this.cameraDistance);
     this.controls.target.copy(this.center);
     this.camera.up.set(0, 1, 0);
     this.camera.lookAt(this.center);
