@@ -45,7 +45,6 @@ const vertexShader = [
 ].join('\n');
 
 const fragmentShader = [
-  '#version 300 es',
   'precision highp float;',
   'uniform float uTime;',
   'uniform vec3 uShallowColor;',
