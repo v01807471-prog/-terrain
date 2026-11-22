@@ -16,7 +16,7 @@ class BlueprintNodeEditor {
   private host: HTMLElement; private viewport: HTMLElement; private viewportMarker: Comment; private apply: (g: ReturnType<typeof createDefaultTerrainGraph>) => void;
   private zoom=1; private assetCanvases=new Map<string,HTMLCanvasElement>(); private selected:number|null=null; private pending:number|null=null; private timer=0; private previewTimer=0;
   constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void,viewport:HTMLElement){
-    this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*300;n.y??=30+Math.floor(i/5)*300;});this.apply=apply;this.shell();this.render();
+    this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*300;n.y??=30+Math.floor(i/5)*380;});this.apply=apply;this.shell();this.render();
   }
   private el<T extends Element=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
   open():void{
