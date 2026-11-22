@@ -235,13 +235,8 @@ export class SphericalClipmap {
   update(camera:THREE.PerspectiveCamera,time:number) {
     this.material.uniforms.uTime.value=time;
 
-    // The planet stays fixed; orient the local clipmap beneath the orbiting camera.
-    const direction=camera.position.clone().normalize();
-    const orientation=new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0,1,0),
-      direction
-    );
-    this.group.quaternion.copy(orientation);
+    // Keep the terrain patch fixed in world space. The camera orbits it;
+    // the patch must not rotate to face the camera on every frame.
 
     const altitude=Math.max(0,camera.position.length()-this.settings.radius);
     const nextExtent=this.calculateExtent(altitude);
@@ -256,7 +251,7 @@ export class SphericalClipmap {
     const outerCellPixels=(nextExtent*2/GRID_SEGMENTS)/Math.max(worldPerPixel,1e-4);
     const desiredRings=THREE.MathUtils.clamp(
       Math.ceil(Math.log2(Math.max(1,outerCellPixels/3)))+1,
-      2,
+      1,
       Math.min(8,Math.round(this.settings.rings))
     );
 
@@ -282,6 +277,17 @@ export class SphericalClipmap {
 
   get lod() {
     return GRID_SEGMENTS;
+  }
+
+  get triangleCount() {
+    return this.levels.reduce((sum,level)=>{
+      const index=level.mesh.geometry.index;
+      return sum+(index ? index.count/3 : 0);
+    },0);
+  }
+
+  get activeLevels() {
+    return this.activeRingCount;
   }
 
   dispose() {
