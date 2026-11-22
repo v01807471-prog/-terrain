@@ -48,7 +48,7 @@ const resizeObserver = new ResizeObserver(resizeRenderer);
 resizeObserver.observe(app);
 resizeRenderer();
 
-const clipmap = new ThreeClipmap({ levels: 7, resolution: 64, baseCellSize: 1 });
+const clipmap = new ThreeClipmap({ levels: 7, resolution: 96, baseCellSize: 1 });
 scene.add(clipmap.group);
 const center = new THREE.Vector2(0, 0);
 
