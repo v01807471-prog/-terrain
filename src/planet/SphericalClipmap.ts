@@ -19,7 +19,7 @@ type Level = {
 };
 
 const GRID_SEGMENTS = 128;
-const MIN_EXTENT = 40;
+const MIN_EXTENT = 2;
 
 function makeSquareLevel(extent:number, level:number) {
   const positions:number[] = [];
@@ -183,9 +183,8 @@ export class SphericalClipmap {
           // Texture coordinates are measured in planet-space kilometres,
           // not in normalized radial coordinates. Therefore texel scale is
           // independent of clipmap ring extent and mesh resolution.
-          float macro=noise3(vRadial*uRadius*0.025);
-          float detail=noise3(vRadial*uRadius*0.12);
-          float micro=noise3(vRadial*uRadius*0.48);
+          float macro=noise3(vRadial*uRadius*0.008);
+          float detail=noise3(vRadial*uRadius*0.025);
           float h=vHeight/max(uAmplitude*.001,0.001);
 
           vec3 deepOcean=vec3(.012,.045,.085);
@@ -203,7 +202,7 @@ export class SphericalClipmap {
           color=mix(color,highRock,smoothstep(.42,.62,h));
           color=mix(color,snow,smoothstep(.72,.95,h));
 
-          float textureMix=(macro-.5)*.22+(detail-.5)*.12+(micro-.5)*.055;
+          float textureMix=(macro-.5)*.10+(detail-.5)*.045;
           color*=1.0+textureMix;
           color*=.08+light*1.08;
           gl_FragColor=vec4(color,1.0);
@@ -302,19 +301,19 @@ export class SphericalClipmap {
     // retain the broad-scale shape so mountains do not pop or collapse.
     this.material.uniforms.uDetailFade.value=THREE.MathUtils.smoothstep(altitude,250,25000);
     const nextExtent=this.calculateExtent(altitude);
-    const extentChanged=Math.abs(nextExtent-this.currentExtent)>Math.max(20,this.currentExtent*.08);
+    const extentChanged=Math.abs(nextExtent-this.currentExtent)>Math.max(.1,this.currentExtent*.08);
     const altitudeChanged=this.lastAltitude<0 ||
-      Math.abs(altitude-this.lastAltitude)>Math.max(25,this.lastAltitude*.08);
+      Math.abs(altitude-this.lastAltitude)>Math.max(.1,this.lastAltitude*.08);
 
-    // Pick the number of nested levels from projected cell size.
-    // Avoid keeping a level whose cells are only a few screen pixels wide.
-    const viewportHeight=Math.max(1, window.innerHeight);
-    const worldPerPixel=(2*Math.max(altitude,1)*Math.tan(THREE.MathUtils.degToRad(camera.fov*.5)))/viewportHeight;
-    const outerCellPixels=(nextExtent*2/GRID_SEGMENTS)/Math.max(worldPerPixel,1e-4);
+    // At ground level we need the full nested stack: otherwise a single
+    // 128x128 mesh spans the whole patch and looks like a coarse, faceted cap.
+    // Reduce levels gradually with altitude instead of using a pixel threshold
+    // that collapsed to one level at zero altitude.
+    const maxRings=Math.min(9,Math.round(this.settings.rings));
     const desiredRings=THREE.MathUtils.clamp(
-      Math.ceil(Math.log2(Math.max(1,outerCellPixels/3)))+1,
+      Math.ceil(9-Math.log2(1+altitude/100)),
       1,
-      Math.min(9,Math.round(this.settings.rings))
+      maxRings
     );
 
     // LOD thresholds are discrete. Require a candidate level count to remain
