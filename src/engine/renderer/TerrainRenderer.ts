@@ -303,11 +303,13 @@ export class TerrainRenderer {
       uWireLift: { value: 0 }
     };
     const sharedMaterial = new THREE.ShaderMaterial({
-      uniforms: common, vertexShader, fragmentShader,
+      uniforms: THREE.UniformsUtils.merge([common, THREE.UniformsLib.lights]),
+      vertexShader, fragmentShader, lights: true,
       glslVersion: THREE.GLSL3, side: THREE.FrontSide
     });
     const sharedInstances = new THREE.InstancedMesh(tileGeometry, sharedMaterial, totalInstances);
     sharedInstances.frustumCulled = false;
+    sharedInstances.receiveShadow = true;
     sharedInstances.count = totalInstances;
     const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
     for (let i = 0; i < totalInstances; i++) sharedInstances.setMatrixAt(i, hidden);
