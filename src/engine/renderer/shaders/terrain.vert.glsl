@@ -54,7 +54,7 @@ void main() {
   vNormal = normalize(vec3(-(hx-h0)/e, 1.0, -(hz-h0)/e));
   vWorld = vec3(p.x,h + uWireLift,p.y);
   vDistance = d;
-  vec4 worldPosition = vec4(vWorld, 1.0);
+  vec3 transformed = vWorld;
   #include <shadowmap_vertex>
   gl_Position = projectionMatrix*viewMatrix*vec4(vWorld,1.0);
 }
