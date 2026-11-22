@@ -251,7 +251,7 @@ export class SphericalClipmap {
 
     // Pick the number of nested levels from projected cell size.
     // Avoid keeping a level whose cells are only a few screen pixels wide.
-    const viewportHeight=Math.max(1, camera.viewportHeight ?? window.innerHeight);
+    const viewportHeight=Math.max(1, window.innerHeight);
     const worldPerPixel=(2*Math.max(altitude,1)*Math.tan(THREE.MathUtils.degToRad(camera.fov*.5)))/viewportHeight;
     const outerCellPixels=(nextExtent*2/GRID_SEGMENTS)/Math.max(worldPerPixel,1e-4);
     const desiredRings=THREE.MathUtils.clamp(
