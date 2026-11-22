@@ -90,6 +90,7 @@ export class SphericalClipmap {
     const vertexShader=`
       uniform float uRadius;
       varying vec3 vWorldNormal;
+      varying vec3 vRadial;
       ${terrainBlueprint.shader}
 
       void main() {
@@ -110,6 +111,7 @@ export class SphericalClipmap {
         vec3 surfacePosition=radial*(uRadius+height);
 
         vHeight=height;
+        vRadial=radial;
         vWorldNormal=normalize(mat3(modelMatrix)*radial);
 
         vec4 mvPosition=modelViewMatrix*vec4(surfacePosition,1.0);
