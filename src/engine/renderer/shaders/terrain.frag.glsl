@@ -46,7 +46,7 @@ void main() {
   // Тени берутся из настоящей shadow map DirectionalLight Three.js.
   float threeShadow = 1.0;
   #if NUM_DIR_LIGHT_SHADOWS > 0
-    threeShadow = getShadow(directionalShadowMap[0], directionalLightShadows[0], vDirectionalShadowCoord[0]);
+    threeShadow = getShadow(directionalShadowMap[0], directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowIntensity, directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius, vDirectionalShadowCoord[0]);
   #endif
   float daylight = 0.18 + uSunIntensity * 0.20;
   vec3 color = base*(daylight+diffuse*uSunIntensity*0.82*shadow*threeShadow)*(1.0-slopeV*0.2);
