@@ -247,6 +247,7 @@ export class SphericalClipmap {
   }
 
   update(camera:THREE.PerspectiveCamera,time:number,planetCenter=new THREE.Vector3()){
+    if(!this.group.visible)return;
     this.material.uniforms.uTime.value=time;
     this.globeMaterial.uniforms.uTime.value=time;
     const cameraFromCenter=camera.position.clone().sub(planetCenter);
