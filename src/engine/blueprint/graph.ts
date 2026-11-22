@@ -1,6 +1,7 @@
 import { compileGraph } from '../graph/compiler.js';
 import noiseShader from '../shaders/noise.glsl?raw';
 import type { TerrainBlueprint } from './types.js';
+import { DOME_HEIGHT_GLSL, domeHeightOffset } from '../terrain/DomeProjection.js';
 
 export interface TerrainGraph {
   seed: number;
@@ -58,15 +59,17 @@ export function compileTerrainGraph(graph: TerrainGraph): TerrainBlueprint {
   const fogColor = compiled.fog?.color ?? '#91aeb4';
   const fogNear = compiled.fog?.near > 0 ? compiled.fog.near : 420;
   const fogFar = compiled.fog?.far > fogNear ? compiled.fog.far : 1800;
+  const heightAt = (x: number, z: number): number => compiled.js(x, z) + domeHeightOffset(x, z);
   const heightFunctionGLSL = `
+    ${DOME_HEIGHT_GLSL}
     ${noiseShader}
     float terrainHeight(vec2 p) {
       vec2 pw = p;
-      ${compiled.glHeight}
+      ${compiled.glHeight.replace(/return (g\\d+);/, 'return $1 + domeHeightOffset(p);')}
     }
   `;
   return {
-    heightAt: compiled.js,
+    heightAt,
     heightFunctionGLSL,
     fragmentGraphGLSL: compiled.glColor.replaceAll('texture2D(', 'texture('),
     textureAssets: compiled.assets,
