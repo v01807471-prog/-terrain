@@ -252,7 +252,7 @@ export class TerrainRenderer {
 
   private createWireForTile(
     ring: { step: number; centerX: number; centerZ: number; wireMaterial: THREE.ShaderMaterial },
-    tile: { ready: boolean; wire: THREE.LineSegments | null },
+    tile: { ready: boolean; visible: boolean; wire: THREE.LineSegments | null },
     tileIndex: number
   ): void {
     if (tile.wire || !tile.ready) return;
