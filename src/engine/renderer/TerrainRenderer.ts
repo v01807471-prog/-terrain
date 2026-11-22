@@ -233,11 +233,11 @@ export class TerrainRenderer {
         const z0 = centerZ + tile.oz * ring.step * lodScale, z1 = z0 + size;
         const minDistance = Math.max(
           Math.max(x0 - cx, 0, cx - x1),
-          Math.max(z0 - cz, 0, cz - z1), altitude
+          Math.max(z0 - cz, 0, cz - z1)
         );
         const maxDistance = Math.max(
           Math.abs(x0 - cx), Math.abs(x1 - cx),
-          Math.abs(z0 - cz), Math.abs(z1 - cz), altitude
+          Math.abs(z0 - cz), Math.abs(z1 - cz)
         );
         // Conservative vertical bounds include procedural peaks and valleys.
         this.tileBounds.min.set(x0, -DOME_RADIUS, z0);
