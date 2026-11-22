@@ -29,6 +29,7 @@ const normalize = (a: Vec3): Vec3 => {
 export class PhysicsWorld {
   readonly config: PhysicsConfig;
   readonly bodies = new Map<string, SphereBody>();
+  readonly diagnostics = { terrainSamples: 0, terrainContacts: 0, spherePairTests: 0, sphereContacts: 0 };
   private readonly terrain: Terrain;
 
   constructor(terrain: Terrain, config: Partial<PhysicsConfig> = {}) {
@@ -64,6 +65,10 @@ export class PhysicsWorld {
   }
 
   step(dt = this.config.fixedDelta): void {
+    this.diagnostics.terrainSamples = 0;
+    this.diagnostics.terrainContacts = 0;
+    this.diagnostics.spherePairTests = 0;
+    this.diagnostics.sphereContacts = 0;
     const bodies = [...this.bodies.values()];
     for (const body of bodies) this.stepSphere(body, dt);
     // Broadphase: проверяем только тела в соседних пространственных ячейках.
@@ -100,7 +105,10 @@ export class PhysicsWorld {
             const bucket = buckets.get(keyOf(cx + dx, cy + dy, cz + dz));
             if (!bucket) continue;
             for (const j of bucket) {
-              if (j > i) this.resolveSphereContact(bodies[i], bodies[j]);
+              if (j > i) {
+                this.diagnostics.spherePairTests++;
+                this.resolveSphereContact(bodies[i], bodies[j]);
+              }
             }
           }
         }
@@ -114,6 +122,7 @@ export class PhysicsWorld {
     const distanceSq = dot(delta, delta);
     const radiusSum = a.radius + b.radius;
     if (distanceSq >= radiusSum * radiusSum) return;
+    this.diagnostics.sphereContacts++;
 
     const distance = Math.sqrt(Math.max(distanceSq, 1e-12));
     const normal = distance > 1e-8 ? scale(delta, 1 / distance) : { x: 1, y: 0, z: 0 };
@@ -187,6 +196,7 @@ export class PhysicsWorld {
       const x = body.position.x + dx;
       const z = body.position.z + dz;
       // Collision samples the same piecewise-planar LOD0 triangles as the visible mesh.
+      this.diagnostics.terrainSamples++;
       const surface = this.terrain.sampleGround(x, z, this.config.terrainCellSize);
       const surfaceY = surface.height;
       const sphereBottom = body.position.y - Math.sqrt(r * r - radialSq);
@@ -206,6 +216,7 @@ export class PhysicsWorld {
   }
 
   private resolveTerrainContact(body: SphereBody, contact: TerrainCollision, dt: number): void {
+    this.diagnostics.terrainContacts++;
     const n = normalize(contact.normal);
     body.position = add(body.position, scale(n, contact.penetration * this.config.positionCorrection));
 
