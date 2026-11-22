@@ -15,7 +15,7 @@ export type TerrainPreset = 'regions' | 'plains' | 'mountains' | 'desert' | 'isl
 
 export function createTerrainPresetGraph(preset: TerrainPreset = 'regions', seed = 17): TerrainGraph {
   const regionNode = preset === 'plains'
-    ? { id: 1, type: 'num', p: { v: 0 } }
+    ? { id: 1, type: 'num', p: { v: -1 } }
     : preset === 'mountains'
       ? { id: 1, type: 'num', p: { v: 1 } }
       : { id: 1, type: 'noise', p: { scale: 0.00135, oct: 3, ns: 11 } };
@@ -33,7 +33,7 @@ export function createTerrainPresetGraph(preset: TerrainPreset = 'regions', seed
     { id: 11, type: 'add', d: { b: preset === 'islands' ? -5 : 3 }, in: { a: 10 } },
     { id: 12, type: 'out_height', in: { h: 11 } },
 
-    { id: 20, type: 'grass' },
+    { id: 20, type: preset === 'desert' ? 'color' : 'grass', p: preset === 'desert' ? { col: '#c7a66b' } : {} },
     { id: 21, type: 'rock' },
     { id: 22, type: 'slope' },
     { id: 23, type: 'smooth', p: { e0: 0.38, e1: 0.7 }, in: { a: 22 } },
