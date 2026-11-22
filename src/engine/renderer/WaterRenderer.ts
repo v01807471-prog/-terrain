@@ -32,7 +32,8 @@ const vertexShader = [
   '  vWorld = world.xyz;',
   '  gl_Position = projectionMatrix * viewMatrix * world;',
   '}'
-].join('\\n');
+].join('\
+');
 
 const fragmentShaderTemplate = `
 precision highp float;
@@ -121,7 +122,9 @@ export class WaterRenderer {
   private readonly exclusionData = Array.from({ length: MAX_EXCLUSIONS }, () => new THREE.Vector4());
   private readonly cameraPosition = new THREE.Vector3();
   private readonly extent: number;
-  private seaLevel: number;\n  private heightFunctionGLSL = '';\n  private material: THREE.ShaderMaterial;
+  private seaLevel: number;
+  private heightFunctionGLSL = '';
+  private material!: THREE.ShaderMaterial;
 
   constructor(scene: THREE.Scene, options: WaterRendererOptions = {}) {
     this.seaLevel = options.seaLevel ?? -6;
@@ -136,16 +139,25 @@ export class WaterRenderer {
       uShallowColor: { value: new THREE.Color(options.shallowColor ?? '#087f86') },
       uDeepColor: { value: new THREE.Color(options.deepColor ?? '#041c35') },
       uOpacity: { value: options.opacity ?? 0.92 },
-      uFoamStrength: { value: options.foamStrength ?? 0.75 },\n      uGlint: { value: 1 },\n      uShoreWidth: { value: 0.6 },\n      uFadeDistance: { value: 220 },\n      uSunDirection: { value: new THREE.Vector3(-0.45, 0.78, 0.42).normalize() },\n      uSunColor: { value: new THREE.Color('#fff0d5') },\n      uAmbient: { value: new THREE.Color('#9bb5a0') },\n      uFogColor: { value: new THREE.Color(options.fogColor ?? '#91aeb4') },\n      uFogNear: { value: options.fogNear ?? 420 },\n      uFogFar: { value: options.fogFar ?? 1800 },
+      uFoamStrength: { value: options.foamStrength ?? 0.75 },
+      uGlint: { value: 1 },
+      uShoreWidth: { value: 0.6 },
+      uFadeDistance: { value: 220 },
+      uSunDirection: { value: new THREE.Vector3(-0.45, 0.78, 0.42).normalize() },
+      uSunColor: { value: new THREE.Color('#fff0d5') },
+      uAmbient: { value: new THREE.Color('#9bb5a0') },
+      uFogColor: { value: new THREE.Color(options.fogColor ?? '#91aeb4') },
+      uFogNear: { value: options.fogNear ?? 420 },
+      uFogFar: { value: options.fogFar ?? 1800 },
       uExclusions: { value: this.exclusionData },
       uExclusionCount: { value: 0 }
     };
     const geometry = new THREE.PlaneGeometry(2, 2, 128, 128);
     geometry.rotateX(-Math.PI / 2);
-    const material = new THREE.ShaderMaterial({
+    this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
       vertexShader,
-      fragmentShader,
+      fragmentShader: fragmentShaderTemplate.replace('__TERRAIN_HEIGHT_FUNCTION__', this.heightFunctionGLSL || 'float terrainHeight(vec2 p) { return 0.0; }'),
       glslVersion: THREE.GLSL3,
       transparent: true,
       depthWrite: false,
@@ -168,13 +180,24 @@ export class WaterRenderer {
       on?: number; level?: number; clarity?: number; wave?: number; wscale?: number;
       wspeed?: number; foam?: number; opacity?: number; shallow?: number[]; deep?: number[];
     };
-    this.mesh.visible = water.on !== 0;\n    if (heightFunctionGLSL && heightFunctionGLSL !== this.heightFunctionGLSL) {\n      this.heightFunctionGLSL = heightFunctionGLSL;\n      this.material.fragmentShader = fragmentShaderTemplate.replace('__TERRAIN_HEIGHT_FUNCTION__', heightFunctionGLSL);\n      this.material.needsUpdate = true;\n    }\n    if (fog?.color) (this.uniforms.uFogColor.value as THREE.Color).set(fog.color);\n    if (Number.isFinite(fog?.near)) this.uniforms.uFogNear.value = fog!.near!;\n    if (Number.isFinite(fog?.far)) this.uniforms.uFogFar.value = fog!.far!;
+    this.mesh.visible = water.on !== 0;
+    if (heightFunctionGLSL && heightFunctionGLSL !== this.heightFunctionGLSL) {
+      this.heightFunctionGLSL = heightFunctionGLSL;
+      this.material.fragmentShader = fragmentShaderTemplate.replace('__TERRAIN_HEIGHT_FUNCTION__', heightFunctionGLSL);
+      this.material.needsUpdate = true;
+    }
+    if (fog?.color) (this.uniforms.uFogColor.value as THREE.Color).set(fog.color);
+    if (Number.isFinite(fog?.near)) this.uniforms.uFogNear.value = fog!.near!;
+    if (Number.isFinite(fog?.far)) this.uniforms.uFogFar.value = fog!.far!;
     if (Number.isFinite(water.level)) this.setSeaLevel(Number(water.level));
     this.uniforms.uClarity.value = THREE.MathUtils.clamp(water.clarity ?? 0.35, 0, 1);
     this.uniforms.uWaveAmplitude.value = Math.max(0, water.wave ?? 1);
     this.uniforms.uWaveScale.value = Math.max(0.05, water.wscale ?? 1);
     this.uniforms.uWaveSpeed.value = Math.max(0, water.wspeed ?? 1);
-    this.uniforms.uFoamStrength.value = THREE.MathUtils.clamp(water.foam ?? 0.75, 0, 2);\n    this.uniforms.uGlint.value = THREE.MathUtils.clamp((water as any).glint ?? 1, 0, 3);\n    this.uniforms.uShoreWidth.value = Math.max(0.15, (water as any).shore ?? 0.6);\n    this.uniforms.uFadeDistance.value = Math.max(20, (water as any).fade ?? 220);
+    this.uniforms.uFoamStrength.value = THREE.MathUtils.clamp(water.foam ?? 0.75, 0, 2);
+    this.uniforms.uGlint.value = THREE.MathUtils.clamp((water as any).glint ?? 1, 0, 3);
+    this.uniforms.uShoreWidth.value = Math.max(0.15, (water as any).shore ?? 0.6);
+    this.uniforms.uFadeDistance.value = Math.max(20, (water as any).fade ?? 220);
     this.uniforms.uOpacity.value = THREE.MathUtils.clamp(water.opacity ?? 0.92, 0, 1);
     if (water.shallow?.length === 3) {
       (this.uniforms.uShallowColor.value as THREE.Color).setRGB(water.shallow[0], water.shallow[1], water.shallow[2], THREE.LinearSRGBColorSpace);
