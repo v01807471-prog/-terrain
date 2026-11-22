@@ -69,13 +69,22 @@ export class Clipmap {
     const next: ClipmapLevelState[] = [];
     const anchorX = this.center.x + this.camera.x;
     const anchorZ = this.center.z + this.camera.z;
+
+    // All rings must share one world-space center. Snapping each level
+    // independently shifts the coarse hole relative to the fine outer edge,
+    // creating cracks even when their vertex spacing is otherwise compatible.
+    // Snap once to the finest-level interval; every level is then derived
+    // from this exact anchor and remains nested on a common lattice.
+    const sharedSnapSize = this.config.baseCellSize * this.config.snapFactor;
+    const snappedAnchorX = snap(anchorX, sharedSnapSize);
+    const snappedAnchorZ = snap(anchorZ, sharedSnapSize);
+
     for (let index = 0; index < this.config.levels; index++) {
       const cellSize = this.config.baseCellSize * 2 ** index;
-      const snapSize = cellSize * this.config.snapFactor;
       const half = this.config.resolution * cellSize * 0.5;
       next.push({
         index, cellSize, resolution: this.config.resolution,
-        origin: { x: snap(anchorX, snapSize) - half, z: snap(anchorZ, snapSize) - half },
+        origin: { x: snappedAnchorX - half, z: snappedAnchorZ - half },
         worldSize: this.config.resolution * cellSize
       });
     }
