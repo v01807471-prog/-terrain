@@ -34,7 +34,7 @@ export class PlanetViewport {
   private bindControls(){
     this.canvas.addEventListener('contextmenu',e=>e.preventDefault());
     this.canvas.addEventListener('pointerdown',e=>{this.dragging=true;this.panning=e.shiftKey||e.button===2;this.lastX=e.clientX;this.lastY=e.clientY;this.canvas.setPointerCapture(e.pointerId);});
-    this.canvas.addEventListener('pointermove',e=>{if(!this.dragging)return;const dx=e.clientX-this.lastX,dy=e.clientY-this.lastY;this.lastX=e.clientX;this.lastY=e.clientY;if(this.panning){this.azimuth-=dx*.003;this.target.y+=dy*this.distance*.00035;}else{this.azimuth-=dx*.004*this.settings.rotationSpeed;this.polar=THREE.MathUtils.clamp(this.polar+dy*.004*this.settings.rotationSpeed,.025,Math.PI-.025);}this.updateCamera();});
+    this.canvas.addEventListener('pointermove',e=>{if(!this.dragging)return;const dx=e.clientX-this.lastX,dy=e.clientY-this.lastY;this.lastX=e.clientX;this.lastY=e.clientY;if(this.panning){this.azimuth-=dx*.003;this.target.y+=dy*this.distance*.00035;}else{\n        // Grab-style orbit: drag right moves the view around the globe;\n        // vertical drag changes latitude instead of only panning the target.\n        this.azimuth+=dx*.005*this.settings.rotationSpeed;\n        this.polar=THREE.MathUtils.clamp(this.polar-dy*.005*this.settings.rotationSpeed,.04,Math.PI-.04);\n      }this.updateCamera();});
     const end=()=>{this.dragging=false;};this.canvas.addEventListener('pointerup',end);this.canvas.addEventListener('pointercancel',end);
     this.canvas.addEventListener('wheel',e=>{e.preventDefault();const factor=Math.exp(e.deltaY*.0012*this.settings.zoomSpeed);this.distance=THREE.MathUtils.clamp(this.distance*factor,this.radius*1.003,90000);this.updateCamera();},{passive:false});
     this.canvas.addEventListener('dblclick',()=>{this.distance=this.radius*1.08;this.updateCamera();});
@@ -43,7 +43,7 @@ export class PlanetViewport {
     const sin=Math.sin(this.polar);this.camera.position.set(this.target.x+this.distance*sin*Math.sin(this.azimuth),this.target.y+this.distance*Math.cos(this.polar),this.target.z+this.distance*sin*Math.cos(this.azimuth));
     this.camera.lookAt(this.target);this.camera.near=Math.max(.02,this.distance/100000);this.camera.far=Math.max(120000,this.distance*5);this.camera.updateProjectionMatrix();
   }
-  start(){if(this.running)return;this.running=true;const tick=()=>{if(!this.running)return;this.frame=requestAnimationFrame(tick);const t=this.clock.getElapsedTime();if(this.settings.autoRotate&&!this.dragging){this.azimuth+=.0007;this.updateCamera();}this.clipmap.update(this.camera,t);this.renderer.render(this.scene,this.camera);};tick();}
+  start(){if(this.running)return;this.running=true;const tick=()=>{if(!this.running)return;this.frame=requestAnimationFrame(tick);const t=this.clock.getElapsedTime();if(this.settings.autoRotate&&!this.dragging){this.azimuth-=.0007;this.updateCamera();}this.clipmap.update(this.camera,t);this.renderer.render(this.scene,this.camera);};tick();}
   getTelemetry(){return{altitude:Math.max(0,this.camera.position.length()-this.radius),rings:this.settings.rings,lod:this.clipmap.lod};}
   getConfig(){return this.settings;}
   updateConfig(patch:Record<string,number|boolean>){Object.assign(this.settings,patch);this.clipmap.setSettings({rings:this.settings.rings,baseSegments:this.settings.baseSegments,amplitude:this.settings.amplitude,frequency:this.settings.frequency,ringGrowth:this.settings.ringGrowth});this.updateCamera();}
