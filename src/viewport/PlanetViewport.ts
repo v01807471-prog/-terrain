@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ResizeManager } from './ResizeManager';
 import { SphericalClipmap } from '../planet/SphericalClipmap';
 import { terrainBlueprint } from '../planet/TerrainBlueprint';
@@ -279,15 +280,35 @@ export class PlanetViewport {
   }
 
   private createAvatar(){
-    const skin=new THREE.MeshStandardMaterial({color:0xe0a16a,roughness:.85});
-    const suit=new THREE.MeshStandardMaterial({color:0x263b58,roughness:.8});
-    const body=new THREE.Mesh(new THREE.CylinderGeometry(.00028,.00034,.00105,8),suit);
-    body.position.y=.00085;
-    const head=new THREE.Mesh(new THREE.SphereGeometry(.00022,10,8),skin);
-    head.position.y=.00155;
-    this.avatar.add(body,head);
+    this.avatar.name='Player';
     this.avatar.visible=false;
     this.scene.add(this.avatar);
+
+    // Use the uploaded rigged male character. Normalize its measured model
+    // height to 1.8 metres; project world units are kilometres.
+    const loader=new GLTFLoader();
+    loader.load(
+      '/Universal%20Base%20Characters%5BStandard%5D/Base%20Characters/Godot%20-%20UE/Superhero_Male_FullBody.gltf',
+      (gltf)=>{
+        const model=gltf.scene;
+        model.updateMatrixWorld(true);
+        const bounds=new THREE.Box3().setFromObject(model);
+        const modelHeight=bounds.max.y-bounds.min.y;
+        if(!(modelHeight>0))return;
+        const scale=.0018/modelHeight;
+        model.scale.setScalar(scale);
+        model.position.y=-bounds.min.y*scale;
+        model.traverse((object)=>{
+          if(object instanceof THREE.Mesh){
+            object.castShadow=true;
+            object.receiveShadow=true;
+          }
+        });
+        this.avatar.add(model);
+      },
+      undefined,
+      (error)=>console.error('Не удалось загрузить модель героя:',error)
+    );
   }
 
   private updateCameraMode(){
