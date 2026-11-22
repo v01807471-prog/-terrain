@@ -190,11 +190,23 @@ export class CharacterTest {
     const clip = this.sourceClips[index];
     if (!clip) return;
     try {
+      // SkeletonUtils expects an explicit target-bone -> source-bone map.
+      // Without it, getBoneName() returns undefined and the target stays in bind/T-pose.
+      const sourceBoneNames = new Set(this.sourceMesh.skeleton.bones.map((bone) => bone.name));
+      const boneMap: Record<string, string> = {};
+      for (const bone of this.targetMesh.skeleton.bones) {
+        if (sourceBoneNames.has(bone.name)) boneMap[bone.name] = bone.name;
+      }
       const retargeted = SkeletonUtils.retargetClip(
         this.targetMesh,
         this.sourceMesh,
         clip,
-        { preservePosition: true }
+        {
+          names: boneMap,
+          fps: 30,
+          preserveBoneMatrix: true,
+          preserveBonePositions: true
+        }
       );
       if (retargeted.tracks.length === 0) {
         this.status.textContent = 'Клип ' + clip.name + ': нет совпавших анимируемых костей';
