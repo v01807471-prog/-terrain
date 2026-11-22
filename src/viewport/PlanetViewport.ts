@@ -36,6 +36,11 @@ export class PlanetViewport {
   private moonRadius=1737;
   private moonTerrainSettings={amplitude:950,frequency:7.4};
   private focusedMoon=false;
+  private flatTestActive=false;
+  private readonly flatTestGroup=new THREE.Group();
+  private savedCameraPosition=new THREE.Vector3();
+  private savedCameraTarget=new THREE.Vector3();
+  private savedCameraUp=new THREE.Vector3(0,1,0);
   private settings={rings:17,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
 
   constructor(private canvas:HTMLCanvasElement) {
@@ -46,6 +51,16 @@ export class PlanetViewport {
     this.scene.background=new THREE.Color('#07111e');
     this.solar=new Solar();
     this.scene.add(this.solar);
+
+    // Diagnostic-only flat clipmap: fixed topology, no terrain shader, no LOD.
+    const flatGeometry=new THREE.PlaneGeometry(200,200,256,256);
+    flatGeometry.rotateX(-Math.PI/2);
+    const flatSurface=new THREE.Mesh(flatGeometry,new THREE.MeshBasicMaterial({color:0x9fc8e8,wireframe:true}));
+    const flatGrid=new THREE.GridHelper(200,40,0x22d3ee,0x36516a);
+    flatGrid.position.y=0.015;
+    this.flatTestGroup.add(flatSurface,flatGrid);
+    this.flatTestGroup.visible=false;
+    this.scene.add(this.flatTestGroup);
     this.syncSolarPositions();
 
     this.scene.add(new THREE.HemisphereLight(0x9ecfff,0x17202b,1.7));
@@ -92,6 +107,43 @@ export class PlanetViewport {
       this.renderer.setPixelRatio(dpr);
       this.renderer.setSize(w,h,false);
     });
+  }
+
+  enterFlatClipmapTest(worldOffset:number){
+    if(!this.flatTestActive){
+      this.savedCameraPosition.copy(this.camera.position);
+      this.savedCameraTarget.copy(this.controls.target);
+      this.savedCameraUp.copy(this.camera.up);
+    }
+    this.flatTestActive=true;
+    this.solar.visible=false;
+    this.flatTestGroup.visible=true;
+    this.flatTestGroup.position.set(worldOffset,0,0);
+    const center=this.flatTestGroup.position;
+    this.camera.position.set(center.x+0,center.y+140,center.z+180);
+    this.camera.up.set(0,1,0);
+    this.controls.target.copy(center);
+    this.controls.minDistance=.1;
+    this.controls.maxDistance=this.systemViewDistance;
+    this.camera.near=.01;
+    this.camera.far=this.systemViewDistance;
+    this.camera.lookAt(center);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+  }
+
+  exitFlatClipmapTest(){
+    if(!this.flatTestActive)return;
+    this.flatTestActive=false;
+    this.flatTestGroup.visible=false;
+    this.solar.visible=true;
+    this.camera.position.copy(this.savedCameraPosition);
+    this.camera.up.copy(this.savedCameraUp);
+    this.controls.target.copy(this.savedCameraTarget);
+    this.controls.minDistance=this.thirdPerson?.003:this.activeRadius+1;
+    this.controls.maxDistance=this.thirdPerson?150000:this.systemViewDistance;
+    this.controls.update();
+    this.updateDepthRange();
   }
 
   private get activeCenter(){return this.focusedMoon?this.moonCenter:this.planetCenter;}
@@ -273,6 +325,11 @@ export class PlanetViewport {
     const tick=()=>{
       if(!this.running)return;
       this.frame=requestAnimationFrame(tick);
+      if(this.flatTestActive){
+        this.controls.update();
+        this.renderer.render(this.scene,this.camera);
+        return;
+      }
       const deltaTime=Math.min(this.clock.getDelta(),0.05);
       const t=this.clock.elapsedTime;
       // Solar updates parent pivots; child bodies inherit orbital transforms.
@@ -362,6 +419,8 @@ export class PlanetViewport {
     cancelAnimationFrame(this.frame);
     this.controls.dispose();
     this.scene.remove(this.avatar);
+    this.scene.remove(this.flatTestGroup);
+    this.flatTestGroup.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const material=object.material;if(Array.isArray(material))material.forEach(m=>m.dispose());else material.dispose();}else if(object instanceof THREE.Line){object.geometry.dispose();const material=object.material;if(Array.isArray(material))material.forEach(m=>m.dispose());else material.dispose();}});
     this.resize.dispose();
     this.clipmap.dispose();
     this.moonClipmap.dispose();
