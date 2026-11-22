@@ -81,7 +81,9 @@ export class PlanetViewport {
     return{
       altitude:Math.max(0,this.camera.position.distanceTo(this.controls.target)-this.radius),
       rings:this.settings.rings,
-      lod:this.clipmap.lod
+      lod:this.clipmap.lod,
+      levels:this.clipmap.activeLevels,
+      triangles:this.clipmap.triangleCount
     };
   }
 
