@@ -350,7 +350,7 @@ const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
   levels: 8, gridSize: 128, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
 });
 const waterRenderer = new WaterRenderer(scene, { seaLevel: 8, extent: 8192 });
-waterRenderer.applyBlueprint(blueprint.water);
+waterRenderer.applyBlueprint(blueprint.water, blueprint.heightFunctionGLSL, blueprint.fog);
 const blueprintStatus = document.querySelector<HTMLParagraphElement>('#pv2-blueprint-status')!;
 const graphEditorHost = document.querySelector<HTMLDivElement>('#pv2-blueprint-editor')!;
 const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (nextGraph) => {
@@ -359,7 +359,7 @@ const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (ne
   blueprintCompileMs = performance.now() - compileStart;
   terrain.setBaseHeight(nextBlueprint.heightAt);
   terrainRenderer.setBlueprint(nextBlueprint);
-  waterRenderer.applyBlueprint(nextBlueprint.water);
+  waterRenderer.applyBlueprint(nextBlueprint.water, nextBlueprint.heightFunctionGLSL, nextBlueprint.fog);
   blueprintGraph = nextGraph;
   blueprint = nextBlueprint;
   scene.background = new THREE.Color(nextBlueprint.fogColor);
