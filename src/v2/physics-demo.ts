@@ -119,7 +119,7 @@ class BlueprintNodeEditor {
       card.append(foot);card.onpointerdown=()=>{this.selected=n.id;host.querySelectorAll('.v2-gnode').forEach(el=>el.classList.toggle('selected',Number((el as HTMLElement).dataset.id)===n.id));};host.append(card);
     }
     this.drawLinks();this.renderAssetLibrary();
-    this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width='3200px';this.el('v2g-world').style.height='2000px';
+    this.el('v2g-world').style.transform='scale('+this.zoom+')';this.updateWorldBounds();
     this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';this.preview();
   }
   private assetCanvas(id:string):HTMLCanvasElement{
@@ -165,7 +165,12 @@ class BlueprintNodeEditor {
   }
   private zoomAt(z:number,x?:number,y?:number):void{
     const sc=this.el('v2g-scroll'),fx=x??sc.clientWidth/2,fy=y??sc.clientHeight/2,cx=(sc.scrollLeft+fx)/this.zoom,cy=(sc.scrollTop+fy)/this.zoom;
-    this.zoom=Math.max(.35,Math.min(1.6,z));this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width='3200px';this.el('v2g-world').style.height='2000px';this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';sc.scrollLeft=cx*this.zoom-fx;sc.scrollTop=cy*this.zoom-fy;this.drawLinks();
+    this.zoom=Math.max(.35,Math.min(1.6,z));this.el('v2g-world').style.transform='scale('+this.zoom+')';this.updateWorldBounds();this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';sc.scrollLeft=cx*this.zoom-fx;sc.scrollTop=cy*this.zoom-fy;this.drawLinks();
+  }
+  private updateWorldBounds():void{
+    const width=Math.max(1500,...this.graph.nodes.map(n=>(n.x||0)+300))+80;
+    const height=Math.max(900,...this.graph.nodes.map(n=>(n.y||0)+390))+80;
+    const world=this.el('v2g-world');world.style.width=width+'px';world.style.height=height+'px';
   }
   private fit():void{
     const sc=this.el('v2g-scroll'),xs=this.graph.nodes.map(n=>n.x||0),ys=this.graph.nodes.map(n=>n.y||0),x0=Math.min(...xs),y0=Math.min(...ys),x1=Math.max(...xs)+240,y1=Math.max(...ys)+340;
