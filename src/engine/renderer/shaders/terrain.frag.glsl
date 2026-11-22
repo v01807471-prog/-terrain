@@ -55,6 +55,6 @@ void main() {
   float daylight = 0.18 + uSunIntensity * 0.20;
   vec3 color = base*(daylight+diffuse*uSunIntensity*0.82*threeShadow)*(1.0-slopeV*0.2);
   float distanceToCamera = length(vWorld-vec3(uCamera.x,0.0,uCamera.y));
-  color = mix(color,uFogColor,smoothstep(uFogNear,uFogFar,distanceToCamera));
+  // Distance fog disabled in V2 so the terrain and clipmap coverage remain visible.
   terrainFragColor = vec4(color,1.0);
 }
