@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 export class CharacterTest {
   private renderer: THREE.WebGLRenderer;
@@ -10,26 +11,31 @@ export class CharacterTest {
   private frame = 0;
   private resizeObserver: ResizeObserver;
   private status: HTMLDivElement;
+  private clock = new THREE.Clock();
+  private mixer: THREE.AnimationMixer | null = null;
+  private targetMesh: THREE.SkinnedMesh | null = null;
+  private sourceScene: THREE.Object3D | null = null;
+  private sourceClips: THREE.AnimationClip[] = [];
+  private activeAction: THREE.AnimationAction | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.shadowMap.enabled = true;
+    // Keep the diagnostic scene free of shadow-map acne and self-shadow artefacts.
+    this.renderer.shadowMap.enabled = false;
     this.scene.background = new THREE.Color(0x182331);
-    this.scene.add(new THREE.HemisphereLight(0xdceaff, 0x55483d, 2.1));
-    const key = new THREE.DirectionalLight(0xffffff, 3.2);
+    this.scene.add(new THREE.HemisphereLight(0xdceaff, 0x55483d, 2.2));
+    const key = new THREE.DirectionalLight(0xffffff, 2.0);
     key.position.set(2.5, 5, 3);
-    key.castShadow = true;
     this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0x91bfff, 1.2);
+    const fill = new THREE.DirectionalLight(0x91bfff, 1.4);
     fill.position.set(-3, 2, -2);
     this.scene.add(fill);
 
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x394653, roughness: 0.95 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x394653, roughness: 1 }));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.015;
-    floor.receiveShadow = true;
     this.scene.add(floor);
     const grid = new THREE.GridHelper(12, 24, 0x8093a5, 0x536475);
     grid.position.y = -0.012;
@@ -46,11 +52,14 @@ export class CharacterTest {
 
     this.status = document.createElement('div');
     this.status.className = 'character-test-status';
-    this.status.textContent = 'Загрузка модели героя…';
+    this.status.textContent = 'Загрузка героя и библиотеки анимаций…';
     document.body.appendChild(this.status);
 
+    const loader = new GLTFLoader();
     const modelUrl = '/Universal%20Base%20Characters%5BStandard%5D/Base%20Characters/Godot%20-%20UE/Superhero_Male_FullBody.gltf';
-    new GLTFLoader().load(modelUrl, (gltf) => {
+    const animationUrl = '/Universal%20Animation%20Library%5BStandard%5D/Unreal-Godot/UAL1_Standard.glb';
+
+    loader.load(modelUrl, (gltf) => {
       const model = gltf.scene;
       model.updateMatrixWorld(true);
       const bounds = new THREE.Box3().setFromObject(model);
@@ -59,27 +68,99 @@ export class CharacterTest {
         this.status.textContent = 'Ошибка: у модели нулевая высота';
         return;
       }
-      // Preserve the source model proportions; this isolated scene uses metres.
       model.position.x -= (bounds.min.x + bounds.max.x) * 0.5;
       model.position.z -= (bounds.min.z + bounds.max.z) * 0.5;
       model.position.y -= bounds.min.y;
       model.traverse((object) => {
+        if (object instanceof THREE.SkinnedMesh) {
+          this.targetMesh = object;
+          object.castShadow = false;
+          object.receiveShadow = false;
+        } else if (object instanceof THREE.Mesh) {
+          object.castShadow = false;
+          object.receiveShadow = false;
+        }
         if (object instanceof THREE.Mesh) {
-          object.castShadow = true;
-          object.receiveShadow = true;
-          object.frustumCulled = false;
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          for (const material of materials) {
+            // Temporarily remove tangent-space normal maps to isolate the
+            // triangular lighting artefacts without altering source geometry.
+            if ('normalMap' in material) {
+              const standard = material as THREE.MeshStandardMaterial;
+              standard.normalMap = null;
+              standard.normalScale.set(1, 1);
+              standard.roughness = Math.max(standard.roughness, 0.82);
+              standard.metalness = 0;
+              standard.needsUpdate = true;
+            }
+          }
         }
       });
       this.scene.add(model);
-      this.status.textContent = 'Модель загружена · высота ' + size.y.toFixed(2) + ' м · ширина ' + size.x.toFixed(2) + ' м · глубина ' + size.z.toFixed(2) + ' м · ЛКМ — вращение, колесо — масштаб';
+      this.mixer = new THREE.AnimationMixer(model);
+      this.status.textContent = 'Герой загружен · ' + size.y.toFixed(2) + ' м · ищу клипы UAL1…';
+      this.tryStartRetargetedAnimation();
     }, undefined, (error) => {
       console.error('Character GLTF load failed:', error);
-      this.status.textContent = 'Не удалось загрузить GLTF — смотри ошибку в консоли';
+      this.status.textContent = 'Не удалось загрузить героя — смотри ошибку в консоли';
+    });
+
+    loader.load(animationUrl, (gltf) => {
+      this.sourceScene = gltf.scene;
+      this.sourceClips = gltf.animations;
+      console.info('UAL1 clips:', this.sourceClips.map((clip) => clip.name));
+      this.tryStartRetargetedAnimation();
+    }, undefined, (error) => {
+      console.error('UAL1 animation library load failed:', error);
+      this.status.textContent = 'Герой загружен, но UAL1.glb не загрузился — смотри консоль';
     });
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
     this.resize();
+  }
+
+  private tryStartRetargetedAnimation() {
+    if (!this.mixer || !this.targetMesh || !this.sourceScene || this.sourceClips.length === 0) return;
+    let sourceMesh: THREE.SkinnedMesh | null = null;
+    this.sourceScene.traverse((object) => {
+      if (!sourceMesh && object instanceof THREE.SkinnedMesh) sourceMesh = object;
+    });
+    if (!sourceMesh) {
+      this.status.textContent = 'UAL1 загружен, но в GLB не найден SkinnedMesh';
+      return;
+    }
+
+    const targetNames = new Set(this.targetMesh.skeleton.bones.map((bone) => bone.name));
+    const sourceNames = new Set(sourceMesh.skeleton.bones.map((bone) => bone.name));
+    const commonBones = [...sourceNames].filter((name) => targetNames.has(name));
+    if (commonBones.length < 5) {
+      this.status.textContent = 'Скелеты UAL1 и героя несовместимы по именам костей (' + commonBones.length + ' совпадений)';
+      console.warn('UAL1 bone names:', [...sourceNames]);
+      console.warn('Hero bone names:', [...targetNames]);
+      return;
+    }
+
+    const preferred = this.sourceClips.find((clip) => /idle|stand|breath/i.test(clip.name)) ?? this.sourceClips[0];
+    try {
+      const retargeted = SkeletonUtils.retargetClip(
+        this.targetMesh,
+        sourceMesh,
+        preferred,
+        { preservePosition: true }
+      );
+      if (retargeted.tracks.length === 0) {
+        this.status.textContent = 'Клип ' + preferred.name + ' найден, но не совпали имена анимируемых костей';
+        return;
+      }
+      this.activeAction = this.mixer.clipAction(retargeted);
+      this.activeAction.play();
+      this.status.textContent = 'Герой · ' + commonBones.length + ' общих костей · анимация: ' + preferred.name +
+        ' · клипов в UAL1: ' + this.sourceClips.length + ' · ЛКМ — вращение, колесо — масштаб';
+    } catch (error) {
+      console.error('UAL1 retarget failed:', error);
+      this.status.textContent = 'Не удалось перенести анимацию UAL1 — детали в консоли';
+    }
   }
 
   private resize() {
@@ -93,6 +174,8 @@ export class CharacterTest {
   start() {
     const tick = () => {
       this.frame = requestAnimationFrame(tick);
+      const delta = Math.min(this.clock.getDelta(), 0.05);
+      this.mixer?.update(delta);
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
     };
@@ -103,6 +186,7 @@ export class CharacterTest {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
     this.controls.dispose();
+    this.mixer?.stopAllAction();
     this.renderer.dispose();
     this.status.remove();
   }
