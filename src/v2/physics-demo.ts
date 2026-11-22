@@ -256,7 +256,7 @@ root.innerHTML = `
           <div><span>Потерянное время</span><b id="pv2-diag-dropped">—</b></div>
           <div><span>Состояние</span><b id="pv2-diag-health">—</b></div>
         </div>
-        <p class="pv2-note">Время CPU — замер JavaScript, не точное время выполнения GPU. Draw calls и треугольники берутся из счётчиков Three.js.</p>
+        <p class="pv2-note">Время CPU — замер JavaScript, не точное время выполнения GPU. Draw calls и треугольники берутся из счётчиков Three.js. Счётчики контактов показывают последний фиксированный шаг физики.</p>
       </section>
       <section class="pv2-panel">
         <h2>Физика шара</h2>
