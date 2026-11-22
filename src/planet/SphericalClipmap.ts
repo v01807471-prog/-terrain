@@ -99,12 +99,14 @@ export class SphericalClipmap {
       uAmplitude:{value:settings.amplitude},
       uFrequency:{value:settings.frequency},
       uRadius:{value:settings.radius},
+      uClipExtent:{value:1},
       uDetailFade:{value:0},
       uGridColor:{value:new THREE.Color(0x22d3ee)}
     };
 
     const vertexShader=`
       uniform float uRadius;
+      uniform float uClipExtent;
       varying vec3 vWorldNormal;
       varying vec3 vRadial;
       varying vec3 vWorldPosition;
@@ -115,7 +117,27 @@ export class SphericalClipmap {
         // sphere with a gnomonic projection. Unlike a linear angle mapping,
         // this keeps every vertex on a smooth spherical cap and naturally
         // compresses larger distances toward the horizon.
-        vec2 plane=position.xz;
+        // Remap the square clipmap footprint to a circular disk before
+        // projecting it onto the sphere. All LOD rings use the same mapping,
+        // so their borders remain aligned while the distant silhouette has
+        // no four stretched square corners.
+        vec2 square=position.xz/max(uClipExtent,0.0001);
+        float ax=abs(square.x);
+        float ay=abs(square.y);
+        vec2 disk=vec2(0.0);
+        if (max(ax,ay)>0.000001) {
+          float r;
+          float angle;
+          if (ax>ay) {
+            r=square.x;
+            angle=0.78539816339*(square.y/square.x);
+          } else {
+            r=square.y;
+            angle=1.57079632679-0.78539816339*(square.x/square.y);
+          }
+          disk=r*vec2(cos(angle),sin(angle));
+        }
+        vec2 plane=disk*uClipExtent;
         vec3 radial=normalize(vec3(plane.x, uRadius, plane.y));
 
         // Convert the clipmap-local direction into a fixed planet/world
@@ -267,6 +289,7 @@ export class SphericalClipmap {
       this.levels.push({mesh,lines,extent,level:i,gridMaterial});
     }
     this.currentExtent=totalExtent;
+    this.material.uniforms.uClipExtent.value=totalExtent;
   }
 
   update(camera:THREE.PerspectiveCamera,time:number,planetCenter=new THREE.Vector3()) {
