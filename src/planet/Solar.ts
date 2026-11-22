@@ -39,7 +39,7 @@ export class Solar extends THREE.Group {
 
     this.moonOrbit.name='MoonOrbit';
     this.moonOrbit.rotation.x=0.089;
-    this.moonOrbit.rotation.y=1.15;
+    this.moonOrbit.rotation.y=0.35;
     this.earth.add(this.moonOrbit);
 
     this.moon.name='Moon';
