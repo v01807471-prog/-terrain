@@ -22,7 +22,7 @@ export class PlanetViewport {
   private orbitAngle=0;
   private orbitRadius=30000;
   private orbitAngularSpeed=0.00005;
-  private settings={rings:16,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
+  private settings={rings:17,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
 
   constructor(private canvas:HTMLCanvasElement) {
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
