@@ -237,6 +237,9 @@ root.innerHTML = `
         <h2>Диагностика движка</h2>
         <div class="pv2-diagnostic-grid">
           <div><span>Кадр CPU</span><b id="pv2-diag-frame">—</b></div>
+          <div><span>Компиляция Blueprint</span><b id="pv2-diag-compile">—</b></div>
+          <div><span>Обновление тайлов</span><b id="pv2-diag-terrain">—</b></div>
+          <div><span>Камера CPU</span><b id="pv2-diag-camera">—</b></div>
           <div><span>Физика CPU</span><b id="pv2-diag-physics">—</b></div>
           <div><span>Рендер submit</span><b id="pv2-diag-render">—</b></div>
           <div><span>Шаги физики</span><b id="pv2-diag-steps">—</b></div>
@@ -320,6 +323,7 @@ sun.shadow.camera.bottom = -55;
 scene.add(sun);
 
 const LOD0_CELL_SIZE = 1;
+let blueprintCompileMs = 0;
 let blueprintGraph = createDefaultTerrainGraph(17);
 let blueprint = compileTerrainGraph(blueprintGraph);
 scene.background = new THREE.Color(blueprint.fogColor);
@@ -335,7 +339,9 @@ waterRenderer.applyBlueprint(blueprint.water);
 const blueprintStatus = document.querySelector<HTMLParagraphElement>('#pv2-blueprint-status')!;
 const graphEditorHost = document.querySelector<HTMLDivElement>('#pv2-blueprint-editor')!;
 const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (nextGraph) => {
+  const compileStart = performance.now();
   const nextBlueprint = compileTerrainGraph(nextGraph);
+  blueprintCompileMs = performance.now() - compileStart;
   terrain.setBaseHeight(nextBlueprint.heightAt);
   terrainRenderer.setBlueprint(nextBlueprint);
   waterRenderer.applyBlueprint(nextBlueprint.water);
@@ -686,6 +692,7 @@ resizeObserver.observe(viewport); resize();
 
 let previousTime = performance.now(), fpsFrames = 0, fpsElapsed = 0;
 let physicsCpuMs = 0, renderSubmitMs = 0, frameCpuMs = 0, droppedPhysicsTime = 0, physicsStepsLastFrame = 0;
+let terrainUpdateCpuMs = 0, cameraCpuMs = 0;
 let diagnosticElapsed = 0;
 function setDiagnostic(id: string, value: string): void {
   const element = document.querySelector<HTMLElement>(`#${id}`);
@@ -695,6 +702,9 @@ function updateDiagnostics(culling: ReturnType<TerrainRenderer['update']>): void
   const info = renderer.info;
   const programs = info.programs?.length ?? 0;
   setDiagnostic('pv2-diag-frame', `${frameCpuMs.toFixed(2)} ms`);
+  setDiagnostic('pv2-diag-compile', `${blueprintCompileMs.toFixed(2)} ms`);
+  setDiagnostic('pv2-diag-terrain', `${terrainUpdateCpuMs.toFixed(2)} ms`);
+  setDiagnostic('pv2-diag-camera', `${cameraCpuMs.toFixed(2)} ms`);
   setDiagnostic('pv2-diag-physics', `${physicsCpuMs.toFixed(2)} ms`);
   setDiagnostic('pv2-diag-render', `${renderSubmitMs.toFixed(2)} ms`);
   setDiagnostic('pv2-diag-steps', `${physicsStepsLastFrame} / кадр`);
@@ -741,9 +751,13 @@ function animate(now: number): void {
     }
   }
   physicsCpuMs = performance.now() - physicsStart;
+  const cameraStart = performance.now();
   updateFollowCamera();
+  cameraCpuMs = performance.now() - cameraStart;
   waterRenderer.update(camera, now / 1000);
+  const terrainStart = performance.now();
   const culling = terrainRenderer.update(camera);
+  terrainUpdateCpuMs = performance.now() - terrainStart;
   document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
   updateStats();
   const renderStart = performance.now();
