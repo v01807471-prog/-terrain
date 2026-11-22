@@ -14,7 +14,8 @@ export class Solar extends THREE.Group {
   readonly bodies:Array<{name:string;node:THREE.Object3D;radius:number}>;
 
   readonly earthOrbitRadius=30000;
-  readonly moonOrbitRadius=38440;
+  // Deliberately compressed for a readable demo; not to scale with real lunar distance.
+  readonly moonOrbitRadius=16000;
   readonly earthOrbitSpeed=0.00005;
   readonly moonOrbitSpeed=0.00012;
 
@@ -31,6 +32,7 @@ export class Solar extends THREE.Group {
 
     this.earthOrbit.name='EarthOrbit';
     this.earthOrbit.rotation.y=Math.PI;
+    this.earthOrbit.add(this.createOrbitLine(this.earthOrbitRadius,0x6b91b8,0.42));
     this.add(this.earthOrbit);
 
     this.earth.name='Earth';
@@ -40,6 +42,7 @@ export class Solar extends THREE.Group {
     this.moonOrbit.name='MoonOrbit';
     this.moonOrbit.rotation.x=0.089;
     this.moonOrbit.rotation.y=0.35;
+    this.moonOrbit.add(this.createOrbitLine(this.moonOrbitRadius,0xb8c5d6,0.58));
     this.earth.add(this.moonOrbit);
 
     this.moon.name='Moon';
@@ -52,6 +55,21 @@ export class Solar extends THREE.Group {
       {name:'Moon',node:this.moon,radius:1737}
     ];
     this.updateMatrixWorld(true);
+  }
+
+  private createOrbitLine(radius:number,color:number,opacity:number){
+    const points:THREE.Vector3[]=[];
+    const segments=256;
+    for(let i=0;i<segments;i++){
+      const angle=(i/segments)*Math.PI*2;
+      points.push(new THREE.Vector3(Math.cos(angle)*radius,0,Math.sin(angle)*radius));
+    }
+    const geometry=new THREE.BufferGeometry().setFromPoints(points);
+    const material=new THREE.LineBasicMaterial({color,transparent:true,opacity,depthWrite:false});
+    const line=new THREE.LineLoop(geometry,material);
+    line.name=`OrbitGuide-${radius}`;
+    line.frustumCulled=false;
+    return line;
   }
 
   update(deltaSeconds:number){
