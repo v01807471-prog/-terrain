@@ -25,6 +25,7 @@ function makeSquareLevel(extent:number, level:number) {
   const positions:number[] = [];
   const indices:number[] = [];
   const linePositions:number[] = [];
+  const lineSet=new Set<string>();
   const step = extent * 2 / GRID_SEGMENTS;
   const inner = level === 0 ? 0 : extent * 0.5;
 
@@ -52,12 +53,18 @@ function makeSquareLevel(extent:number, level:number) {
 
       // Draw only the four square edges; never expose the mesh's
       // internal triangulation diagonal in the debug grid.
-      linePositions.push(
-        x0,0,z0, x1,0,z0,
-        x1,0,z0, x1,0,z1,
-        x1,0,z1, x0,0,z1,
-        x0,0,z1, x0,0,z0
-      );
+      const addLine=(ax:number,az:number,bx:number,bz:number)=>{
+        const a=`${ax.toFixed(5)},${az.toFixed(5)}`;
+        const b=`${bx.toFixed(5)},${bz.toFixed(5)}`;
+        const key=a<b?`${a}|${b}`:`${b}|${a}`;
+        if(lineSet.has(key)) return;
+        lineSet.add(key);
+        linePositions.push(ax,0,az,bx,0,bz);
+      };
+      addLine(x0,z0,x1,z0);
+      addLine(x1,z0,x1,z1);
+      addLine(x1,z1,x0,z1);
+      addLine(x0,z1,x0,z0);
     }
   }
 
