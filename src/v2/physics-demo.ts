@@ -255,6 +255,8 @@ root.innerHTML = `
           <button class="pv2-button" id="pv2-drop-pair">⚪ Уронить пару шаров</button>
           <button class="pv2-button" id="pv2-pause">Ⅱ Пауза физики</button>
           <button class="pv2-button" id="pv2-camera">◎ Камера за героем</button>
+          <label class="pv2-toggle"><input id="pv2-base-visible" type="checkbox" checked> Показывать базовый рельеф генератора</label>
+          <label class="pv2-toggle"><input id="pv2-local-visible" type="checkbox" checked> Показывать локальные изменения рельефа</label>
           <label class="pv2-toggle"><input id="pv2-wire" type="checkbox"> Сетка рельефа по уровням LOD</label>
           <label class="pv2-toggle"><input id="pv2-physics-debug" type="checkbox"> Контакты физики героя</label>
           <label class="pv2-toggle"><input id="pv2-cpu-surface" type="checkbox"> Показать CPU-сетку столкновений (только диагностика)</label>
@@ -724,6 +726,10 @@ document.querySelector('#pv2-drop-pair')!.addEventListener('click', () => {
   createSphere(player.x + 3, player.z + 3, 12);
   createSphere(player.x + 5, player.z + 3, 12);
 });
+document.querySelector<HTMLInputElement>('#pv2-base-visible')!.addEventListener('change', (event) =>
+  terrainRenderer.setBaseVisible((event.currentTarget as HTMLInputElement).checked));
+document.querySelector<HTMLInputElement>('#pv2-local-visible')!.addEventListener('change', (event) =>
+  terrainRenderer.setLocalEditsVisible((event.currentTarget as HTMLInputElement).checked));
 document.querySelector<HTMLInputElement>('#pv2-wire')!.addEventListener('change', (event) =>
   terrainRenderer.setWireframe((event.currentTarget as HTMLInputElement).checked));
 document.querySelector<HTMLInputElement>('#pv2-cpu-surface')!.addEventListener('change', (event) => {
