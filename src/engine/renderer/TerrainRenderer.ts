@@ -3,6 +3,7 @@ import terrainVertexShader from './shaders/terrain.vert.glsl?raw';
 import terrainFragmentShader from './shaders/terrain.frag.glsl?raw';
 import wireFragmentShader from './shaders/wire.frag.glsl?raw';
 import type { Terrain } from '../terrain/Terrain.js';
+import type { TerrainBounds } from '../terrain/types.js';
 import type { TerrainBlueprint } from '../blueprint/types.js';
 import { BUILTIN_TEXTURE_ASSETS, createBuiltinTexture } from '../textures/assets.js';
 import { DOME_RADIUS } from '../terrain/DomeProjection.js';
@@ -17,6 +18,9 @@ export interface TerrainClipmapOptions {
 
 export class TerrainRenderer {
   readonly group = new THREE.Group();
+  private readonly localEditGroup = new THREE.Group();
+  private readonly localEditMaterial = new THREE.MeshStandardMaterial({ color: '#78845b', roughness: 1, metalness: 0, polygonOffset: true, polygonOffsetFactor: -1, side: THREE.DoubleSide });
+  private readonly editRegions: TerrainBounds[] = [];
   readonly levels: number;
   readonly gridSize: number;
   readonly tileSize: number;
@@ -93,9 +97,100 @@ export class TerrainRenderer {
     };
     this.build(blueprint);
     this.scene.add(this.group);
-    this.unsubscribe = terrain.subscribeChanges(() => {
-      // GPU edit-delta upload is handled by a future terrain-renderer adapter.
+    this.scene.add(this.localEditGroup);
+    this.unsubscribe = terrain.subscribeChanges((change) => {
+      const b = change.bounds;
+      if (!Number.isFinite(b.minX + b.minZ + b.maxX + b.maxZ)) {
+        if (terrain.edits.allocatedChunkCount === 0) this.clearLocalEditPatches();
+        else this.rebuildLocalEditPatches();
+        return;
+      }
+      this.addOrMergeEditRegion(b);
     });
+  }
+
+  /** Hides only the generated procedural surface; Terrain and physics stay active. */
+  setBaseVisible(visible: boolean): void {
+    this.group.visible = visible;
+  }
+
+  /** Shows or hides the sparse local-edit overlay independently of the base surface. */
+  setLocalEditsVisible(visible: boolean): void {
+    this.localEditGroup.visible = visible;
+  }
+
+  private clearLocalEditPatches(): void {
+    for (const child of [...this.localEditGroup.children]) {
+      const mesh = child as THREE.Mesh;
+      this.localEditGroup.remove(mesh);
+      (mesh.geometry as THREE.BufferGeometry).dispose();
+    }
+    this.editRegions.length = 0;
+  }
+
+  private addOrMergeEditRegion(bounds: TerrainBounds): void {
+    let merged = { ...bounds };
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = this.editRegions.length - 1; i >= 0; i--) {
+        const r = this.editRegions[i];
+        const separated = merged.maxX < r.minX || merged.minX > r.maxX || merged.maxZ < r.minZ || merged.minZ > r.maxZ;
+        if (separated) continue;
+        merged = {
+          minX: Math.min(merged.minX, r.minX), minZ: Math.min(merged.minZ, r.minZ),
+          maxX: Math.max(merged.maxX, r.maxX), maxZ: Math.max(merged.maxZ, r.maxZ)
+        };
+        this.editRegions.splice(i, 1);
+        changed = true;
+      }
+    }
+    this.editRegions.push(merged);
+    this.rebuildLocalEditPatches();
+  }
+
+  private rebuildLocalEditPatches(): void {
+    for (const child of [...this.localEditGroup.children]) {
+      const mesh = child as THREE.Mesh;
+      this.localEditGroup.remove(mesh);
+      (mesh.geometry as THREE.BufferGeometry).dispose();
+    }
+    for (const bounds of this.editRegions) {
+      const geometry = this.createLocalEditGeometry(bounds);
+      const mesh = new THREE.Mesh(geometry, this.localEditMaterial);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 2;
+      this.localEditGroup.add(mesh);
+    }
+  }
+
+  private createLocalEditGeometry(bounds: TerrainBounds): THREE.BufferGeometry {
+    const intervalsX = Math.max(1, Math.min(128, Math.ceil((bounds.maxX - bounds.minX) / this.terrain.config.editCellSize)));
+    const intervalsZ = Math.max(1, Math.min(128, Math.ceil((bounds.maxZ - bounds.minZ) / this.terrain.config.editCellSize)));
+    const width = bounds.maxX - bounds.minX;
+    const depth = bounds.maxZ - bounds.minZ;
+    const positions = new Float32Array((intervalsX + 1) * (intervalsZ + 1) * 3);
+    const indices: number[] = [];
+    for (let z = 0; z <= intervalsZ; z++) {
+      for (let x = 0; x <= intervalsX; x++) {
+        const wx = bounds.minX + width * x / intervalsX;
+        const wz = bounds.minZ + depth * z / intervalsZ;
+        const i = (z * (intervalsX + 1) + x) * 3;
+        positions[i] = wx;
+        positions[i + 1] = this.terrain.getHeight(wx, wz);
+        positions[i + 2] = wz;
+      }
+    }
+    for (let z = 0; z < intervalsZ; z++) for (let x = 0; x < intervalsX; x++) {
+      const a = z * (intervalsX + 1) + x;
+      const b = a + 1, c = a + intervalsX + 1, d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
   }
 
   setWireframe(enabled: boolean): void {
@@ -121,6 +216,7 @@ export class TerrainRenderer {
     const nextTextureIds = Array.from({ length: 8 }, (_, i) => blueprint.textureAssets?.[i] ?? '');
     const texturesChanged = nextTextureIds.some((id, i) => id !== this.activeTextureIds[i]);
     this.uniforms.uFogColor.value.set(blueprint.fogColor);
+    this.localEditMaterial.color.set(blueprint.terrainColor);
     this.baseFogNear = blueprint.fogNear;
     this.baseFogFar = blueprint.fogFar;
     this.uniforms.uFogNear.value = this.baseFogNear * this.uniforms.uLodScale.value;
@@ -269,6 +365,9 @@ export class TerrainRenderer {
 
   dispose(): void {
     this.unsubscribe();
+    this.clearLocalEditPatches();
+    this.scene.remove(this.localEditGroup);
+    this.localEditMaterial.dispose();
     for (const texture of this.assetTextures.values()) texture.dispose();
     this.assetTextures.clear();
     this.fallbackAssetTexture.dispose();
