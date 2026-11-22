@@ -32,8 +32,7 @@ const vertexShader = [
   '  vWorld = world.xyz;',
   '  gl_Position = projectionMatrix * viewMatrix * world;',
   '}'
-].join('\
-');
+].join(String.fromCharCode(10))
 
 const fragmentShaderTemplate = `
 precision highp float;
