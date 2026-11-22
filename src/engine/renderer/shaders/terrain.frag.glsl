@@ -49,7 +49,7 @@ void main() {
     threeShadow = getShadow(directionalShadowMap[0], directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowIntensity, directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius, vDirectionalShadowCoord[0]);
   #endif
   float daylight = 0.18 + uSunIntensity * 0.20;
-  vec3 color = base*(daylight+diffuse*uSunIntensity*0.82*shadow*threeShadow)*(1.0-slopeV*0.2);
+  vec3 color = base*(daylight+diffuse*uSunIntensity*0.82*threeShadow)*(1.0-slopeV*0.2);
   float distanceToCamera = length(vWorld-vec3(uCamera.x,0.0,uCamera.y));
   color = mix(color,uFogColor,smoothstep(uFogNear,uFogFar,distanceToCamera));
   terrainFragColor = vec4(color,1.0);
