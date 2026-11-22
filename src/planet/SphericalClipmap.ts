@@ -19,7 +19,7 @@ type Level = {
 };
 
 const GRID_SEGMENTS = 128;
-const MIN_EXTENT = 40;
+const MIN_EXTENT = 2;
 
 function makeSquareLevel(extent:number, level:number) {
   const positions:number[] = [];
@@ -101,7 +101,8 @@ export class SphericalClipmap {
       uRadius:{value:settings.radius},
       uClipExtent:{value:1},
       uDetailFade:{value:0},
-      uGridColor:{value:new THREE.Color(0x22d3ee)}
+      uGridColor:{value:new THREE.Color(0x22d3ee)},
+      uSunPosition:{value:new THREE.Vector3(0,0,0)}
     };
 
     const vertexShader=`
@@ -168,6 +169,7 @@ export class SphericalClipmap {
         varying float vHeight;
         uniform float uAmplitude;
         uniform float uRadius;
+        uniform vec3 uSunPosition;
 
         float hash3(vec3 p) {
           p=fract(p*.3183099+vec3(.13,.17,.11));
@@ -190,7 +192,9 @@ export class SphericalClipmap {
           // and hides the mountain slopes at orbital viewing distances.
           vec3 n=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
           if(dot(n,vRadial)<0.0) n=-n;
-          float light=max(dot(n,normalize(vec3(.4,.8,.3))),0.0);
+          // Point the lighting vector from each terrain fragment toward the Sun.
+          vec3 toSun=normalize(uSunPosition-vWorldPosition);
+          float light=max(dot(n,toSun),0.0);
           // Texture coordinates are measured in planet-space kilometres,
           // not in normalized radial coordinates. Therefore texel scale is
           // independent of clipmap ring extent and mesh resolution.
@@ -216,7 +220,7 @@ export class SphericalClipmap {
 
           float textureMix=(macro-.5)*.22+(detail-.5)*.12+(micro-.5)*.055;
           color*=1.0+textureMix;
-          color*=.24+light*.96;
+          color*=.08+light*1.08;
           gl_FragColor=vec4(color,1.0);
         }
       `,
