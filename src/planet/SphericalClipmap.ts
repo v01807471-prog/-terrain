@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { terrainBlueprint } from './TerrainBlueprint';
 
 export interface ClipmapSettings { rings:number; baseSegments:number; ringGrowth:number; radius:number; amplitude:number; frequency:number; }
-type Ring = { mesh:THREE.Mesh; level:number; segments:number; inner:number; outer:number };
+type Ring = { mesh:THREE.Mesh; grid:THREE.Mesh; level:number; segments:number; inner:number; outer:number };
 
 function makeAnnulus(inner:number,outer:number,segments:number,radialSteps:number,radius:number){
   const vertices:number[]=[];const indices:number[]=[];const uvs:number[]=[];
@@ -28,6 +28,7 @@ export class SphericalClipmap {
   readonly group=new THREE.Group();
   private rings:Ring[]=[];
   private material:THREE.ShaderMaterial;
+  private gridMaterial:THREE.ShaderMaterial;
   private lastDirection=new THREE.Vector3();
   private lastAltitude=-1;
   private rebuildQueued=false;
@@ -53,10 +54,17 @@ export class SphericalClipmap {
         c*=.3+light*.85;gl_FragColor=vec4(c,1.0);}`,
       side:THREE.DoubleSide
     });
+    this.gridMaterial=new THREE.ShaderMaterial({
+      uniforms:this.material.uniforms,
+      vertexShader:this.material.vertexShader,
+      fragmentShader:`void main(){gl_FragColor=vec4(0.18,0.82,1.0,0.82);}`,
+      wireframe:true,transparent:true,opacity:0.82,depthWrite:false,
+      polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1,side:THREE.DoubleSide
+    });
     this.scene.add(this.group);this.rebuild();
   }
   private rebuild(){
-    for(const r of this.rings){this.group.remove(r.mesh);r.mesh.geometry.dispose();}
+    for(const r of this.rings){this.group.remove(r.mesh);this.group.remove(r.grid);r.mesh.geometry.dispose();}
     this.rings=[];
     const count=THREE.MathUtils.clamp(Math.round(this.settings.rings),1,16);
     const growth=this.settings.ringGrowth;
@@ -67,9 +75,12 @@ export class SphericalClipmap {
       const centerResolution=12+Math.max(0,this.settings.baseSegments-12)*4*this.proximity;
       const segments=Math.min(512,Math.max(12,Math.round(12+(centerResolution-12)*Math.exp(-i*.42))));
       const radialSteps=Math.max(2,Math.round(segments*.25));
-      const mesh=new THREE.Mesh(makeAnnulus(inner,outer,segments,radialSteps,this.settings.radius),this.material);
+      const geometry=makeAnnulus(inner,outer,segments,radialSteps,this.settings.radius);
+      const mesh=new THREE.Mesh(geometry,this.material);
       mesh.frustumCulled=false;mesh.renderOrder=i;
-      this.group.add(mesh);this.rings.push({mesh,level:i,segments,inner,outer});
+      const grid=new THREE.Mesh(geometry,this.gridMaterial);
+      grid.frustumCulled=false;grid.renderOrder=100+i;
+      this.group.add(mesh,grid);this.rings.push({mesh,grid,level:i,segments,inner,outer});
     }
   }
   update(camera:THREE.PerspectiveCamera,time:number){
@@ -96,5 +107,5 @@ export class SphericalClipmap {
     if(rebuild)this.rebuild();
   }
   get lod(){return this.rings[0]?.segments??0;}
-  dispose(){for(const r of this.rings)r.mesh.geometry.dispose();this.material.dispose();this.scene.remove(this.group);}
+  dispose(){for(const r of this.rings)r.mesh.geometry.dispose();this.material.dispose();this.gridMaterial.dispose();this.scene.remove(this.group);}
 }
