@@ -249,6 +249,17 @@ export class SphericalClipmap {
     const altitudeChanged=this.lastAltitude<0 ||
       Math.abs(altitude-this.lastAltitude)>Math.max(25,this.lastAltitude*.08);
 
+    // Pick the number of nested levels from projected cell size.
+    // Avoid keeping a level whose cells are only a few screen pixels wide.
+    const viewportHeight=Math.max(1, camera.viewportHeight ?? window.innerHeight);
+    const worldPerPixel=(2*Math.max(altitude,1)*Math.tan(THREE.MathUtils.degToRad(camera.fov*.5)))/viewportHeight;
+    const outerCellPixels=(nextExtent*2/GRID_SEGMENTS)/Math.max(worldPerPixel,1e-4);
+    const desiredRings=THREE.MathUtils.clamp(
+      Math.ceil(Math.log2(Math.max(1,outerCellPixels/3)))+1,
+      2,
+      Math.min(8,Math.round(this.settings.rings))
+    );
+
     if (extentChanged || altitudeChanged || desiredRings!==this.activeRingCount) this.rebuild(nextExtent,desiredRings);
     this.lastAltitude=altitude;
   }
