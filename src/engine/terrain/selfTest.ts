@@ -1,5 +1,6 @@
 import { TerrainEditStore } from './TerrainEditStore.js';
 import { Terrain } from './Terrain.js';
+import { TerrainUpdateQueue } from './TerrainUpdateQueue.js';
 
 export interface TerrainSelfTestResult {
   passed: string[];
@@ -101,6 +102,42 @@ export function runTerrainSelfTests(): TerrainSelfTestResult {
   unsubscribe();
   editedTerrain.applyEdit(2, 2, 1.5, 1);
   assert(changes.length === 2, 'отписка прекращает получение событий Terrain');
+
+  const queue = new TerrainUpdateQueue({ maxRegionsPerDrain: 1 });
+  const originalChange = {
+    version: 1,
+    bounds: { minX: 0, minZ: 0, maxX: 4, maxZ: 4 }
+  };
+  queue.enqueue(originalChange);
+  queue.enqueue({ version: 2, bounds: { minX: 4, minZ: 1, maxX: 6, maxZ: 3 } });
+  queue.enqueue({ version: 4, bounds: { minX: 6, minZ: 3, maxX: 8, maxZ: 5 } });
+  assert(queue.pendingCount === 1, 'очередь объединяет пересекающиеся и соприкасающиеся области транзитивно');
+  const mergedChange = queue.drain({ maxRegions: 1 })[0];
+  assert(mergedChange.version === 4
+    && mergedChange.bounds.minX === 0
+    && mergedChange.bounds.minZ === 0
+    && mergedChange.bounds.maxX === 8
+    && mergedChange.bounds.maxZ === 5,
+  'объединённая область сохраняет последнюю версию и точные общие границы');
+  assert(queue.pendingCount === 0 && originalChange.bounds.maxX === 4,
+    'drain удаляет только выданную область и не изменяет исходное событие');
+
+  const prioritizedQueue = new TerrainUpdateQueue({ maxRegionsPerDrain: 1 });
+  prioritizedQueue.enqueue({ version: 1, bounds: { minX: 100, minZ: 100, maxX: 110, maxZ: 110 } });
+  prioritizedQueue.enqueue({ version: 2, bounds: { minX: 2, minZ: 2, maxX: 3, maxZ: 3 } });
+  const nearest = prioritizedQueue.drain({ priority: { x: 0, z: 0 } })[0];
+  assert(nearest.version === 2 && prioritizedQueue.pendingCount === 1,
+    'очередь отдаёт ближайшую к камере область и соблюдает лимит выдачи');
+
+  const fullResetQueue = new TerrainUpdateQueue();
+  fullResetQueue.enqueue({
+    version: 5,
+    bounds: { minX: -Infinity, minZ: -Infinity, maxX: Infinity, maxZ: Infinity }
+  });
+  fullResetQueue.enqueue({ version: 6, bounds: { minX: 1, minZ: 2, maxX: 3, maxZ: 4 } });
+  const fullReset = fullResetQueue.drain()[0];
+  assert(fullReset.version === 6 && fullReset.bounds.minX === -Infinity && fullReset.bounds.maxX === Infinity,
+    'полный сброс поглощает локальные dirty-области и сохраняет последнюю версию');
 
   const plane = new Terrain((x, z) => 2 * x + 3 * z, { normalSampleDistance: 0.25 });
   const firstTriangle = plane.sampleGround(0.25, 0.5, 1);
