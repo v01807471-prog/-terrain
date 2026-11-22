@@ -82,6 +82,25 @@ export class TerrainRenderer {
     }
   }
 
+  /** Recompiles the visible terrain materials without rebuilding clipmap geometry. */
+  setBlueprint(blueprint: TerrainBlueprint): void {
+    const vertexShader = terrainVertexShader.replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL);
+    const fragmentShader = terrainFragmentShader.replace(
+      '__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;'
+    );
+    this.uniforms.uFogColor.value.set(blueprint.fogColor);
+    this.uniforms.uFogNear.value = blueprint.fogNear;
+    this.uniforms.uFogFar.value = blueprint.fogFar;
+    for (const ring of this.rings) {
+      ring.material.vertexShader = vertexShader;
+      ring.material.fragmentShader = fragmentShader;
+      ring.material.uniforms.uBaseColor.value.set(blueprint.terrainColor);
+      ring.wireMaterial.vertexShader = vertexShader;
+      ring.material.needsUpdate = true;
+      ring.wireMaterial.needsUpdate = true;
+    }
+  }
+
   update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; altitude: number } {
     camera.updateMatrixWorld(true);
     const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
