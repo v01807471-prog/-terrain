@@ -235,15 +235,17 @@ export class SphericalClipmap {
   update(camera:THREE.PerspectiveCamera,time:number) {
     this.material.uniforms.uTime.value=time;
 
-    // Keep the clipmap centered beneath the camera's ground footprint.
-    // This rotates the local tangent frame to the camera's radial direction,
-    // while the sun and world lighting remain fixed in scene coordinates.
-    const direction=camera.position.clone().normalize();
-    const orientation=new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0,1,0),
-      direction
-    );
-    this.group.quaternion.copy(orientation);
+    // Anchor the patch to the player's spherical coordinates. Build a stable
+    // tangent frame from planet north so the patch does not acquire arbitrary
+    // twist as the camera moves around the globe.
+    const radial=camera.position.clone().normalize();
+    const northReference=Math.abs(radial.dot(new THREE.Vector3(0,1,0)))>.995
+      ? new THREE.Vector3(0,0,1)
+      : new THREE.Vector3(0,1,0);
+    const east=new THREE.Vector3().crossVectors(northReference,radial).normalize();
+    const south=new THREE.Vector3().crossVectors(east,radial).normalize();
+    const frame=new THREE.Matrix4().makeBasis(east,radial,south);
+    this.group.quaternion.setFromRotationMatrix(frame);
 
     const altitude=Math.max(0,camera.position.length()-this.settings.radius);
     const nextExtent=this.calculateExtent(altitude);
