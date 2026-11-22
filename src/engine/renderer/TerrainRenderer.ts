@@ -23,12 +23,13 @@ export class TerrainRenderer {
   private readonly tilesPerSide: number;
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly wireGeometries: THREE.BufferGeometry[] = [];
+  private readonly creationQueue: Array<{ ringIndex: number; tileIndex: number }> = [];
   private readonly rings: Array<{
     step: number;
     half: number;
     cut: number;
     outer: number;
-    tiles: Array<{ mesh: THREE.Mesh; wire: THREE.LineSegments; ox: number; oz: number }>;
+    tiles: Array<{ mesh: THREE.Mesh | null; wire: THREE.LineSegments | null; ox: number; oz: number }>;
     material: THREE.ShaderMaterial;
     wireMaterial: THREE.ShaderMaterial;
   }> = [];
@@ -48,6 +49,9 @@ export class TerrainRenderer {
   private readonly projectionView = new THREE.Matrix4();
   private readonly tileBounds = new THREE.Box3();
   private readonly assetTextures = new Map<string, THREE.DataTexture>();
+  private activeVertexShader = '';
+  private activeFragmentShader = '';
+  private activeTextureIds: string[] = [];
   private readonly fallbackAssetTexture = (() => { const pixels = new Uint8Array([255,0,255,255, 0,0,0,255, 0,0,0,255, 255,0,255,255]); const t = new THREE.DataTexture(pixels,2,2,THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; })();
 
   constructor(
@@ -84,8 +88,13 @@ export class TerrainRenderer {
 
   setWireframe(enabled: boolean): void {
     this.showWireframe = enabled;
-    for (const ring of this.rings) {
-      for (const tile of ring.tiles) tile.wire.visible = enabled && tile.mesh.visible;
+    for (let level = 0; level < this.rings.length; level++) {
+      const ring = this.rings[level];
+      for (let i = 0; i < ring.tiles.length; i++) {
+        const tile = ring.tiles[i];
+        if (enabled && tile.mesh && !tile.wire) this.createWireForTile(ring, tile, i);
+        if (tile.wire) tile.wire.visible = enabled && !!tile.mesh?.visible;
+      }
     }
   }
 
@@ -95,22 +104,34 @@ export class TerrainRenderer {
     const fragmentShader = terrainFragmentShader
       .replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL)
       .replace('__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;');
+    const vertexChanged = vertexShader !== this.activeVertexShader;
+    const fragmentChanged = fragmentShader !== this.activeFragmentShader;
+    const nextTextureIds = Array.from({ length: 8 }, (_, i) => blueprint.textureAssets?.[i] ?? '');
+    const texturesChanged = nextTextureIds.some((id, i) => id !== this.activeTextureIds[i]);
     this.uniforms.uFogColor.value.set(blueprint.fogColor);
     this.uniforms.uFogNear.value = blueprint.fogNear;
     this.uniforms.uFogFar.value = blueprint.fogFar;
     for (const ring of this.rings) {
-      ring.material.vertexShader = vertexShader;
-      ring.material.fragmentShader = fragmentShader;
+      if (vertexChanged) {
+        ring.material.vertexShader = vertexShader;
+        ring.wireMaterial.vertexShader = vertexShader;
+        ring.material.needsUpdate = true;
+        ring.wireMaterial.needsUpdate = true;
+      }
+      if (fragmentChanged) {
+        ring.material.fragmentShader = fragmentShader;
+        ring.material.needsUpdate = true;
+      }
       ring.material.uniforms.uBaseColor.value.set(blueprint.terrainColor);
-      ring.wireMaterial.vertexShader = vertexShader;
-      for (let i = 0; i < 8; i++) {
-        const texture = this.getAssetTexture(blueprint.textureAssets?.[i]);
+      if (texturesChanged) for (let i = 0; i < 8; i++) {
+        const texture = this.getAssetTexture(nextTextureIds[i] || undefined);
         ring.material.uniforms[`uAsset${i}`].value = texture;
         ring.wireMaterial.uniforms[`uAsset${i}`].value = texture;
       }
-      ring.material.needsUpdate = true;
-      ring.wireMaterial.needsUpdate = true;
     }
+    this.activeVertexShader = vertexShader;
+    this.activeFragmentShader = fragmentShader;
+    this.activeTextureIds = nextTextureIds;
   }
 
   setLighting(direction: THREE.Vector3, intensity: number): void {
@@ -131,6 +152,19 @@ export class TerrainRenderer {
     this.uniforms.uCamera.value.set(cx, cz);
     this.uniforms.uAltitude.value = altitude;
 
+    // Create only a few tiles per frame. Queue order is LOD-first, then nearest-to-camera.
+    // This makes the central terrain appear first and spreads GPU program compilation over frames.
+    for (let i = 0; i < 4 && this.creationQueue.length > 0; i++) {
+      const item = this.creationQueue.shift()!;
+      const ring = this.rings[item.ringIndex];
+      const tile = ring.tiles[item.tileIndex];
+      const mesh = new THREE.Mesh(this.geometries[item.tileIndex], ring.material);
+      mesh.scale.set(ring.step, 1, ring.step);
+      mesh.frustumCulled = false;
+      tile.mesh = mesh;
+      this.group.add(mesh);
+      if (this.showWireframe) this.createWireForTile(ring, tile, item.tileIndex);
+    }
     let visibleTiles = 0;
     for (let level = 0; level < this.rings.length; level++) {
       const ring = this.rings[level];
@@ -139,9 +173,10 @@ export class TerrainRenderer {
       const centerZ = Math.round(cz / snap) * snap;
       const last = level === this.rings.length - 1;
       for (const tile of ring.tiles) {
+        if (!tile.mesh) continue;
         if (tile.mesh.position.x !== centerX || tile.mesh.position.z !== centerZ) {
           tile.mesh.position.set(centerX, 0, centerZ);
-          tile.wire.position.set(centerX, 0, centerZ);
+          if (tile.wire) tile.wire.position.set(centerX, 0, centerZ);
         }
         const size = this.tileSize * ring.step;
         const x0 = centerX + tile.ox * ring.step, x1 = x0 + size;
@@ -161,11 +196,11 @@ export class TerrainRenderer {
         const inRing = maxDistance >= ring.cut && (last || minDistance < ring.outer);
         const visible = inCameraFrustum && inRing;
         tile.mesh.visible = visible;
-        tile.wire.visible = visible && this.showWireframe;
+        if (tile.wire) tile.wire.visible = visible && this.showWireframe;
         if (visible) visibleTiles++;
       }
     }
-    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, altitude };
+    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.mesh !== null).length, 0), queuedTiles: this.creationQueue.length, altitude };
   }
 
   dispose(): void {
@@ -185,8 +220,23 @@ export class TerrainRenderer {
     this.wireGeometries.length = 0;
   }
 
+  private createWireForTile(ring: (typeof this.rings)[number], tile: (typeof ring.tiles)[number], tileIndex: number): void {
+    if (tile.wire) return;
+    const wire = new THREE.LineSegments(this.wireGeometries[tileIndex], ring.wireMaterial);
+    wire.scale.set(ring.step, 1, ring.step);
+    wire.frustumCulled = false;
+    wire.position.copy(tile.mesh?.position ?? new THREE.Vector3());
+    wire.visible = this.showWireframe && !!tile.mesh?.visible;
+    tile.wire = wire;
+    this.group.add(wire);
+  }
+
   private build(blueprint: TerrainBlueprint): void {
     const vertexShader = terrainVertexShader.replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL);
+    const fragmentShader = terrainFragmentShader.replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL).replace('__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;');
+    this.activeVertexShader = vertexShader;
+    this.activeFragmentShader = fragmentShader;
+    this.activeTextureIds = Array.from({ length: 8 }, (_, i) => blueprint.textureAssets?.[i] ?? '');
     for (let tz = 0; tz < this.tilesPerSide; tz++) {
       for (let tx = 0; tx < this.tilesPerSide; tx++) {
         this.geometries.push(this.createTileGeometry(tx, tz));
@@ -232,17 +282,16 @@ export class TerrainRenderer {
       for (let i = 0; i < this.geometries.length; i++) {
         const tx = i % this.tilesPerSide, tz = Math.floor(i / this.tilesPerSide);
         const ox = tx * this.tileSize - halfGrid, oz = tz * this.tileSize - halfGrid;
-        const mesh = new THREE.Mesh(this.geometries[i], material);
-        const wire = new THREE.LineSegments(this.wireGeometries[i], wireMaterial);
-        mesh.scale.set(step, 1, step);
-        wire.scale.set(step, 1, step);
-        // Tile visibility is explicitly tested against the active camera frustum.
-        mesh.frustumCulled = false;
-        wire.frustumCulled = false;
-        this.group.add(mesh, wire);
-        tiles.push({ mesh, wire, ox, oz });
+        tiles.push({ mesh: null, wire: null, ox, oz });
       }
       this.rings.push({ step, half, cut, outer, tiles, material, wireMaterial });
+    }
+    // Within each LOD, create central tiles first; outer rings are queued later.
+    for (let ringIndex = 0; ringIndex < this.rings.length; ringIndex++) {
+      const ring = this.rings[ringIndex];
+      const order = ring.tiles.map((tile, tileIndex) => ({ tileIndex, distance: Math.hypot(tile.ox + this.tileSize / 2, tile.oz + this.tileSize / 2) }))
+        .sort((a, b) => a.distance - b.distance);
+      for (const item of order) this.creationQueue.push({ ringIndex, tileIndex: item.tileIndex });
     }
   }
 
