@@ -27,7 +27,7 @@ function createDefaultHeight(seed: number): HeightFunction {
 export class Terrain {
   readonly edits: TerrainEditStore;
   readonly config: TerrainConfig;
-  private readonly baseHeight: HeightFunction;
+  private baseHeight: HeightFunction;
   private readonly listeners = new Set<TerrainListener>();
   private version = 0;
 
@@ -43,6 +43,17 @@ export class Terrain {
       ...config,
       seed: Number((graph as { seed?: number }).seed) || 0
     });
+  }
+
+  /** Replaces the procedural source at runtime while preserving sparse edits. */
+  setBaseHeight(heightAt: HeightFunction): TerrainChange {
+    this.baseHeight = heightAt;
+    const change: TerrainChange = {
+      version: ++this.version,
+      bounds: { minX: -Infinity, minZ: -Infinity, maxX: Infinity, maxZ: Infinity }
+    };
+    for (const listener of this.listeners) listener(change);
+    return change;
   }
 
   get dataVersion(): number {
