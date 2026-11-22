@@ -72,229 +72,85 @@ html,body.physics-v2-page,#physics-v2-root{height:100%;min-height:0;overflow:hid
  .pv2-viewport{border-radius:12px}
 }
 
-/* V2 visual Blueprint graph editor */
-#pv2-blueprint-editor{display:none;position:fixed;inset:0;z-index:1000;background:#070d12eF}
+/* Blueprint editor — rebuilt as a compact Godot-like workspace. */
+#pv2-blueprint-editor{display:none;position:fixed;inset:0;z-index:1000;background:#0b1118;color:#dce8ec}
 #pv2-blueprint-editor.open{display:block}
-.v2-graph-window{height:100dvh;width:100%;display:flex;flex-direction:column;background:#0d151b;color:#e3edf0;font:12px Inter,system-ui,sans-serif}
-.v2-graph-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 12px;background:#17242c;border-bottom:1px solid #344750}
-.v2-graph-toolbar b{font-size:14px;margin-right:8px}
-.v2-graph-toolbar button,.v2-graph-toolbar select,.v2-graph-toolbar input{background:#22343e;color:#e6f0f2;border:1px solid #49616b;border-radius:6px;padding:6px 8px;font:inherit}
-.v2-graph-toolbar label{display:flex;align-items:center;gap:5px;color:#9db1b8}
-.v2-graph-toolbar input{width:75px}
-.v2-graph-toolbar #v2g-status{color:#8ed9bb;margin-left:auto}
-.v2-graph-toolbar #v2g-status.error{color:#ff9999}
-.v2-graph-toolbar button[data-a=apply]{background:#b5f0d9;color:#12251f;font-weight:800}
-.v2-graph-body{display:grid;grid-template-columns:minmax(0,1fr) 245px;flex:1;min-height:0}
-.v2-graph-scroll{position:relative;overflow:auto;min-width:0;min-height:0;background-color:#101a20;background-image:radial-gradient(#34454c 1px,transparent 1px);background-size:22px 22px;overscroll-behavior:contain;cursor:grab}
-.v2-graph-world{position:relative;transform-origin:0 0;min-width:3200px;min-height:2000px}
+.v2-graph-window{position:relative;width:100%;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:#111a20;color:#dce8ec;font:12px Inter,system-ui,sans-serif}
+.v2-graph-toolbar{height:58px;min-height:58px;display:flex;align-items:center;gap:6px;padding:0 14px;background:linear-gradient(180deg,#202d35,#19252c);border-bottom:1px solid #34454d;box-shadow:0 2px 12px #0004;z-index:3}
+.v2g-brand{display:flex;align-items:center;gap:9px;min-width:128px}
+.v2g-brand-mark{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:#294a46;color:#9de0c7;font-size:19px}
+.v2g-brand div{display:flex;flex-direction:column;gap:1px}
+.v2g-brand b{font-size:13px;letter-spacing:.03em;color:#edf6f5}
+.v2g-brand small{font-size:8px;letter-spacing:.18em;color:#83a39f}
+.v2g-toolbar-separator{width:1px;height:26px;background:#3b4c53;margin:0 5px}
+.v2g-toolbar-spacer{flex:1}
+.v2-graph-toolbar button,.v2-graph-toolbar select,.v2-graph-toolbar input{height:31px;border:1px solid #40545d;border-radius:7px;background:#25353d;color:#e0eaed;padding:0 9px;font:inherit;transition:background .14s,border-color .14s}
+.v2-graph-toolbar button{min-width:31px;cursor:pointer;font-size:14px}
+.v2-graph-toolbar button:hover,.v2-graph-toolbar select:hover{background:#31464f;border-color:#68827f}
+.v2-graph-toolbar select{max-width:155px}
+.v2-graph-toolbar label{display:flex;align-items:center;gap:6px;color:#91a8ad;font-size:9px;letter-spacing:.08em}
+.v2-graph-toolbar input[type=number]{width:72px}
+.v2-graph-toolbar #v2g-status{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9bcdb8;font-size:10px;margin:0 5px}
+.v2-graph-toolbar #v2g-status.error{color:#ff9b9b}
+.v2-graph-toolbar .v2g-apply-button{min-width:94px;background:#9bd9c0;color:#12251e;border-color:#9bd9c0;font-weight:800}
+.v2-graph-toolbar .v2g-apply-button:hover{background:#b8ecd4}
+.v2g-sun-control{color:#e3c58a!important}
+.v2g-sun-control input{width:90px!important;padding:0!important;accent-color:#e3c58a}
+.v2-graph-body{position:relative;display:flex;flex:1;min-height:0}
+.v2-graph-scroll{position:relative;flex:1;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;cursor:grab;background-color:#121d23;background-image:radial-gradient(#3a4c53 1px,transparent 1px);background-size:22px 22px}
+.v2-graph-scroll:active{cursor:grabbing}
+.v2-graph-world{position:relative;transform-origin:0 0;width:1500px;height:900px;min-width:0;min-height:0;background-image:linear-gradient(#ffffff04 1px,transparent 1px),linear-gradient(90deg,#ffffff04 1px,transparent 1px);background-size:88px 88px}
 #v2g-links{position:absolute;left:0;top:0;z-index:1;pointer-events:none;overflow:visible}
 #v2g-nodes{position:absolute;left:0;top:0;z-index:2}
-.v2-graph-inspector{background:#17242c;border-left:1px solid #344750;padding:14px;overflow:auto;color:#a9bec5}
-.v2-graph-inspector b{color:#edf7f8;font-size:13px}
-.v2-graph-inspector h3{color:#d9f2e9;margin:14px 0 6px}
-.v2-graph-inspector p{line-height:1.6}
-.v2-graph-inspector button{background:#293e47;color:#fff;border:1px solid #536b73;border-radius:6px;padding:7px}
-.v2-gnode{position:absolute;width:220px;background:#1b2b33;border:1px solid #49616b;border-radius:9px;box-shadow:0 8px 24px #0008;color:#d9e7eb;overflow:hidden;user-select:none}
-.v2-gnode.selected{border-color:#8ee0c1;box-shadow:0 0 0 2px #8ee0c133,0 8px 24px #0009}
-.v2-gnode.color{border-color:#92704c}
-.v2-gnode>header{padding:8px 10px;background:#2a414b;color:#f1f8f8;font-weight:800;cursor:grab}
-.v2-gnode-preview{display:block;width:100%;height:80px;object-fit:cover;background:#10191e;border-bottom:1px solid #354a52}
-.v2-gport,.v2-gparam{display:flex;align-items:center;gap:7px;min-height:27px;padding:3px 8px;border-bottom:1px solid #2c3d44}
-.v2-gport span,.v2-gparam label{flex:1;color:#a9bbc1;font-size:11px}
-.v2-gport input,.v2-gparam input{width:76px;min-width:0;background:#0d171c;border:1px solid #425861;color:#e4eff1;border-radius:4px;padding:4px;font-size:11px}
-.v2-gparam input[type=color]{width:42px;height:23px;padding:1px}
-.v2-gdot{width:13px;height:13px;min-width:13px;padding:0;border-radius:50%;border:2px solid #85d6f0;background:#14252c;cursor:pointer}
-.v2-gdot.color{border-color:#ffb86b}
-.v2-gout{border-color:#9be6c9}
-.v2-gout.active{background:#9be6c9;box-shadow:0 0 0 4px #9be6c944}
-.v2-gnode footer{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:7px 8px;color:#9eb4bc;font-size:10px}
-.v2-gnode footer button:not(.v2-gdot){background:#263a43;color:#cbd9dc;border:1px solid #465d66;border-radius:5px;padding:4px 7px;font-size:10px}
-.v2-g-help{margin-top:20px;font-size:11px;line-height:1.65;color:#829ba4}
-@media(max-width:760px){.v2-graph-body{grid-template-columns:minmax(0,1fr)}.v2-graph-inspector{display:none}.v2-graph-toolbar{gap:4px}.v2-graph-toolbar #v2g-status{display:none}}
-
-/* Keep the live 3D viewport visible beside the graph while editing. */
-#pv2-blueprint-editor{inset:0 0 0 auto;width:min(74vw,1120px);background:linear-gradient(90deg,transparent 0%,#070d12cc 10%,#070d12f2 24%);pointer-events:none}
-#pv2-blueprint-editor.open{display:block}
-#pv2-blueprint-editor .v2-graph-window{width:100%;pointer-events:auto;box-shadow:-18px 0 60px #0009}
-.v2-graph-world{position:relative;transform-origin:0 0}
-#v2g-nodes{position:absolute;left:0;top:0}
-#v2g-links{position:absolute;left:0;top:0;pointer-events:none}
-.v2-graph-scroll{cursor:grab}
-@media(max-width:700px){#pv2-blueprint-editor{width:88vw;background:#070d12eF}.v2-graph-toolbar{max-height:130px;overflow:auto}}
-
-/* Blueprint workspace: full-screen graph with a live, resizable game preview. */
-#pv2-blueprint-editor{inset:0;width:100%;background:#080e13f5;pointer-events:auto}
-#pv2-blueprint-editor.open{display:block}
-#pv2-blueprint-editor .v2-graph-window{width:100%;height:100dvh;background:radial-gradient(ellipse at 40% 0%,#1b3039 0,#0c151b 58%);box-shadow:none}
-.v2-graph-toolbar{min-height:58px;padding:10px 16px;background:#111e26;border-bottom:1px solid #30444e;gap:9px}
-.v2-graph-toolbar b{font-size:15px;letter-spacing:.01em}
-.v2-graph-toolbar button{border-radius:8px;padding:8px 11px;transition:background .15s,border-color .15s}
-.v2-graph-toolbar button:hover{background:#34515e;border-color:#75b7b1}
-.v2-graph-toolbar button[data-a=apply]{background:#a9eed4;border-color:#a9eed4;color:#0b241d}
-.v2-graph-toolbar button[data-a=close]{background:#253b45;border-color:#58717b}
-.v2-graph-body{height:calc(100dvh - 58px);min-height:0;grid-template-columns:minmax(0,1fr) 290px}
-.v2-graph-scroll{background-color:#0b151b;background-image:radial-gradient(#38505a 1px,transparent 1px);background-size:24px 24px}
-.v2-graph-inspector{background:linear-gradient(180deg,#172630,#111c23);border-left:1px solid #304750;padding:18px}
-.v2-graph-inspector> b{display:block;font-size:15px;letter-spacing:.02em}
-.v2-gnode{width:248px;border-radius:12px;background:linear-gradient(160deg,#20343e,#14232b);border-color:#45616d;box-shadow:0 12px 32px #0008}
-.v2-gnode>header{padding:11px 13px;background:linear-gradient(90deg,#294653,#223740);font-size:12px;letter-spacing:.01em}
-.v2-gnode.color{border-color:#987c55}
-.v2-gnode-preview{height:104px;background:#0c171d;border-bottom:1px solid #3a525c}
-.v2-gport,.v2-gparam{min-height:32px;padding:5px 10px;border-color:#30444c}
-.v2-gport span,.v2-gparam label{font-size:11px;color:#bfd0d4}
-.v2-gport input,.v2-gparam input{width:88px;padding:6px;border-radius:6px}
-.v2-gdot{width:15px;height:15px;min-width:15px;box-shadow:0 0 0 3px #0c171d}
-.v2-gnode footer{padding:9px 10px}
-.v2-graph-preview-dock{position:fixed;right:24px;bottom:24px;z-index:1004;width:360px;height:250px;padding:8px;border:1px solid #54727a;border-radius:15px;background:#101b22f5;box-shadow:0 18px 55px #000b;backdrop-filter:blur(14px);transition:width .2s,height .2s,top .2s,left .2s,right .2s,bottom .2s}
-.v2-graph-preview-caption{height:30px;display:flex;align-items:center;gap:9px;padding:0 3px 7px;color:#e5f1f2;font-size:11px}
-.v2-graph-preview-caption span{color:#91a8af;font-size:10px;flex:1}
-.v2-graph-preview-caption button{width:26px;height:24px;border:1px solid #49616a;border-radius:6px;background:#233943;color:#e7f4f3;cursor:pointer}
-#v2g-preview-slot{height:calc(100% - 30px);overflow:hidden;border-radius:9px}
-#v2g-preview-slot #pv2-viewport{width:100%;height:100%;min-height:0;margin:0;border:0;border-radius:9px;box-shadow:none}
+.v2g-canvas-help{position:sticky;left:14px;bottom:12px;width:max-content;margin:0 0 12px 14px;padding:7px 10px;border:1px solid #3b4c52;border-radius:7px;background:#17242bdc;color:#8fa6ad;font-size:10px;pointer-events:none}
+.v2-gnode{position:absolute;width:248px;overflow:hidden;border:1px solid #465c63;border-radius:10px;background:linear-gradient(160deg,#263841,#1b2a31);box-shadow:0 8px 24px #0007;color:#dce8eb;user-select:none}
+.v2-gnode.selected{border-color:#9bd9c0;box-shadow:0 0 0 2px #9bd9c033,0 10px 28px #0009}
+.v2-gnode.color{border-color:#90734f}
+.v2-gnode>header{display:flex;align-items:center;gap:8px;min-height:38px;padding:7px 10px;background:linear-gradient(90deg,#354f58,#293d45);color:#f0f7f6;font-size:11px;font-weight:750;letter-spacing:.015em;cursor:grab}
+.v2-gnode.color>header{background:linear-gradient(90deg,#594b38,#403a30)}
+.v2-gnode-preview{display:block;width:100%;height:76px;object-fit:cover;background:#10191e;border-bottom:1px solid #354a52}
+.v2-gport,.v2-gparam{display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 9px;border-bottom:1px solid #34464c}
+.v2-gport span,.v2-gparam label{flex:1;color:#b8c9cd;font-size:10px}
+.v2-gport input,.v2-gparam input,.v2-gparam select{width:92px;min-width:0;height:25px;background:#142128;border:1px solid #425a62;color:#e4eff1;border-radius:5px;padding:3px 6px;font-size:10px}
+.v2-gparam input[type=color]{width:42px;padding:2px}
+.v2-gdot{width:13px;height:13px;min-width:13px;padding:0!important;border-radius:50%!important;border:2px solid #83c9e2!important;background:#172b33!important;cursor:pointer}
+.v2-gdot.color{border-color:#e0ae70!important}
+.v2-gout{border-color:#9bd9c0!important}
+.v2-gout.active{background:#9bd9c0!important;box-shadow:0 0 0 4px #9bd9c044}
+.v2-gnode footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:7px 9px;color:#9eb4bc;font-size:9px}
+.v2-gnode footer button:not(.v2-gdot){height:24px;background:#2b3e46;color:#cbd9dc;border:1px solid #465d66;border-radius:5px;padding:0 8px;font-size:9px}
+.v2-graph-preview-dock{position:fixed;right:20px;bottom:20px;z-index:1004;width:340px;height:230px;padding:8px;border:1px solid #536b70;border-radius:12px;background:#17242bf2;box-shadow:0 14px 40px #0009;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:30px minmax(0,1fr);overflow:hidden;backdrop-filter:blur(12px)}
+.v2-graph-preview-caption{grid-column:1;grid-row:1;display:flex;align-items:center;gap:8px;padding:0 3px 6px;color:#e6f0f1;font-size:9px;letter-spacing:.08em}
+.v2-graph-preview-caption b{font-size:9px}
+.v2-graph-preview-caption span{flex:1;color:#82999f;font-size:9px;letter-spacing:0}
+.v2-graph-preview-caption button{width:26px;min-width:26px;height:24px;border:1px solid #4a626a;border-radius:6px;background:#2b4149;color:#e8f4f2;cursor:pointer}
+#v2g-preview-slot{grid-column:1;grid-row:2;min-width:0;min-height:0;overflow:hidden;border-radius:8px;background:#0d171c}
+#v2g-preview-slot #pv2-viewport{width:100%;height:100%;min-height:0;margin:0;border:0;border-radius:8px;box-shadow:none}
 #v2g-preview-slot #pv2-viewport canvas{width:100%;height:100%;min-height:0}
-#v2g-preview-slot .pv2-overlay{left:8px;top:8px;gap:4px}
-#v2g-preview-slot .pv2-chip{padding:4px 6px;font-size:9px}
-#v2g-preview-slot .pv2-hint{left:8px;bottom:8px;padding:5px 7px;font-size:9px}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:min(78vw,1180px);height:min(76vh,760px);padding:12px;box-shadow:0 30px 100px #000e;border-color:#8bd7c4}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption{height:36px}
-#pv2-blueprint-editor.preview-expanded #v2g-preview-slot{height:calc(100% - 36px)}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption button{background:#a9eed4;color:#10251f}
-@media(max-width:900px){
- .v2-graph-body{grid-template-columns:minmax(0,1fr) 240px}
- .v2-graph-preview-dock{right:12px;bottom:12px;width:300px;height:210px}
-}
-@media(max-width:680px){
- .v2-graph-toolbar{max-height:100px;overflow:auto;align-content:center}
- .v2-graph-body{height:calc(100dvh - 100px);grid-template-columns:minmax(0,1fr)}
- .v2-graph-inspector{display:none}
- .v2-graph-preview-dock{width:190px;height:142px;right:8px;bottom:8px}
- .v2-graph-preview-caption{font-size:9px}
- #pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{width:94vw;height:64vh}
-}
-
-/* Procedural material library inside the Blueprint inspector. */
-.v2g-asset-library{margin-top:22px;padding-top:16px;border-top:1px solid #354c56}
-.v2g-asset-heading{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}
+#v2g-preview-slot .pv2-overlay,#v2g-preview-slot .pv2-hint{display:none}
+.v2g-preview-inspector{display:none;min-width:0;min-height:0;overflow:auto;border-left:1px solid #344950;background:#19272e;padding:13px}
+.v2g-preview-inspector-title{margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid #3a4e55;color:#9bbab0;font-size:9px;font-weight:800;letter-spacing:.14em}
+.v2g-preview-inspector .pv2-side{display:flex!important;flex-direction:column;gap:9px;padding:0;overflow:visible}
+.v2g-preview-inspector .pv2-panel{padding:11px;border:1px solid #34474e;border-radius:9px;background:#202f36}
+.v2g-preview-inspector .pv2-panel h2{font-size:11px;margin-bottom:9px}
+.v2g-preview-inspector .pv2-note{font-size:10px}
+.v2g-asset-drawer{display:none;position:absolute;z-index:1008;left:14px;top:68px;width:min(560px,calc(100vw - 28px));max-height:56vh;overflow:auto;padding:14px;border:1px solid #465e65;border-radius:12px;background:#17242bf7;box-shadow:0 18px 48px #000a}
+#pv2-blueprint-editor.assets-open .v2g-asset-drawer{display:block}
+.v2g-asset-heading{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
 .v2g-asset-heading b{font-size:13px;color:#e7f2f2}
 .v2g-asset-heading span{font-size:10px;color:#8da5ad}
-#v2g-assets-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.v2g-asset-card{display:flex;flex-direction:column;gap:5px;min-width:0;padding:7px;border:1px solid #3b535d;border-radius:9px;background:linear-gradient(150deg,#223943,#17262e);color:#e5eff0;text-align:left;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
-.v2g-asset-card:hover{transform:translateY(-2px);border-color:#9be2c8;background:#29434c}
-.v2g-asset-card canvas{width:100%;height:66px;object-fit:cover;border-radius:5px;background:#10191e}
+#v2g-assets-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.v2g-asset-card{display:flex;flex-direction:column;gap:5px;min-width:0;padding:8px;border:1px solid #3b535d;border-radius:9px;background:#20343d;color:#e5eff0;text-align:left;cursor:pointer}
+.v2g-asset-card:hover{border-color:#9bd9c0;background:#29434c}
+.v2g-asset-card canvas{width:100%;height:78px;object-fit:cover;border-radius:5px;background:#10191e}
 .v2g-asset-card b{font-size:11px}
-.v2g-asset-card span{font-size:9px;color:#8fa8af}
-.v2g-asset-card small{font-size:9px;color:#a9eed4;margin-top:2px}
-.v2-gparam select{width:102px;min-width:0;background:#0d171c;border:1px solid #425861;color:#e4eff1;border-radius:6px;padding:5px;font-size:10px}
-@media(max-width:680px){.v2g-asset-library{display:none}}
-
-/* Пресеты и управление освещением в Blueprint workspace. */
-#v2g-preset{background:#20343d;color:#e9f4f4;border:1px solid #4a6670;border-radius:8px;padding:8px;font:inherit}
-.pv2-control input[type=range]{cursor:pointer}
-
-.pv2-diagnostic-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.pv2-diagnostic-grid>div{min-width:0;padding:8px 9px;border:1px solid #293d46;border-radius:8px;background:#0b151b}
-.pv2-diagnostic-grid span{display:block;margin-bottom:4px;color:#8299a2;font-size:9px;letter-spacing:.02em}
-.pv2-diagnostic-grid b{display:block;overflow-wrap:anywhere;color:#dff3ec;font-size:12px;font-variant-numeric:tabular-nums}
-
-
-/* Начиная с запуска V2 сразу открываем граф: игровая сцена живёт в dock предпросмотра. */
-.pv2-shell{display:none!important}
-#pv2-blueprint-editor.open{display:block}
-#pv2-blueprint-editor .v2-graph-body{grid-template-columns:minmax(0,1fr)!important;height:auto;flex:1;min-height:0}
-.v2-graph-inspector{display:none!important}
-.v2g-asset-drawer{display:none;position:absolute;z-index:1008;left:16px;top:68px;width:min(560px,calc(100vw - 32px));max-height:52vh;overflow:auto;padding:14px;border:1px solid #48636c;border-radius:13px;background:#111e26f5;box-shadow:0 18px 50px #000b}
-#pv2-blueprint-editor.assets-open .v2g-asset-drawer{display:block}
-.v2g-asset-drawer #v2g-assets-list{grid-template-columns:repeat(3,minmax(0,1fr))}
-.v2g-asset-drawer .v2g-asset-card canvas{height:90px}
-.v2g-sun-control{display:flex;align-items:center;gap:5px;color:#f4d89b!important;font-size:11px}
-.v2g-sun-control input{width:105px!important;accent-color:#e9bd72}
-.v2-graph-toolbar{padding:8px 12px;gap:7px}
-.v2-graph-toolbar button{white-space:nowrap}
-.v2-graph-preview-dock{width:390px;height:270px}
-#v2g-preview-slot #pv2-viewport{min-height:0}
-#v2g-preview-slot #pv2-viewport canvas{min-height:0}
-#v2g-preview-slot .pv2-overlay{display:none}
-@media(max-width:700px){
- .v2g-asset-drawer #v2g-assets-list{grid-template-columns:repeat(2,minmax(0,1fr))}
- .v2-graph-preview-dock{width:210px;height:155px}
- .v2-graph-toolbar{max-height:118px;overflow:auto}
-}
-
-
-/* Asset and diagnostics drawers replace the fixed right inspector. */
-.v2g-diagnostics-drawer{display:none;position:absolute;z-index:1008;right:16px;top:68px;width:min(430px,calc(100vw - 32px));max-height:65vh;overflow:auto;padding:12px;border:1px solid #48636c;border-radius:13px;background:#101d25f7;box-shadow:0 18px 50px #000b}
-#pv2-blueprint-editor.diagnostics-open .v2g-diagnostics-drawer{display:block}
-.v2g-diagnostics-drawer .pv2-side{display:flex!important;flex-direction:column;gap:9px;padding:0;overflow:visible}
-.v2g-diagnostics-drawer .pv2-panel{padding:11px;background:#14232b;border-radius:10px}
-.v2g-diagnostics-drawer .pv2-panel h2{font-size:12px;margin-bottom:8px}
-.v2g-diagnostics-drawer .pv2-note{font-size:10px}
-.v2g-diagnostics-drawer .pv2-panel:nth-child(5){display:none}
-
-#pv2-blueprint-editor .v2-graph-toolbar button[data-a=close]{display:none!important}
-
-
-/* Godot-like focused preview: full-screen viewport with a docked scene inspector. */
-.v2-graph-world{min-width:1600px;min-height:900px}
-#v2g-world{width:1600px!important;height:900px!important}
-.v2-graph-preview-dock{overflow:hidden}
-.v2g-preview-inspector{display:none;min-width:0;overflow:auto;border-left:1px solid #354b55;background:linear-gradient(180deg,#172630,#101a21);padding:16px}
-.v2g-preview-inspector-title{font-size:13px;font-weight:800;color:#e4f2f1;padding:3px 0 13px;border-bottom:1px solid #344a53;margin-bottom:12px}
-#pv2-blueprint-editor.preview-expanded .v2-graph-toolbar{display:none}
-#pv2-blueprint-editor.preview-expanded .v2-graph-body{display:none}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{
- position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;
- transform:none;padding:0;border:0;border-radius:0;display:grid;
- grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:54px minmax(0,1fr);
- background:#0b1319;box-shadow:none;z-index:1005
-}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption{
- grid-column:1/-1;height:54px;padding:0 18px;border-bottom:1px solid #344a53;
- background:#14232b
-}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption b{font-size:14px}
-#pv2-blueprint-editor.preview-expanded #v2g-preview-slot{
- grid-column:1;grid-row:2;height:100%;min-height:0;border-radius:0;background:#10191e
-}
-#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector{
- display:block;grid-column:2;grid-row:2
-}
-#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .pv2-side{
- display:flex!important;flex-direction:column;gap:10px;padding:0;overflow:visible
-}
-#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .pv2-panel{padding:12px}
-#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .pv2-panel:nth-child(5){display:block}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption span{display:block}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption button{margin-left:auto;width:34px;height:30px;font-size:18px}
-#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption button::after{content:" Закрыть";font-size:11px}
-.v2-gnode{width:248px}
-@media(max-width:760px){
- #pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{grid-template-columns:minmax(0,1fr);grid-template-rows:48px minmax(0,1fr) 38dvh}
- #pv2-blueprint-editor.preview-expanded .v2g-preview-inspector{grid-column:1;grid-row:3;border-left:0;border-top:1px solid #354b55}
- #pv2-blueprint-editor.preview-expanded #v2g-preview-slot{grid-column:1;grid-row:2}
-}
-
-/* The preview inspector owns the scene controls while preview is maximized. */
-#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .v2g-diagnostics-drawer{
- display:block;position:static;width:auto;max-height:none;overflow:visible;padding:0;
- border:0;background:transparent;box-shadow:none
-}
-#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .v2g-diagnostics-drawer .pv2-side{
- display:flex!important
-}
-
-
-/* Compact editor chrome and finite, readable graph canvas. */
-.v2-graph-toolbar{min-height:54px;display:flex;align-items:center;gap:6px;padding:8px 14px;background:linear-gradient(180deg,#1a2a33,#121f26);box-shadow:0 1px 0 #ffffff08}
-.v2-graph-toolbar b{font-size:14px;margin-right:10px;white-space:nowrap}
-.v2-graph-toolbar button{min-width:32px;height:32px;padding:6px 9px;border-radius:8px;background:#1d3039;border-color:#3d5661;color:#dcebed;font-weight:650}
-.v2-graph-toolbar button[data-a=apply]{min-width:90px;background:#a9eed4;color:#10251f}
-.v2-graph-toolbar select{height:32px;border-radius:8px;background:#1b3039;border-color:#3d5661}
-.v2-graph-toolbar label{font-size:10px}
-.v2-graph-toolbar #v2g-status{font-size:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.v2-graph-scroll{scrollbar-width:thin;scrollbar-color:#47616b #111c22}
-.v2-graph-scroll::-webkit-scrollbar{width:10px;height:10px}
-.v2-graph-scroll::-webkit-scrollbar-track{background:#111c22}
-.v2-graph-scroll::-webkit-scrollbar-thumb{background:#3b535e;border:2px solid #111c22;border-radius:8px}
-.v2-gnode{margin:0;box-shadow:0 10px 26px #0007}
-.v2-gnode>header{letter-spacing:.015em}
-@media(max-width:1100px){.v2-graph-toolbar{flex-wrap:wrap;max-height:112px;overflow:auto}.v2-graph-toolbar #v2g-status{margin-left:0}}
+.v2g-asset-card span,.v2g-asset-card small{font-size:9px;color:#9ab0b6}
+.v2g-asset-card small{color:#9bd9c0}
+#pv2-blueprint-editor.preview-expanded::before{content:"";position:fixed;inset:0;z-index:1003;background:#050b10b9;backdrop-filter:blur(3px)}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:min(1120px,90vw);height:min(740px,82vh);padding:10px;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:38px minmax(0,1fr);z-index:1005;border-color:#668a83;box-shadow:0 28px 90px #000e}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption{grid-column:1/-1;grid-row:1;padding:0 5px 8px}
+#pv2-blueprint-editor.preview-expanded #v2g-preview-slot{grid-column:1;grid-row:2}
+#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector{display:block;grid-column:2;grid-row:2}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption button{background:#9bd9c0;color:#142720;border-color:#9bd9c0}
+@media(max-width:900px){.v2-graph-toolbar{gap:4px;padding:0 8px}.v2g-brand{min-width:94px}.v2-graph-toolbar select{max-width:115px}.v2-graph-preview-dock{width:290px;height:200px;right:12px;bottom:12px}}
+@media(max-width:680px){.v2-graph-toolbar{height:auto;min-height:58px;flex-wrap:wrap;padding:8px}.v2g-brand{min-width:100px}.v2g-toolbar-spacer{display:none}.v2-graph-toolbar #v2g-status{display:none}.v2-graph-preview-dock{width:210px;height:150px;right:8px;bottom:8px}#pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{width:94vw;height:82vh;grid-template-columns:minmax(0,1fr);grid-template-rows:34px minmax(0,1fr) 35vh}#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector{grid-column:1;grid-row:3;border-left:0;border-top:1px solid #344950}}
