@@ -80,7 +80,7 @@ class BlueprintNodeEditor {
     if(a==='close'){this.close();return;}
     if(a==='preview'){this.host.classList.toggle('preview-expanded');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
     if(a==='assets'){this.host.classList.toggle('assets-open');this.host.classList.remove('diagnostics-open');return;}
-    if(a==='diagnostics'){this.host.classList.add('preview-expanded');this.host.classList.toggle('preview-inspector-open');this.host.classList.remove('assets-open');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
+    if(a==='diagnostics'){this.host.classList.add('preview-expanded');this.host.classList.remove('assets-open');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
     if(a==='physics'){const input=document.querySelector<HTMLInputElement>('#pv2-physics-debug')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
     if(a==='wire'){const input=document.querySelector<HTMLInputElement>('#pv2-wire')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
     if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);
@@ -148,8 +148,8 @@ class BlueprintNodeEditor {
       if(!['out_height','out_color','out_water','out_fog'].includes(n.type)){const del=document.createElement('button');del.textContent='Удалить';del.onclick=()=>this.remove(n.id);foot.append(del);}
       card.append(foot);card.onpointerdown=()=>{this.selected=n.id;host.querySelectorAll('.v2-gnode').forEach(el=>el.classList.toggle('selected',Number((el as HTMLElement).dataset.id)===n.id));};host.append(card);
     }
-    this.drawLinks();this.renderAssetLibrary();
     this.el('v2g-world').style.transform='scale('+this.zoom+')';this.updateWorldBounds();
+    this.drawLinks();this.renderAssetLibrary();
     this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';this.preview();
   }
   private assetCanvas(id:string):HTMLCanvasElement{
