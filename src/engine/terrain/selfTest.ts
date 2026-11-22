@@ -81,7 +81,7 @@ export function runTerrainSelfTests(): TerrainSelfTestResult {
   const editedTerrain = new Terrain(() => 12, { editCellSize: 1, editChunkSize: 8 });
   const originalBase = editedTerrain.getBaseHeight(2, 2);
   const originalHeight = editedTerrain.getHeight(2, 2);
-  const changes: Array<{ version: number; minX: number; minZ: number; maxX: number; maxZ: number }> = [];
+  const changes: Array<{ version: number; bounds: { minX: number; minZ: number; maxX: number; maxZ: number } }> = [];
   const unsubscribe = editedTerrain.subscribeChanges(change => changes.push(change));
   const editChange = editedTerrain.applyEdit(2, 2, 1.5, 3);
   assert(editedTerrain.getBaseHeight(2, 2) === originalBase,
