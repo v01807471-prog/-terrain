@@ -28,7 +28,8 @@ __TERRAIN_HEIGHT_FUNCTION__
 void main() {
   if (!gl_FrontFacing) discard;
   vec2 delta = abs(vWorld.xz-uCamera);
-  float d = max(max(delta.x,delta.y),uAltitude);
+  // Ring masking is horizontal; altitude affects morphing, not ring ownership.
+  float d = max(delta.x,delta.y);
   if (d < vCut) discard;
   vec3 n = normalize(vNormal);
   vec2 pw = vWorld.xz;
