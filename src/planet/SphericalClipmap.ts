@@ -19,7 +19,7 @@ type Level = {
 };
 
 const GRID_SEGMENTS = 128;
-const MIN_EXTENT = 2;
+const MIN_EXTENT = 40;
 
 function makeSquareLevel(extent:number, level:number) {
   const positions:number[] = [];
@@ -92,6 +92,8 @@ export class SphericalClipmap {
   private lastAltitude=-1;
   private currentExtent=0;
   private activeRingCount=4;
+  private pendingRingCount=0;
+  private pendingRingFrames=0;
 
   constructor(private readonly scene:THREE.Scene,public settings:ClipmapSettings) {
     const uniforms={
@@ -118,27 +120,10 @@ export class SphericalClipmap {
         // sphere with a gnomonic projection. Unlike a linear angle mapping,
         // this keeps every vertex on a smooth spherical cap and naturally
         // compresses larger distances toward the horizon.
-        // Remap the square clipmap footprint to a circular disk before
-        // projecting it onto the sphere. All LOD rings use the same mapping,
-        // so their borders remain aligned while the distant silhouette has
-        // no four stretched square corners.
-        vec2 square=position.xz/max(uClipExtent,0.0001);
-        float ax=abs(square.x);
-        float ay=abs(square.y);
-        vec2 disk=vec2(0.0);
-        if (max(ax,ay)>0.000001) {
-          float r;
-          float angle;
-          if (ax>ay) {
-            r=square.x;
-            angle=0.78539816339*(square.y/square.x);
-          } else {
-            r=square.y;
-            angle=1.57079632679-0.78539816339*(square.x/square.y);
-          }
-          disk=r*vec2(cos(angle),sin(angle));
-        }
-        vec2 plane=disk*uClipExtent;
+        // Keep the clipmap in its native square tangent-plane coordinates.
+        // The gnomonic projection below still bends this square patch onto
+        // the spherical planet; no square-to-disk warp is applied.
+        vec2 plane=position.xz;
         vec3 radial=normalize(vec3(plane.x, uRadius, plane.y));
 
         // Convert the clipmap-local direction into a fixed planet/world
@@ -332,7 +317,23 @@ export class SphericalClipmap {
       Math.min(9,Math.round(this.settings.rings))
     );
 
-    if (extentChanged || altitudeChanged || desiredRings!==this.activeRingCount) this.rebuild(nextExtent,desiredRings);
+    // LOD thresholds are discrete. Require a candidate level count to remain
+    // stable for several frames so tiny camera/altitude changes cannot make
+    // the whole terrain rebuild back and forth while standing on the ground.
+    if(desiredRings===this.activeRingCount){
+      this.pendingRingCount=0;
+      this.pendingRingFrames=0;
+    }else if(desiredRings!==this.pendingRingCount){
+      this.pendingRingCount=desiredRings;
+      this.pendingRingFrames=1;
+    }else{
+      this.pendingRingFrames++;
+    }
+    const ringCountStable=this.pendingRingFrames>=8;
+    if(extentChanged || altitudeChanged || ringCountStable){
+      this.rebuild(nextExtent,ringCountStable?desiredRings:this.activeRingCount);
+      if(ringCountStable){this.pendingRingCount=0;this.pendingRingFrames=0;}
+    }
     this.lastAltitude=altitude;
   }
 
