@@ -137,11 +137,17 @@ export class WaterRenderer {
   private readonly cameraPosition = new THREE.Vector3();
   private readonly extent: number;
   private seaLevel: number;
+  private baseFadeDistance = 220;
+  private baseFogNear = 420;
+  private baseFogFar = 1800;
   private heightFunctionGLSL = '';
   private material!: THREE.ShaderMaterial;
 
   constructor(scene: THREE.Scene, options: WaterRendererOptions = {}) {
     this.seaLevel = options.seaLevel ?? -6;
+    this.baseFadeDistance = 220;
+    this.baseFogNear = options.fogNear ?? 420;
+    this.baseFogFar = options.fogFar ?? 1800;
     this.extent = options.extent ?? 8192;
     this.uniforms = {
       uTime: { value: 0 },
@@ -202,8 +208,8 @@ export class WaterRenderer {
       this.material.needsUpdate = true;
     }
     if (fog?.color) (this.uniforms.uFogColor.value as THREE.Color).set(fog.color);
-    if (Number.isFinite(fog?.near)) this.uniforms.uFogNear.value = fog!.near!;
-    if (Number.isFinite(fog?.far)) this.uniforms.uFogFar.value = fog!.far!;
+    if (Number.isFinite(fog?.near)) this.baseFogNear = fog!.near!;
+    if (Number.isFinite(fog?.far)) this.baseFogFar = fog!.far!;
     if (Number.isFinite(water.level)) this.setSeaLevel(Number(water.level));
     this.uniforms.uClarity.value = THREE.MathUtils.clamp(water.clarity ?? 0.35, 0, 1);
     this.uniforms.uWaveAmplitude.value = Math.max(0, water.wave ?? 1);
@@ -212,7 +218,7 @@ export class WaterRenderer {
     this.uniforms.uFoamStrength.value = THREE.MathUtils.clamp(water.foam ?? 0.75, 0, 2);
     this.uniforms.uGlint.value = THREE.MathUtils.clamp((water as any).glint ?? 1, 0, 3);
     this.uniforms.uShoreWidth.value = Math.max(0.15, (water as any).shore ?? 0.6);
-    this.uniforms.uFadeDistance.value = Math.max(20, (water as any).fade ?? 220);
+    this.baseFadeDistance = Math.max(20, (water as any).fade ?? 220);
     this.uniforms.uOpacity.value = THREE.MathUtils.clamp(water.opacity ?? 0.92, 0, 1);
     if (water.shallow?.length === 3) {
       (this.uniforms.uShallowColor.value as THREE.Color).setRGB(water.shallow[0], water.shallow[1], water.shallow[2], THREE.LinearSRGBColorSpace);
@@ -242,6 +248,9 @@ export class WaterRenderer {
     this.mesh.position.x = this.cameraPosition.x;
     this.mesh.position.z = this.cameraPosition.z;
     this.mesh.scale.set(this.extent * lodScale, 1, this.extent * lodScale);
+    this.uniforms.uFadeDistance.value = this.baseFadeDistance * lodScale;
+    this.uniforms.uFogNear.value = this.baseFogNear * lodScale;
+    this.uniforms.uFogFar.value = this.baseFogFar * lodScale;
     this.uniforms.uTime.value = elapsedSeconds;
   }
 
