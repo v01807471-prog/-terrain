@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ResizeManager } from './ResizeManager';
 import { SphericalClipmap } from '../planet/SphericalClipmap';
 import { terrainBlueprint } from '../planet/TerrainBlueprint';
+import { Solar } from '../planet/Solar';
 
 type PlanetRenderEntry = {
   name:string;
@@ -19,6 +20,7 @@ export class PlanetViewport {
   readonly clipmap:SphericalClipmap;
   readonly moonClipmap:SphericalClipmap;
   readonly planets:PlanetRenderEntry[]=[];
+  private solar:Solar;
   private controls:OrbitControls;
   private resize:ResizeManager;
   private radius=6371;
@@ -27,20 +29,12 @@ export class PlanetViewport {
   private clock=new THREE.Clock();
   private thirdPerson=false;
   private avatar=new THREE.Group();
-  // World-space center of the Earth. The Sun remains fixed at the origin.
-  private planetCenter=new THREE.Vector3(30000,0,0);
-  private moonCenter=new THREE.Vector3(0,0,0);
+  // Cached world-space positions are read from the Solar scene graph.
+  private planetCenter=new THREE.Vector3();
+  private moonCenter=new THREE.Vector3();
   private moonRadius=1737;
   private moonTerrainSettings={amplitude:950,frequency:7.4};
-  private moonOrbitRadius=38440;
-  private moonOrbitAngle=0;
-  private moonOrbitSpeed=0.00012;
   private focusedMoon=false;
-  private moonOrbitPath:THREE.LineLoop;
-  private orbitAngle=0;
-  private orbitRadius=30000;
-  private orbitAngularSpeed=0.00005;
-  private orbitPath:THREE.LineLoop;
   private settings={rings:17,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
 
   constructor(private canvas:HTMLCanvasElement) {
@@ -49,6 +43,9 @@ export class PlanetViewport {
     this.renderer.setSize(innerWidth,innerHeight,false);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.scene.background=new THREE.Color('#07111e');
+    this.solar=new Solar();
+    this.scene.add(this.solar);
+    this.syncSolarPositions();
 
     this.scene.add(new THREE.HemisphereLight(0x9ecfff,0x17202b,1.7));
     // Sun direction is fixed in world coordinates; camera rotation never moves it.
@@ -56,58 +53,14 @@ export class PlanetViewport {
     sun.position.set(1,2,1);
     this.scene.add(sun);
 
-    // A visible, stationary Sun at the world origin. Earth orbits around it.
-    const sunMesh=new THREE.Mesh(
-      new THREE.SphereGeometry(3500,32,24),
-      new THREE.MeshBasicMaterial({color:0xffc45c})
-    );
-    sunMesh.position.set(0,0,0);
-    this.scene.add(sunMesh);
-
-    // Visible orbital track in the same XZ plane used by Earth's orbit.
-    const orbitPoints:THREE.Vector3[]=[];
-    const orbitSegments=512;
-    for(let i=0;i<orbitSegments;i++){
-      const angle=(i/orbitSegments)*Math.PI*2;
-      orbitPoints.push(new THREE.Vector3(
-        Math.cos(angle)*this.orbitRadius,
-        0,
-        Math.sin(angle)*this.orbitRadius
-      ));
-    }
-    const orbitGeometry=new THREE.BufferGeometry().setFromPoints(orbitPoints);
-    const orbitMaterial=new THREE.LineBasicMaterial({
-      color:0x6b91b8,
-      transparent:true,
-      opacity:0.72,
-      depthWrite:false
-    });
-    this.orbitPath=new THREE.LineLoop(orbitGeometry,orbitMaterial);
-    this.orbitPath.frustumCulled=false;
-    this.orbitPath.renderOrder=2;
-    this.scene.add(this.orbitPath);
-
     this.clipmap=new SphericalClipmap(this.scene,this.settings);
     this.moonClipmap=new SphericalClipmap(this.scene,{
       rings:17,baseSegments:24,ringGrowth:1.22,radius:this.moonRadius,
       amplitude:this.moonTerrainSettings.amplitude,frequency:this.moonTerrainSettings.frequency
     });
-    const moonOrbitPoints:THREE.Vector3[]=[];
-    for(let i=0;i<256;i++){
-      const a=i/256*Math.PI*2;
-      moonOrbitPoints.push(new THREE.Vector3(
-        Math.cos(a)*this.moonOrbitRadius,
-        Math.sin(a)*this.moonOrbitRadius*.089,
-        Math.sin(a)*this.moonOrbitRadius*.996
-      ));
-    }
-    this.moonOrbitPath=new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(moonOrbitPoints),
-      new THREE.LineBasicMaterial({color:0x9aa8b8,transparent:true,opacity:.48,depthWrite:false})
-    );
-    this.moonOrbitPath.frustumCulled=false;
-    this.scene.add(this.moonOrbitPath);
-    this.updateMoonPosition();
+    this.solar.earth.add(this.clipmap.group);
+    this.solar.moon.add(this.moonClipmap.group);
+    this.syncSolarPositions();
     this.planets.push(
       this.createPlanetRenderEntry('Earth',this.planetCenter,this.radius,this.clipmap),
       this.createPlanetRenderEntry('Moon',this.moonCenter,this.moonRadius,this.moonClipmap)
@@ -190,13 +143,9 @@ export class PlanetViewport {
     }
   }
 
-  private updateMoonPosition(){
-    this.moonCenter.set(
-      this.planetCenter.x+Math.cos(this.moonOrbitAngle)*this.moonOrbitRadius,
-      this.planetCenter.y+Math.sin(this.moonOrbitAngle)*this.moonOrbitRadius*.089,
-      this.planetCenter.z+Math.sin(this.moonOrbitAngle)*this.moonOrbitRadius*.996
-    );
-    this.moonOrbitPath.position.copy(this.planetCenter);
+  private syncSolarPositions(){
+    this.solar.getWorldPositionOf(this.solar.earth,this.planetCenter);
+    this.solar.getWorldPositionOf(this.solar.moon,this.moonCenter);
   }
 
   focusMoon(){
@@ -249,7 +198,7 @@ export class PlanetViewport {
       : Math.max(.05,targetDistance*.00001);
     this.camera.far=this.thirdPerson
       ? Math.max(1,targetDistance*1.5+.1)
-      : Math.max(50000,targetDistance+this.orbitRadius*2+this.radius*2);
+      : Math.max(100000,targetDistance+100000);
     this.camera.updateProjectionMatrix();
   }
 
@@ -325,19 +274,12 @@ export class PlanetViewport {
       this.frame=requestAnimationFrame(tick);
       const deltaTime=Math.min(this.clock.getDelta(),0.05);
       const t=this.clock.elapsedTime;
-      // Move Earth around the fixed Sun and translate the camera rig by the
-      // exact same world-space delta, preserving the current view and zoom.
+      // Solar updates parent pivots; child bodies inherit orbital transforms.
       const previousCenter=this.planetCenter.clone();
       const previousMoon=this.moonCenter.clone();
-      this.orbitAngle+=this.orbitAngularSpeed*deltaTime;
-      this.planetCenter.set(
-        Math.cos(this.orbitAngle)*this.orbitRadius,
-        0,
-        Math.sin(this.orbitAngle)*this.orbitRadius
-      );
+      this.solar.update(deltaTime);
+      this.syncSolarPositions();
       const orbitDelta=this.planetCenter.clone().sub(previousCenter);
-      this.moonOrbitAngle+=this.moonOrbitSpeed*deltaTime;
-      this.updateMoonPosition();
       const moonDelta=this.moonCenter.clone().sub(previousMoon);
       const activeDelta=this.focusedMoon?moonDelta:orbitDelta;
       this.camera.position.add(activeDelta);
@@ -385,7 +327,7 @@ export class PlanetViewport {
     return{
       altitude:this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.activeCenter)-this.activeRadius),
       rings:this.settings.rings,
-      lod:this.clipmap.lod,
+      lod:this.activeClipmap.lod,
       levels:this.activeClipmap.activeLevels,
       triangles:this.planets.reduce((sum,planet)=>sum+(planet.clipmap.group.visible?planet.clipmap.triangleCount:0),0),
       visiblePlanets:this.planets.filter(planet=>planet.clipmap.group.visible).map(planet=>planet.name)
@@ -419,12 +361,7 @@ export class PlanetViewport {
     this.resize.dispose();
     this.clipmap.dispose();
     this.moonClipmap.dispose();
-    this.scene.remove(this.moonOrbitPath);
-    this.moonOrbitPath.geometry.dispose();
-    (this.moonOrbitPath.material as THREE.Material).dispose();
-    this.scene.remove(this.orbitPath);
-    this.orbitPath.geometry.dispose();
-    (this.orbitPath.material as THREE.Material).dispose();
+    this.scene.remove(this.solar);
     this.renderer.dispose();
   }
 }
