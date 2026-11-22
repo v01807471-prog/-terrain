@@ -25,14 +25,12 @@ class BlueprintNodeEditor {
   private shell():void{
     this.host.innerHTML=`<div class="v2-graph-window"><header class="v2-graph-toolbar">
     <b>◈ Граф мира</b><select id="v2g-preset"><option value="regions">🌍 Регионы</option><option value="plains">🌾 Равнины</option><option value="mountains">⛰️ Горы</option><option value="desert">🏜️ Пустыня</option><option value="islands">🏝️ Острова</option></select><button data-a="preset">Загрузить пресет</button><label>Сид <input id="v2g-seed" type="number"></label><button data-a="random">🎲</button>
-    <select id="v2g-add"></select><button data-a="add">+ Узел</button><button data-a="fit">Уместить</button>
+    <select id="v2g-add"></select><button data-a="add">+ Узел</button><button data-a="assets">Материалы</button><button data-a="physics">Физика</button><button data-a="wire">Сетка</button><label class="v2g-sun-control">☀ <input id="v2g-sun-time" type="range" min="0" max="1" step="0.001" value="0.36"></label><button data-a="fit">Уместить</button>
     <button data-a="minus">−</button><span id="v2g-zoom">100%</span><button data-a="plus">+</button>
     <button data-a="export">Экспорт</button><button data-a="import">Импорт</button><input id="v2g-file" type="file" accept=".json" hidden>
     <span id="v2g-status">Граф готов</span><button data-a="apply">Применить</button><button data-a="close">← В игру</button></header>
     <div class="v2-graph-preview-dock"><div class="v2-graph-preview-caption"><b>Живой предпросмотр</b><span>Нажми, чтобы увеличить</span><button data-a="preview" aria-label="Увеличить предпросмотр">⤢</button></div><div id="v2g-preview-slot"></div></div>
-    <div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world">
-    <svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div><aside class="v2-graph-inspector"><b>Узел</b><div id="v2g-info">Выбери узел</div>
-    <p>Перетаскивай узлы за заголовок. Выход → вход создаёт связь. Нажми на подключённый вход, чтобы отключить. Ctrl + колесо — масштаб.</p><section class="v2g-asset-library"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Встроенные текстуры</span></div><div id="v2g-assets-list"></div></section></aside></div></div>`;
+    <div class="v2g-asset-drawer"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Выбери текстуру и добавь её узлом в граф</span></div><div id="v2g-assets-list"></div></div><div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world"><svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div></div></div>`;
     const sel=this.el<HTMLSelectElement>('v2g-add');
     for(const [type,t] of Object.entries(NODE_TYPES)){const o=document.createElement('option');o.value=type;o.textContent=(t as any).t;sel.append(o);}
     this.host.querySelectorAll<HTMLButtonElement>('[data-a]').forEach(b=>b.onclick=()=>this.action(b.dataset.a||''));
@@ -44,6 +42,9 @@ class BlueprintNodeEditor {
   private action(a:string):void{
     if(a==='close'){this.close();return;}
     if(a==='preview'){this.host.classList.toggle('preview-expanded');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
+    if(a==='assets'){this.host.classList.toggle('assets-open');return;}
+    if(a==='physics'){const input=document.querySelector<HTMLInputElement>('#pv2-physics-debug')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
+    if(a==='wire'){const input=document.querySelector<HTMLInputElement>('#pv2-wire')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
     if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);
     if(a==='preset'){const preset=this.el<HTMLSelectElement>('v2g-preset').value as any;this.graph=createTerrainPresetGraph(preset,this.graph.seed);this.graph.nodes.forEach((n,i)=>{n.x=30+(i%5)*250;n.y=30+Math.floor(i/5)*250;});this.selected=null;this.render();this.applyNow();}
     if(a==='apply')this.applyNow();
@@ -109,7 +110,7 @@ class BlueprintNodeEditor {
       if(!['out_height','out_color','out_water','out_fog'].includes(n.type)){const del=document.createElement('button');del.textContent='Удалить';del.onclick=()=>this.remove(n.id);foot.append(del);}
       card.append(foot);card.onpointerdown=()=>{this.selected=n.id;this.info(n);};host.append(card);
     }
-    this.drawLinks();this.info(this.selected===null?null:this.node(this.selected));this.renderAssetLibrary();
+    this.drawLinks();this.renderAssetLibrary();
     this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width='3200px';this.el('v2g-world').style.height='2000px';
     this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';this.preview();
   }
@@ -133,12 +134,7 @@ class BlueprintNodeEditor {
     this.graph.nodes.push({id,type:'tex_asset',x:(sc.scrollLeft+120)/this.zoom,y:(sc.scrollTop+100)/this.zoom,p:{asset:assetId,tile:4,tri:0},d:{},in:{}});
     this.selected=id;this.render();this.schedule();this.status('Текстура добавлена в граф. Соедини выход с узлом цвета.');
   }
-  private info(n:any):void{
-    const box=this.el('v2g-info');box.innerHTML='';if(!n){box.textContent='Выбери узел';return;}
-    const h=document.createElement('h3');h.textContent=(NODE_TYPES as any)[n.type].t;box.append(h);
-    const p=document.createElement('p');p.textContent='ID '+n.id+' · '+n.type;box.append(p);
-    const b=document.createElement('button');b.textContent='Удалить узел';b.onclick=()=>this.remove(n.id);box.append(b);
-  }
+  
   private drawLinks():void{
     const world=this.el('v2g-world'),svg=this.el<SVGSVGElement>('v2g-links'),r=world.getBoundingClientRect();svg.innerHTML='';svg.setAttribute('width','3200');svg.setAttribute('height','2000');
     for(const n of this.graph.nodes)for(const [port,source] of Object.entries(n.in||{})){
@@ -202,9 +198,9 @@ root.innerHTML = `
       <div class="pv2-viewport" id="pv2-viewport">
         <div class="pv2-overlay">
           <span class="pv2-chip">Режим: <b id="pv2-state">исследование</b></span>
-          <span class="pv2-chip">Управление: <b>WASD + мышь</b></span>
+          
         </div>
-        <div class="pv2-hint">WASD — бег · Пробел — прыжок · Зажми ЛКМ и веди мышь — повернуть камеру · Колесо — приблизить</div>
+        
       </div>
     </section>
     <aside class="pv2-side">
@@ -353,6 +349,7 @@ const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (ne
   blueprintStatus.style.color = '#8affc1';
 }, viewport);
 document.querySelector('#pv2-open-blueprint')!.addEventListener('click', () => graphEditor.open());
+graphEditor.open();
 document.querySelector<HTMLInputElement>('#pv2-water')!.addEventListener('change', (event) => {
   waterRenderer.mesh.visible = (event.currentTarget as HTMLInputElement).checked;
 });
@@ -383,7 +380,8 @@ function updateDayNight(delta: number): void {
   if (document.activeElement !== dayTimeInput) dayTimeInput.value = String(dayTime);
 }
 dayNightToggle.addEventListener('change',()=>{dayCycle=dayNightToggle.checked;});
-dayTimeInput.addEventListener('input',()=>{dayTime=Number(dayTimeInput.value);updateDayNight(0);});
+dayTimeInput.addEventListener('input',()=>{dayTime=Number(dayTimeInput.value);const toolbarTime=document.querySelector<HTMLInputElement>('#v2g-sun-time');if(toolbarTime)toolbarTime.value=String(dayTime);updateDayNight(0);});
+document.querySelector<HTMLInputElement>('#v2g-sun-time')!.addEventListener('input',e=>{dayTime=Number((e.currentTarget as HTMLInputElement).value);dayTimeInput.value=String(dayTime);updateDayNight(0);});
 const cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
 
 const world = new PhysicsWorld(terrain, { fixedDelta: 1 / 60, maxSubSteps: 10, maxFrameDelta: 0.1, terrainCellSize: LOD0_CELL_SIZE });
@@ -411,7 +409,18 @@ const playerMesh = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: '#f0b66f', roughness: 0.62 })
 );
 playerMesh.castShadow = true;
+playerMesh.receiveShadow = true;
 scene.add(playerMesh);
+
+// Мягкая динамическая тень персонажа на процедурном terrain shader.
+// Положение и вытяжка тени следуют направлению солнца и высоте героя.
+const playerShadow = new THREE.Mesh(
+  new THREE.CircleGeometry(1, 40),
+  new THREE.MeshBasicMaterial({ color: '#080b0d', transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide })
+);
+playerShadow.rotation.x = -Math.PI / 2;
+playerShadow.renderOrder = 2;
+scene.add(playerShadow);
 
 // Диагностика опоры капсулы: зелёные точки — высота земли,
 // вертикальные отрезки — зазор до нижней поверхности капсулы.
@@ -553,6 +562,17 @@ function updatePlayer(frameDelta: number): void {
   }
   playerMesh.position.set(player.x, player.y, player.z);
   playerMesh.rotation.y = player.yaw;
+  const shadowGround = terrain.getGroundHeight(player.x, player.z, LOD0_CELL_SIZE);
+  const shadowHeight = Math.max(0, player.y - playerHeight * 0.5 - playerRadius - shadowGround);
+  const sunDir = sun.position.clone().normalize();
+  playerShadow.position.set(
+    player.x - sunDir.x * shadowHeight * 0.42,
+    shadowGround + 0.045,
+    player.z - sunDir.z * shadowHeight * 0.42
+  );
+  const shadowScale = 0.72 + Math.min(shadowHeight, 8) * 0.11;
+  playerShadow.scale.set(shadowScale * (1 + Math.abs(sunDir.x) * 0.45), shadowScale * (1 + Math.abs(sunDir.z) * 0.45), 1);
+  (playerShadow.material as THREE.MeshBasicMaterial).opacity = Math.max(0.06, 0.34 - shadowHeight * 0.032);
   if (physicsDebug.visible) updatePhysicsDebug();
 }
 function updateFollowCamera(): void {
@@ -664,8 +684,19 @@ document.querySelector<HTMLInputElement>('#pv2-cpu-surface')!.addEventListener('
   cpuSurfaceDebug.setVisible(enabled);
   if (enabled) cpuSurfaceDebug.update(player.x, player.z);
 });
+let wireframeBeforePhysicsDebug = false;
 document.querySelector<HTMLInputElement>('#pv2-physics-debug')!.addEventListener('change', (event) => {
-  physicsDebug.visible = (event.currentTarget as HTMLInputElement).checked;
+  const enabled = (event.currentTarget as HTMLInputElement).checked;
+  const wireInput = document.querySelector<HTMLInputElement>('#pv2-wire')!;
+  if (enabled) {
+    wireframeBeforePhysicsDebug = wireInput.checked;
+    wireInput.checked = false;
+    terrainRenderer.setWireframe(false);
+  } else if (wireframeBeforePhysicsDebug) {
+    wireInput.checked = true;
+    terrainRenderer.setWireframe(true);
+  }
+  physicsDebug.visible = enabled;
   if (physicsDebug.visible) updatePhysicsDebug();
 });
 document.querySelector('#pv2-camera')!.addEventListener('click', () => {
@@ -772,7 +803,7 @@ resetPlayer();
 updateFollowCamera();
 requestAnimationFrame(animate);
 window.addEventListener('beforeunload', () => {
-  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); waterRenderer.dispose(scene); cpuSurfaceDebug.dispose();
+  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); waterRenderer.dispose(scene); cpuSurfaceDebug.dispose(); playerShadow.geometry.dispose(); (playerShadow.material as THREE.Material).dispose();
   sphereGeometry.dispose(); sphereMaterial.dispose();
 });
 
