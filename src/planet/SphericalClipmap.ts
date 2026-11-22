@@ -87,6 +87,7 @@ export class SphericalClipmap {
     };
 
     const vertexShader=`
+      uniform float uRadius;
       varying vec3 vWorldNormal;
       ${terrainBlueprint.shader}
 
