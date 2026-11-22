@@ -133,7 +133,7 @@ export class ThreeClipmap {
     const geometry = this.createRingGeometry(level, coarser);
     const surface = new THREE.Mesh(geometry, this.surfaceMaterials[level.index]);
     surface.receiveShadow = true;
-    surface.frustumCulled = false;
+    // Let Three.js reject this level when its bounds are outside the camera frustum.\n    surface.frustumCulled = true;
     levelGroup.add(surface);
   }
 
