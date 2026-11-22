@@ -259,7 +259,7 @@ root.innerHTML = `
           <label class="pv2-toggle"><input id="pv2-physics-debug" type="checkbox"> Контакты физики героя</label>
           <label class="pv2-toggle"><input id="pv2-cpu-surface" type="checkbox"> Показать CPU-сетку столкновений (только диагностика)</label>
         </div>
-        <p class="pv2-note">В обычной игре CPU-сетка не рисуется: физика вычисляет высоту напрямую из Terrain, а GPU строит видимую поверхность шейдером. Включай сетку только для сравнения CPU и GPU.</p>
+        <p class="pv2-note">F — включить/выключить полёт; Space — вверх, Shift — вниз, WASD — движение. В обычной игре CPU-сетка не рисуется: физика вычисляет высоту напрямую из Terrain, а GPU строит видимую поверхность шейдером. Включай сетку только для сравнения CPU и GPU.</p>
       </section>
       <section class="pv2-panel">
         <h2>Показания</h2>
@@ -522,6 +522,7 @@ let draggingCamera = false;
 let previousPointerX = 0;
 let previousPointerY = 0;
 const keys = new Set<string>();
+let flightMode = false;
 
 const playerHalfSegment = playerHeight * 0.5;
 const playerFixedStep = 1 / 120;
@@ -547,6 +548,7 @@ function placePlayerAt(x: number, z: number): void {
   player.y = getPlayerSupportHeight(x, z);
   player.vx = 0; player.vy = 0; player.vz = 0;
   player.grounded = true;
+  flightMode = false;
   playerAccumulator = 0;
 }
 function resetPlayer(): void {
@@ -567,8 +569,9 @@ function updatePlayer(frameDelta: number): void {
     const f = forwardInput / inputLength, s = sideInput / inputLength;
     const forwardX = -Math.sin(cameraYaw), forwardZ = -Math.cos(cameraYaw);
     const rightX = Math.cos(cameraYaw), rightZ = -Math.sin(cameraYaw);
-    targetX = (forwardX * f + rightX * s) * 7.5;
-    targetZ = (forwardZ * f + rightZ * s) * 7.5;
+    const moveSpeed = flightMode ? 180 : 7.5;
+    targetX = (forwardX * f + rightX * s) * moveSpeed;
+    targetZ = (forwardZ * f + rightZ * s) * moveSpeed;
     player.yaw = Math.atan2(targetX, targetZ);
   }
 
@@ -578,12 +581,17 @@ function updatePlayer(frameDelta: number): void {
     const blend = 1 - Math.exp(-12 * dt);
     player.vx += (targetX - player.vx) * blend;
     player.vz += (targetZ - player.vz) * blend;
-    if (keys.has('Space') && player.grounded) {
-      player.vy = 6.2;
+    if (flightMode) {
+      const verticalInput = (keys.has('Space') ? 1 : 0) - (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 1 : 0);
+      player.vy = verticalInput * 300;
       player.grounded = false;
+    } else {
+      if (keys.has('Space') && player.grounded) {
+        player.vy = 6.2;
+        player.grounded = false;
+      }
+      player.vy -= 18 * dt;
     }
-
-    player.vy -= 18 * dt;
     player.x += player.vx * dt;
     player.z += player.vz * dt;
     player.y += player.vy * dt;
@@ -657,7 +665,13 @@ renderer.domElement.addEventListener('wheel', (event) => {
   event.preventDefault();
 }, { passive: false });
 window.addEventListener('keydown', (event) => {
-  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'].includes(event.code)) event.preventDefault();
+  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight'].includes(event.code)) event.preventDefault();
+  if (event.code === 'KeyF' && !event.repeat) {
+    flightMode = !flightMode;
+    player.vy = 0;
+    if (flightMode) player.grounded = false;
+    setPauseLabel();
+  }
   keys.add(event.code);
 });
 window.addEventListener('keyup', (event) => keys.delete(event.code));
@@ -688,7 +702,7 @@ function clearSpheres(): void {
 }
 function setPauseLabel(): void {
   document.querySelector('#pv2-pause')!.textContent = paused ? '▶ Продолжить физику' : 'Ⅱ Пауза физики';
-  document.querySelector('#pv2-state')!.textContent = paused ? 'пауза физики' : 'исследование';
+  document.querySelector('#pv2-state')!.textContent = paused ? 'пауза физики' : flightMode ? 'режим полёта · F' : 'исследование';
 }
 function reset(): void {
   clearSpheres(); nextId = 1; loop.reset(); totalSteps = 0;
