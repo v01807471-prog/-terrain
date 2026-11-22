@@ -6,6 +6,15 @@ export class PlanetGui {
   constructor(viewport:PlanetViewport,container:HTMLElement){
     this.gui=new GUI({container,title:'PLANET CONTROLS',width:300});
     const config=viewport.getConfig();
+    const diagnostic=this.gui.addFolder('DIAGNOSTICS · FLAT CLIPMAP');
+    const flatTest={
+      'At origin':()=>viewport.enterFlatClipmapTest(0),
+      'At 150 million km':()=>viewport.enterFlatClipmapTest(150000000),
+      'Exit test':()=>viewport.exitFlatClipmapTest()
+    };
+    diagnostic.add(flatTest,'At origin').name('Test at (0, 0, 0)');
+    diagnostic.add(flatTest,'At 150 million km').name('Test at 150M km');
+    diagnostic.add(flatTest,'Exit test').name('Return to planet');
     const navigation=this.gui.addFolder('00 · SOLAR SYSTEM');
     const destinations={
       'Focus Earth':()=>viewport.focusEarth(),
@@ -25,7 +34,7 @@ export class PlanetGui {
     const terrain=this.gui.addFolder('03 · TERRAIN');
     terrain.add(config,'amplitude',0,2200,10).name('Relief amplitude').onChange((v:number)=>viewport.updateConfig({amplitude:v}));
     terrain.add(config,'frequency',1,14,.1).name('Noise frequency').onChange((v:number)=>viewport.updateConfig({frequency:v}));
-    navigation.open();camera.open();clip.open();terrain.open();
+    diagnostic.open();navigation.open();camera.open();clip.open();terrain.open();
   }
   destroy(){this.gui.destroy();}
 }
