@@ -308,7 +308,7 @@ editorToggle.addEventListener('click', () => {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#91aeb4');
 scene.fog = new THREE.Fog('#91aeb4', 100, 320);
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 700);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2400);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7));
 renderer.shadowMap.enabled = true;
