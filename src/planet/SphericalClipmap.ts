@@ -84,7 +84,8 @@ export class SphericalClipmap {
       uTime:{value:0},
       uAmplitude:{value:settings.amplitude},
       uFrequency:{value:settings.frequency},
-      uRadius:{value:settings.radius}
+      uRadius:{value:settings.radius},
+      uDetailFade:{value:0}
     };
 
     const vertexShader=`
@@ -127,6 +128,7 @@ export class SphericalClipmap {
         varying vec3 vWorldNormal;
         varying vec3 vRadial;
         varying float vHeight;
+        uniform float uAmplitude;
 
         float hash3(vec3 p) {
           p=fract(p*.3183099+vec3(.13,.17,.11));
@@ -149,7 +151,7 @@ export class SphericalClipmap {
           float macro=noise3(vRadial*34.0);
           float detail=noise3(vRadial*180.0);
           float micro=noise3(vRadial*720.0);
-          float h=vHeight/1100.0;
+          float h=vHeight/max(uAmplitude*.001,0.001);
 
           vec3 deepOcean=vec3(.012,.045,.085);
           vec3 shallowOcean=vec3(.025,.19,.23);
@@ -251,6 +253,9 @@ export class SphericalClipmap {
     this.group.quaternion.setFromRotationMatrix(frame);
 
     const altitude=Math.max(0,camera.position.length()-this.settings.radius);
+    // At orbital distances, suppress fine displacement octaves smoothly;
+    // retain the broad-scale shape so mountains do not pop or collapse.
+    this.material.uniforms.uDetailFade.value=THREE.MathUtils.smoothstep(altitude,250,25000);
     const nextExtent=this.calculateExtent(altitude);
     const extentChanged=Math.abs(nextExtent-this.currentExtent)>Math.max(20,this.currentExtent*.08);
     const altitudeChanged=this.lastAltitude<0 ||
