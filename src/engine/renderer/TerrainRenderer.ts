@@ -220,7 +220,11 @@ export class TerrainRenderer {
     this.wireGeometries.length = 0;
   }
 
-  private createWireForTile(ring: (typeof this.rings)[number], tile: (typeof ring.tiles)[number], tileIndex: number): void {
+  private createWireForTile(
+    ring: { step: number; wireMaterial: THREE.ShaderMaterial },
+    tile: { mesh: THREE.Mesh | null; wire: THREE.LineSegments | null },
+    tileIndex: number
+  ): void {
     if (tile.wire) return;
     const wire = new THREE.LineSegments(this.wireGeometries[tileIndex], ring.wireMaterial);
     wire.scale.set(ring.step, 1, ring.step);
