@@ -79,6 +79,8 @@ export class SphericalClipmap {
   private material:THREE.ShaderMaterial;
   private globe:THREE.Mesh;
   private globeMaterial:THREE.ShaderMaterial;
+  private globeGrid:THREE.Mesh;
+  private globeGridMaterial:THREE.ShaderMaterial;
   private gridVisible=true;
   private lastAltitude=-1;
   private currentExtent=0;
@@ -197,8 +199,19 @@ export class SphericalClipmap {
     );
     this.globe.frustumCulled=false;
     this.globe.visible=false;
+    this.globeGridMaterial=new THREE.ShaderMaterial({
+      uniforms:{uGridColor:{value:new THREE.Color(0x22d3ee)}},
+      vertexShader:this.globeMaterial.vertexShader,
+      fragmentShader:`uniform vec3 uGridColor;void main(){gl_FragColor=vec4(uGridColor,.34);}`,
+      transparent:true,depthTest:true,depthWrite:false,
+      wireframe:true,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1
+    });
+    this.globeGrid=new THREE.Mesh(this.globe.geometry,this.globeGridMaterial);
+    this.globeGrid.name='GlobeGrid';
+    this.globeGrid.frustumCulled=false;
+    this.globeGrid.visible=false;
     this.scene.add(this.group);
-    this.group.add(this.globe);
+    this.group.add(this.globe,this.globeGrid);
     this.rebuild(this.calculateExtent(15000-settings.radius),4);
   }
 
@@ -290,6 +303,7 @@ export class SphericalClipmap {
     // whole displaced sphere in orbit/space.
     const globeBlend=THREE.MathUtils.smoothstep(altitude,this.settings.radius*.18,this.settings.radius*.42);
     this.globe.visible=globeBlend>.001;
+    this.globeGrid.visible=this.gridVisible&&this.globe.visible;
     for(const level of this.levels){
       level.mesh.visible=globeBlend<.999;
       level.lines.visible=this.gridVisible&&globeBlend<.999;
@@ -314,13 +328,15 @@ export class SphericalClipmap {
     if(rebuild){
       this.globe.geometry.dispose();
       this.globe.geometry=new THREE.SphereGeometry(this.settings.radius,192,128);
+      this.globeGrid.geometry=this.globe.geometry;
       this.rebuild(this.calculateExtent(Math.max(0,this.lastAltitude)),this.activeRingCount);
     }
   }
 
   setGridVisible(visible:boolean){
     this.gridVisible=visible;
-    for(const level of this.levels)level.lines.visible=visible;
+    this.globeGrid.visible=visible&&this.globe.visible;
+    for(const level of this.levels)level.lines.visible=visible&&level.mesh.visible;
   }
 
   get lod(){return BASE_TILES*Math.pow(2,this.activeRingCount-1);}
@@ -336,7 +352,7 @@ export class SphericalClipmap {
     for(const level of this.levels){
       level.mesh.geometry.dispose();level.lines.geometry.dispose();level.gridMaterial.dispose();
     }
-    this.globe.geometry.dispose();this.globeMaterial.dispose();this.material.dispose();
+    this.globe.geometry.dispose();this.globeMaterial.dispose();this.globeGridMaterial.dispose();this.material.dispose();
     this.scene.remove(this.group);
   }
 }
