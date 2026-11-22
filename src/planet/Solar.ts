@@ -11,6 +11,7 @@ export class Solar extends THREE.Group {
   readonly earth=new THREE.Group();
   readonly moonOrbit=new THREE.Group();
   readonly moon=new THREE.Group();
+  readonly bodies:Array<{name:string;node:THREE.Object3D;radius:number}>;
 
   readonly earthOrbitRadius=30000;
   readonly moonOrbitRadius=38440;
@@ -45,6 +46,11 @@ export class Solar extends THREE.Group {
     this.moon.position.set(this.moonOrbitRadius,0,0);
     this.moonOrbit.add(this.moon);
 
+    this.bodies=[
+      {name:'Sun',node:this.sun,radius:3500},
+      {name:'Earth',node:this.earth,radius:6371},
+      {name:'Moon',node:this.moon,radius:1737}
+    ];
     this.updateMatrixWorld(true);
   }
 
