@@ -31,6 +31,7 @@ export class SphericalClipmap {
   private lastDirection=new THREE.Vector3();
   private lastAltitude=-1;
   private rebuildQueued=false;
+  private proximity=0;
   constructor(private readonly scene:THREE.Scene,public settings:ClipmapSettings){
     this.material=new THREE.ShaderMaterial({
       uniforms:{uTime:{value:0},uAmplitude:{value:settings.amplitude},uFrequency:{value:settings.frequency}},
@@ -63,7 +64,8 @@ export class SphericalClipmap {
     for(let i=0;i<count;i++){
       const inner=i===0?0:baseAngle*Math.pow(growth,i-1)*this.settings.radius;
       const outer=baseAngle*Math.pow(growth,i)*this.settings.radius;
-      const segments=Math.min(512,Math.max(16,Math.round(this.settings.baseSegments*Math.pow(1.16,count-1-i))));
+      const centerResolution=12+Math.max(0,this.settings.baseSegments-12)*4*this.proximity;
+      const segments=Math.min(512,Math.max(12,Math.round(12+(centerResolution-12)*Math.exp(-i*.42))));
       const radialSteps=Math.max(2,Math.round(segments*.25));
       const mesh=new THREE.Mesh(makeAnnulus(inner,outer,segments,radialSteps,this.settings.radius),this.material);
       mesh.frustumCulled=false;mesh.renderOrder=i;
@@ -79,11 +81,10 @@ export class SphericalClipmap {
     const altitude=Math.max(0,camera.position.length()-this.settings.radius);
     // Keep the whole clipmap coarse at startup/far zoom; add density only as the camera approaches.
     const proximity=THREE.MathUtils.clamp(1-altitude/(this.settings.radius*.8),0,1);
-    const desiredBase=Math.round(12+proximity*180);
-    const current=this.rings[0]?.segments??0;
-    if(Math.abs(desiredBase-current)>Math.max(12,current*.22)&&!this.rebuildQueued){
+    if(Math.abs(proximity-this.proximity)>.035&&!this.rebuildQueued){
+      this.proximity=proximity;
       this.rebuildQueued=true;
-      queueMicrotask(()=>{this.settings.baseSegments=Math.max(12,Math.round(desiredBase/Math.pow(1.16,this.settings.rings-1)));this.rebuild();this.rebuildQueued=false;});
+      queueMicrotask(()=>{this.rebuild();this.rebuildQueued=false;});
     }
     this.lastDirection.copy(direction);this.lastAltitude=altitude;
   }
