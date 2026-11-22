@@ -22,6 +22,7 @@ export class PlanetViewport {
   private orbitAngle=0;
   private orbitRadius=30000;
   private orbitAngularSpeed=0.00005;
+  private orbitPath:THREE.LineLoop;
   private settings={rings:17,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
 
   constructor(private canvas:HTMLCanvasElement) {
@@ -44,6 +45,29 @@ export class PlanetViewport {
     );
     sunMesh.position.set(0,0,0);
     this.scene.add(sunMesh);
+
+    // Visible orbital track in the same XZ plane used by Earth's orbit.
+    const orbitPoints:THREE.Vector3[]=[];
+    const orbitSegments=512;
+    for(let i=0;i<orbitSegments;i++){
+      const angle=(i/orbitSegments)*Math.PI*2;
+      orbitPoints.push(new THREE.Vector3(
+        Math.cos(angle)*this.orbitRadius,
+        0,
+        Math.sin(angle)*this.orbitRadius
+      ));
+    }
+    const orbitGeometry=new THREE.BufferGeometry().setFromPoints(orbitPoints);
+    const orbitMaterial=new THREE.LineBasicMaterial({
+      color:0x6b91b8,
+      transparent:true,
+      opacity:0.72,
+      depthWrite:false
+    });
+    this.orbitPath=new THREE.LineLoop(orbitGeometry,orbitMaterial);
+    this.orbitPath.frustumCulled=false;
+    this.orbitPath.renderOrder=2;
+    this.scene.add(this.orbitPath);
 
     this.clipmap=new SphericalClipmap(this.scene,this.settings);
     this.createAvatar();
@@ -252,6 +276,9 @@ export class PlanetViewport {
     this.scene.remove(this.avatar);
     this.resize.dispose();
     this.clipmap.dispose();
+    this.scene.remove(this.orbitPath);
+    this.orbitPath.geometry.dispose();
+    (this.orbitPath.material as THREE.Material).dispose();
     this.renderer.dispose();
   }
 }
