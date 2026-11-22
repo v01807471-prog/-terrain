@@ -53,19 +53,6 @@ export class PlanetViewport {
         );
       }
       this.updateCamera();
-      }else{
-        // Rotate the planet itself; the camera position and orientation stay fixed.
-        const cameraRight=new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld,0).normalize();
-        const yaw=new THREE.Quaternion().setFromAxisAngle(
-          new THREE.Vector3(0,1,0),
-          dx*.005*this.settings.rotationSpeed
-        );
-        const pitch=new THREE.Quaternion().setFromAxisAngle(
-          cameraRight,
-          dy*.005*this.settings.rotationSpeed
-        );
-        this.planetRotation.premultiply(yaw).premultiply(pitch).normalize();
-      }
     });
     const end=()=>{this.dragging=false;};this.canvas.addEventListener('pointerup',end);this.canvas.addEventListener('pointercancel',end);
     this.canvas.addEventListener('wheel',e=>{e.preventDefault();const factor=Math.exp(e.deltaY*.0012*this.settings.zoomSpeed);this.distance=THREE.MathUtils.clamp(this.distance*factor,this.radius*1.003,90000);this.updateCamera();},{passive:false});
