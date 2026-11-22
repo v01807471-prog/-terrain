@@ -92,20 +92,36 @@ const patchFragment=`
   float light=0.24+0.76*max(0.0,dot(n,normalize(uSun)));
   gl_FragColor=vec4(color*light,1.0);
  }`;
-const patchGeometry=new THREE.PlaneGeometry(2,2,256,256);
 const patchRings=[
  {scale:1_000,inner:0,outer:1_000},
  {scale:4_000,inner:900,outer:4_000},
  {scale:16_000,inner:3_600,outer:16_000},
  {scale:64_000,inner:14_400,outer:64_000}
 ].map(ring=>{
+ const geometry=new THREE.PlaneGeometry(2,2,256,256);
  const material=new THREE.ShaderMaterial({
   uniforms:{uRadius:{value:blueprint.radius},uPatchScale:{value:ring.scale},uInnerRadius:{value:ring.inner},uOuterRadius:{value:ring.outer},uUp:{value:new THREE.Vector3(1,0,0)},uEast:{value:new THREE.Vector3(0,0,1)},uNorth:{value:new THREE.Vector3(0,1,0)},uSun:{value:new THREE.Vector3(-0.4,0.7,0.5).normalize()}},
   vertexShader:patchVertex,fragmentShader:patchFragment,side:THREE.DoubleSide
  });
- const mesh=new THREE.Mesh(patchGeometry,material);mesh.frustumCulled=false;scene.add(mesh);
- return {material,mesh};
+ const mesh=new THREE.Mesh(geometry,material);mesh.frustumCulled=false;scene.add(mesh);
+ return {material,mesh,geometry,scale:ring.scale,segments:256};
 });
+
+function updateTerrainLod():void {
+ const distance=Math.max(1,camera.position.distanceTo(worldPosition));
+ const pixelsPerMeter=viewport.clientHeight/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov)*0.5)*distance);
+ for(const ring of patchRings){
+  // Keep terrain triangles near a few screen pixels instead of spending
+  // the same vertex budget when the camera is pulled far away.
+  const wanted=THREE.MathUtils.clamp(Math.ceil((2*ring.scale*pixelsPerMeter)/6),24,256);
+  const segments=Math.min(256,Math.max(24,Math.ceil(wanted/8)*8));
+  if(Math.abs(segments-ring.segments)<16)continue;
+  ring.geometry.dispose();
+  ring.geometry=new THREE.PlaneGeometry(2,2,segments,segments);
+  ring.mesh.geometry=ring.geometry;
+  ring.segments=segments;
+ }
+}
 
 const atmosphereMaterial=new THREE.ShaderMaterial({
  transparent:true,depthWrite:false,side:THREE.BackSide,
@@ -190,6 +206,7 @@ function updateCamera():void {
  camera.position.copy(cameraTarget).add(cameraOffset);
  camera.up.copy(f.up);
  camera.lookAt(cameraTarget.clone().addScaledVector(look,20));
+ updateTerrainLod();
  const cameraHeight=Math.max(1,worldPosition.length()-surfaceRadius(f.up));
  camera.near=Math.max(0.1,Math.min(5,cameraHeight*0.00001+0.1));
  const horizon=Math.sqrt(2*blueprint.radius*cameraHeight+cameraHeight*cameraHeight);
@@ -272,4 +289,4 @@ flightButton.addEventListener('click',()=>{flightMode=!flightMode;onGround=false
 document.addEventListener('pointerlockchange',()=>{if(!pointerLocked)keys.clear();});
 window.addEventListener('blur',()=>keys.clear());
 updatePlanetFrame();updateCamera();requestAnimationFrame(animate);
-window.addEventListener('beforeunload',()=>{observer.disconnect();renderer.dispose();planet.geometry.dispose();planetMaterial.dispose();ballGeometry.dispose();ballMaterial.dispose();patchGeometry.dispose();for(const ring of patchRings){scene.remove(ring.mesh);ring.material.dispose();}atmosphere.geometry.dispose();atmosphereMaterial.dispose();starGeometry.dispose();playerGeometry.dispose();playerMaterial.dispose();});
+window.addEventListener('beforeunload',()=>{observer.disconnect();renderer.dispose();planet.geometry.dispose();planetMaterial.dispose();ballGeometry.dispose();ballMaterial.dispose();for(const ring of patchRings){scene.remove(ring.mesh);ring.geometry.dispose();ring.material.dispose();}atmosphere.geometry.dispose();atmosphereMaterial.dispose();starGeometry.dispose();playerGeometry.dispose();playerMaterial.dispose();});
