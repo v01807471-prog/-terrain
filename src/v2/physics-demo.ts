@@ -87,19 +87,19 @@ class BlueprintNodeEditor {
         const row=document.createElement('div');row.className='v2-gport';
         const dot=document.createElement('button');dot.className='v2-gdot v2-gin'+(ty==='c'?' color':'');dot.dataset.node=String(n.id);dot.dataset.port=port;dot.onclick=()=>{
           if(this.pending!==null)this.connect(this.pending,n.id,port);
-          else if(nodeInputs[port]!=null){delete n.in[port];this.render();this.schedule();}
+          else if(nodeInputs[port]!=null){delete nodeInputs[port];this.render();this.schedule();}
         };
         const label=document.createElement('span');label.textContent=port;row.append(dot,label);
-        if(def!==null&&ty==='f'&&n.in[port]==null){const input=document.createElement('input');input.type='number';input.step='any';input.value=String(nodeDefaults[port]??def);input.onchange=()=>{n.d[port]=Number(input.value);this.schedule();};row.append(input);}
+        if(def!==null&&ty==='f'&&nodeInputs[port]==null){const input=document.createElement('input');input.type='number';input.step='any';input.value=String(nodeDefaults[port]??def);input.onchange=()=>{nodeDefaults[port]=Number(input.value);this.schedule();};row.append(input);}
         card.append(row);
       }
       for(const [key,def,kind] of t.p){
         const row=document.createElement('div');row.className='v2-gparam';const label=document.createElement('label');label.textContent=key;row.append(label);
         if(kind==='asset'){
-          const select=document.createElement('select');for(const asset of BUILTIN_TEXTURE_ASSETS){const option=document.createElement('option');option.value=asset.id;option.textContent=asset.name;select.append(option);}select.value=String(nodeParams[key]??def);select.onchange=()=>{n.p[key]=select.value;this.schedule();};row.append(select);
+          const select=document.createElement('select');for(const asset of BUILTIN_TEXTURE_ASSETS){const option=document.createElement('option');option.value=asset.id;option.textContent=asset.name;select.append(option);}select.value=String(nodeParams[key]??def);select.onchange=()=>{nodeParams[key]=select.value;this.schedule();};row.append(select);
         }else{
           const input=document.createElement('input');input.type=kind==='color'?'color':'number';input.step='any';input.value=String(n.p[key]??def);
-          input.onchange=()=>{n.p[key]=kind==='color'?input.value:Number(input.value);this.schedule();};row.append(input);
+          input.onchange=()=>{nodeParams[key]=kind==='color'?input.value:Number(input.value);this.schedule();};row.append(input);
         }
         card.append(row);
       }
