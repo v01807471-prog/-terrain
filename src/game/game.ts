@@ -55,7 +55,7 @@ const planetFragment=`
   vec3 low=mix(vec3(0.055,0.16,0.105),vec3(0.19,0.28,0.16),broad);
   vec3 high=mix(vec3(0.25,0.24,0.20),vec3(0.76,0.78,0.76),clamp((vHeight-2100.0)/2600.0,0.0,1.0));
   vec3 color=mix(low,high,clamp((vHeight-900.0)/2600.0,0.0,1.0));
-  color=mix(color,vec3(0.035,0.18,0.25),smoothstep(-260.0,-80.0,vHeight)*0.9);
+  color=mix(color,vec3(0.035,0.18,0.25),(1.0-smoothstep(-260.0,-80.0,vHeight))*0.9);
   float light=0.22+0.78*max(0.0,dot(n,normalize(uSun)));
   gl_FragColor=vec4(color*light,1.0);
  }`;
@@ -123,7 +123,8 @@ for(let i=0;i<starCount;i++){
  starPositions[i*3]=Math.cos(a)*r*d;starPositions[i*3+1]=y*d;starPositions[i*3+2]=Math.sin(a)*r*d;
 }
 const starGeometry=new THREE.BufferGeometry();starGeometry.setAttribute('position',new THREE.BufferAttribute(starPositions,3));
-const stars=new THREE.Points(starGeometry,new THREE.PointsMaterial({color:'#dce8ff',size:12000,sizeAttenuation:true,transparent:true,opacity:0.85}));
+const starsMaterial=new THREE.PointsMaterial({color:'#dce8ff',size:12000,sizeAttenuation:true,transparent:true,opacity:0});
+const stars=new THREE.Points(starGeometry,starsMaterial);
 scene.add(stars);
 
 const sun=new THREE.DirectionalLight(0xffffff,2.2);sun.position.set(-8_000_000,12_000_000,9_000_000);scene.add(sun);
@@ -159,6 +160,7 @@ function updatePlanetFrame():void {
  altitudeLabel.textContent=altitude>=1000?`${(altitude/1000).toFixed(2)} km`:`${Math.round(altitude)} m`;
  const atmosphereFactor=THREE.MathUtils.clamp(altitude/blueprint.atmosphereHeight,0,1);
  scene.background=new THREE.Color().lerpColors(new THREE.Color('#78b9e8'),new THREE.Color('#020611'),THREE.MathUtils.smoothstep(atmosphereFactor,0.05,0.95));
+ starsMaterial.opacity=THREE.MathUtils.smoothstep(atmosphereFactor,0.22,0.95)*0.9;
  surfaceState.textContent=onGround?'НА ПОВЕРХНОСТИ':altitude>blueprint.atmosphereHeight?'КОСМОС':flightMode?'ПОЛЁТ':'СВОБОДНОЕ ПАДЕНИЕ';
  flightButton.textContent=flightMode?'ПОЛЁТ: ВКЛ.':'ПОЛЁТ: ВЫКЛ.';
  flightButton.classList.toggle('active',flightMode);
