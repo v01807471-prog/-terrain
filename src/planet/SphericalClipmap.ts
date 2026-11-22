@@ -179,7 +179,7 @@ export class SphericalClipmap {
     // A complete spherical proxy takes over at orbital distances. The square
     // tangent clipmap is never stretched into a disk or asked to cover a globe.
     this.globeMaterial=new THREE.ShaderMaterial({
-      uniforms:{...uniforms},
+      uniforms:{...uniforms,uPatchOpacity:{value:1}},
       vertexShader:`
         uniform float uRadius;
         varying vec3 vRadial;
@@ -312,6 +312,7 @@ export class SphericalClipmap {
     );
     this.globe.visible=true;
     this.material.uniforms.uPatchOpacity.value=1-globeBlend;
+    this.globeMaterial.uniforms.uPatchOpacity.value=1;
     this.globeGridMaterial.uniforms.uGlobeGridOpacity.value=globeBlend;
     this.globeGrid.visible=this.gridVisible;
     for(const level of this.levels){
