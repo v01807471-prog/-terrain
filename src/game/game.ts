@@ -193,7 +193,8 @@ function movePlayer(dt:number):void {
   if(onGround){
    const moved=moveOnSurface(geo,tangent.dot(f.east)*dt,tangent.dot(f.north)*dt);
    geo=moved;
-   worldPosition=toWorld({...geo,altitude:Math.max(0,geo.altitude)});
+   worldPosition=toWorld({...geo,altitude:0});
+   worldPosition.setLength(surfaceRadius(worldPosition.clone().normalize())+1.15);
    velocity.set(0,0,0);
   }else{
    velocity.addScaledVector(gravity,dt);
