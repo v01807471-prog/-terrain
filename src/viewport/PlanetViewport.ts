@@ -34,7 +34,26 @@ export class PlanetViewport {
   private bindControls(){
     this.canvas.addEventListener('contextmenu',e=>e.preventDefault());
     this.canvas.addEventListener('pointerdown',e=>{this.dragging=true;this.panning=e.shiftKey||e.button===2;this.lastX=e.clientX;this.lastY=e.clientY;this.canvas.setPointerCapture(e.pointerId);});
-    this.canvas.addEventListener('pointermove',e=>{if(!this.dragging)return;const dx=e.clientX-this.lastX,dy=e.clientY-this.lastY;this.lastX=e.clientX;this.lastY=e.clientY;if(this.panning){this.azimuth-=dx*.003;this.target.y+=dy*this.distance*.00035;}else{\n        // Grab-style orbit: drag right moves the view around the globe;\n        // vertical drag changes latitude instead of only panning the target.\n        this.azimuth+=dx*.005*this.settings.rotationSpeed;\n        this.polar=THREE.MathUtils.clamp(this.polar-dy*.005*this.settings.rotationSpeed,.04,Math.PI-.04);\n      }this.updateCamera();});
+    this.canvas.addEventListener('pointermove',e=>{
+      if(!this.dragging)return;
+      const dx=e.clientX-this.lastX;
+      const dy=e.clientY-this.lastY;
+      this.lastX=e.clientX;
+      this.lastY=e.clientY;
+      if(this.panning){
+        this.azimuth-=dx*.003;
+        this.target.y+=dy*this.distance*.00035;
+      }else{
+        // Orbit the camera around the planet on both axes.
+        this.azimuth+=dx*.005*this.settings.rotationSpeed;
+        this.polar=THREE.MathUtils.clamp(
+          this.polar-dy*.005*this.settings.rotationSpeed,
+          .04,
+          Math.PI-.04
+        );
+      }
+      this.updateCamera();
+    });
     const end=()=>{this.dragging=false;};this.canvas.addEventListener('pointerup',end);this.canvas.addEventListener('pointercancel',end);
     this.canvas.addEventListener('wheel',e=>{e.preventDefault();const factor=Math.exp(e.deltaY*.0012*this.settings.zoomSpeed);this.distance=THREE.MathUtils.clamp(this.distance*factor,this.radius*1.003,90000);this.updateCamera();},{passive:false});
     this.canvas.addEventListener('dblclick',()=>{this.distance=this.radius*1.08;this.updateCamera();});
