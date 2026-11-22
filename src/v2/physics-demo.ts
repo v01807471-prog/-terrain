@@ -134,7 +134,7 @@ const waterRenderer = new WaterRenderer(scene, { seaLevel: -6, extent: 8192 });
 waterRenderer.applyBlueprint(blueprint.water);
 const blueprintStatus = document.querySelector<HTMLParagraphElement>('#pv2-blueprint-status')!;
 const graphEditorHost = document.querySelector<HTMLDivElement>('#pv2-blueprint-editor')!;
-new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (nextGraph) => {
+const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (nextGraph) => {
   const nextBlueprint = compileTerrainGraph(nextGraph);
   terrain.setBaseHeight(nextBlueprint.heightAt);
   terrainRenderer.setBlueprint(nextBlueprint);
@@ -146,7 +146,7 @@ new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (nextGraph) => {
   blueprintStatus.textContent = 'Blueprint применён: CPU, физика и GPU обновлены без перезапуска.';
   blueprintStatus.style.color = '#8affc1';
 });
-document.querySelector('#pv2-open-blueprint')!.addEventListener('click', () => graphEditorHost.classList.add('open'));
+document.querySelector('#pv2-open-blueprint')!.addEventListener('click', () => graphEditor.open());
 document.querySelector<HTMLInputElement>('#pv2-water')!.addEventListener('change', (event) => {
   waterRenderer.mesh.visible = (event.currentTarget as HTMLInputElement).checked;
 });
@@ -506,6 +506,7 @@ class BlueprintNodeEditor {
     this.host=host;this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
   }
   private el<T extends HTMLElement=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
+  open():void{this.host.classList.add('open');requestAnimationFrame(()=>this.fit());}
   private node(id:number):any{return this.graph.nodes.find(n=>n.id===id);}
   private shell():void{
     this.host.innerHTML=`<div class="v2-graph-window"><header class="v2-graph-toolbar">
