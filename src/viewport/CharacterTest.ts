@@ -19,6 +19,12 @@ export class CharacterTest {
   private sourceMesh: THREE.SkinnedMesh | null = null;
   private animationSelect: HTMLSelectElement;
   private activeAction: THREE.AnimationAction | null = null;
+  private heroRoot: THREE.Group | null = null;
+  private readonly keys = new Set<string>();
+  private yaw = 0;
+  private pitch = 0.16;
+  private pointerLocked = false;
+  private readonly retargetedClips = new Map<string, THREE.AnimationClip>();
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -35,13 +41,7 @@ export class CharacterTest {
     fill.position.set(-3, 2, -2);
     this.scene.add(fill);
 
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x394653, roughness: 1 }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.015;
-    this.scene.add(floor);
-    const grid = new THREE.GridHelper(12, 24, 0x8093a5, 0x536475);
-    grid.position.y = -0.012;
-    this.scene.add(grid);
+    this.createFlatClipmap();
 
     this.camera.position.set(0, 1.15, 3.8);
     this.camera.lookAt(0, 0.9, 0);
@@ -51,6 +51,11 @@ export class CharacterTest {
     this.controls.minDistance = 1.5;
     this.controls.maxDistance = 8;
     this.controls.update();
+    this.canvas.addEventListener('click', this.onCanvasClick);
+    document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    document.addEventListener('mousemove', this.onMouseMove);
+    document.addEventListener('keydown', this.onKeyDown);
+    document.addEventListener('keyup', this.onKeyUp);
 
     this.status = document.createElement('div');
     this.status.className = 'character-test-status';
@@ -113,7 +118,10 @@ export class CharacterTest {
         this.status.textContent = 'В модели не найден SkinnedMesh со скелетом';
         return;
       }
-      this.scene.add(model);
+      this.heroRoot = new THREE.Group();
+      this.heroRoot.name = 'HeroRoot';
+      this.heroRoot.add(model);
+      this.scene.add(this.heroRoot);
       // retargetClip creates tracks addressed through the SkinnedMesh's bones[] binding.
       // The mixer root must therefore be the skinned mesh, not the outer GLTF Group.
       this.mixer = new THREE.AnimationMixer(this.targetMesh);
@@ -148,6 +156,134 @@ export class CharacterTest {
     this.resizeObserver.observe(canvas);
     this.resize();
   }
+
+
+  private createFlatClipmap() {
+    const material = new THREE.MeshStandardMaterial({ color: 0x394653, roughness: 1, side: THREE.DoubleSide });
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x61788d, transparent: true, opacity: 0.48 });
+    const addRing = (extent: number, inner: number, divisions: number) => {
+      const positions: number[] = [];
+      const indices: number[] = [];
+      const lines: number[] = [];
+      const step = extent * 2 / divisions;
+      for (let z = 0; z < divisions; z++) for (let x = 0; x < divisions; x++) {
+        const x0 = -extent + x * step, x1 = x0 + step;
+        const z0 = -extent + z * step, z1 = z0 + step;
+        const cx = (x0 + x1) * 0.5, cz = (z0 + z1) * 0.5;
+        if (inner > 0 && Math.abs(cx) < inner && Math.abs(cz) < inner) continue;
+        const a = positions.length / 3;
+        positions.push(x0, 0, z0, x1, 0, z0, x1, 0, z1, x0, 0, z1);
+        indices.push(a, a + 2, a + 1, a, a + 3, a + 2);
+        lines.push(x0, 0, z0, x1, 0, z0, x1, 0, z0, x1, 0, z1);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.y = -0.012;
+      this.scene.add(mesh);
+      const gridGeometry = new THREE.BufferGeometry();
+      gridGeometry.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+      const grid = new THREE.LineSegments(gridGeometry, lineMaterial);
+      grid.position.y = -0.009;
+      this.scene.add(grid);
+    };
+    addRing(8, 0, 128);
+    addRing(16, 8, 128);
+    addRing(32, 16, 128);
+    addRing(64, 32, 128);
+    addRing(128, 64, 128);
+  }
+
+  private loadAdditionalLibrary(url: string, label: string) {
+    if (!this.targetMesh || !this.mixer) return;
+    new GLTFLoader().load(url, (gltf) => {
+      const meshes: THREE.SkinnedMesh[] = [];
+      gltf.scene.traverse((object) => { if (object instanceof THREE.SkinnedMesh) meshes.push(object); });
+      if (!meshes.length || !this.targetMesh) return;
+      const targetNames = new Set(this.targetMesh.skeleton.bones.map((bone) => bone.name));
+      const source = meshes.map((mesh) => ({
+        mesh,
+        overlap: mesh.skeleton.bones.filter((bone) => targetNames.has(bone.name)).length
+      })).sort((a, b) => b.overlap - a.overlap)[0].mesh;
+      const sourceNames = new Set(source.skeleton.bones.map((bone) => bone.name));
+      const names: Record<string, string> = {};
+      for (const bone of this.targetMesh.skeleton.bones) if (sourceNames.has(bone.name)) names[bone.name] = bone.name;
+      if (Object.keys(names).length < 5) {
+        this.status.textContent += ' · ' + label + ': несовместимый скелет';
+        return;
+      }
+      const rootNames = this.targetMesh.skeleton.bones
+        .filter((bone) => !this.targetMesh!.skeleton.bones.includes(bone.parent as THREE.Bone))
+        .map((bone) => bone.name);
+      let count = 0;
+      for (const clip of gltf.animations) {
+        try {
+          const converted = SkeletonUtils.retargetClip(this.targetMesh, source, clip, {
+            names, fps: 30, preserveBoneMatrix: true, preserveBonePositions: true
+          });
+          converted.tracks = converted.tracks.filter((track) =>
+            !(track.name.endsWith('.position') && rootNames.some((name) => track.name.includes('[' + name + ']')))
+          );
+          if (!converted.tracks.length) continue;
+          const name = label + ' · ' + (clip.name || 'Clip ' + count);
+          converted.name = name;
+          this.retargetedClips.set(name, converted);
+          const option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          this.animationSelect.appendChild(option);
+          count++;
+        } catch (error) { console.warn(label + ' retarget failed:', clip.name, error); }
+      }
+      this.status.textContent += ' · ' + label + ': ' + count + ' клипов';
+    }, undefined, (error) => console.error(label + ' load failed:', error));
+  }
+
+  private updateThirdPerson(delta: number) {
+    if (!this.heroRoot) return;
+    if (this.pointerLocked) {
+      const forward = Number(this.keys.has('KeyW')) - Number(this.keys.has('KeyS'));
+      const side = Number(this.keys.has('KeyD')) - Number(this.keys.has('KeyA'));
+      const magnitude = Math.hypot(forward, side);
+      if (magnitude > 0) {
+        const speed = (this.keys.has('ShiftLeft') ? 5.2 : 3.1) * delta;
+        this.heroRoot.position.x += (Math.sin(this.yaw) * forward + Math.cos(this.yaw) * side) / magnitude * speed;
+        this.heroRoot.position.z += (Math.cos(this.yaw) * forward - Math.sin(this.yaw) * side) / magnitude * speed;
+        this.heroRoot.rotation.y = this.yaw;
+      }
+    }
+    const target = this.heroRoot.position.clone().add(new THREE.Vector3(0, 0.98, 0));
+    const distance = 3.5;
+    const horizontal = Math.cos(this.pitch) * distance;
+    this.camera.position.set(
+      target.x - Math.sin(this.yaw) * horizontal,
+      target.y + Math.sin(this.pitch) * distance + 0.25,
+      target.z - Math.cos(this.yaw) * horizontal
+    );
+    this.camera.lookAt(target);
+    this.controls.target.copy(target);
+    this.controls.enabled = !this.pointerLocked;
+  }
+
+  private onCanvasClick = () => { if (!this.pointerLocked) void this.canvas.requestPointerLock(); };
+  private onPointerLockChange = () => {
+    this.pointerLocked = document.pointerLockElement === this.canvas;
+    if (!this.pointerLocked) this.keys.clear();
+  };
+  private onMouseMove = (event: MouseEvent) => {
+    if (!this.pointerLocked) return;
+    this.yaw -= event.movementX * 0.0022;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - event.movementY * 0.0018, -0.25, 0.7);
+  };
+  private onKeyDown = (event: KeyboardEvent) => {
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft'].includes(event.code)) {
+      event.preventDefault();
+      this.keys.add(event.code);
+    }
+  };
+  private onKeyUp = (event: KeyboardEvent) => { this.keys.delete(event.code); };
 
   private tryStartRetargetedAnimation() {
     if (!this.mixer || !this.targetMesh || !this.sourceScene || this.sourceClips.length === 0) return;
@@ -186,6 +322,14 @@ export class CharacterTest {
 
   private playSelectedAnimation(commonBoneCount?: number) {
     if (!this.mixer || !this.targetMesh || !this.sourceMesh) return;
+    const prepared = this.retargetedClips.get(this.animationSelect.value);
+    if (prepared) {
+      this.activeAction?.fadeOut(0.15);
+      this.activeAction = this.mixer.clipAction(prepared);
+      this.activeAction.reset().fadeIn(0.15).play();
+      this.status.textContent = 'Анимация: ' + prepared.name + ' · UAL2';
+      return;
+    }
     const index = Number(this.animationSelect.value);
     const clip = this.sourceClips[index];
     if (!clip) return;
@@ -242,6 +386,7 @@ export class CharacterTest {
       this.frame = requestAnimationFrame(tick);
       const delta = Math.min(this.clock.getDelta(), 0.05);
       this.mixer?.update(delta);
+      this.updateThirdPerson(delta);
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
     };
@@ -252,6 +397,11 @@ export class CharacterTest {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
     this.controls.dispose();
+    this.canvas.removeEventListener('click', this.onCanvasClick);
+    document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    document.removeEventListener('mousemove', this.onMouseMove);
+    document.removeEventListener('keydown', this.onKeyDown);
+    document.removeEventListener('keyup', this.onKeyUp);
     this.mixer?.stopAllAction();
     this.renderer.dispose();
     this.status.remove();
