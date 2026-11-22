@@ -281,7 +281,9 @@ export class TerrainRenderer {
       }
     }
     const baseCoverage = this.gridSize * 0.5 * this.baseCellSize * 2 ** (this.levels - 1);
-    const lodScale = THREE.MathUtils.clamp(Math.max(1, horizonDistance / baseCoverage), 1, 256);
+    // Keep world-space tile spacing stable. Altitude expands the camera horizon,
+    // but must not stretch the existing clipmap geometry.
+    const lodScale = 1;
     const lodScaleChanged = Math.abs(this.uniforms.uLodScale.value - lodScale) > 0.0005;
     this.uniforms.uLodScale.value = lodScale;
     this.uniforms.uFogNear.value = this.baseFogNear * lodScale;
