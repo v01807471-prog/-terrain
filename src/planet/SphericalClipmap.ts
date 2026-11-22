@@ -228,7 +228,7 @@ export class SphericalClipmap {
     }
     this.levels=[];
 
-    const count=THREE.MathUtils.clamp(Math.round(requestedCount),1,Math.min(8,Math.round(this.settings.rings)));
+    const count=THREE.MathUtils.clamp(Math.round(requestedCount),1,Math.min(9,Math.round(this.settings.rings)));
     this.activeRingCount=count;
     const maxLevel=count-1;
     const baseExtent=totalExtent/Math.pow(2,maxLevel);
@@ -302,7 +302,7 @@ export class SphericalClipmap {
     const desiredRings=THREE.MathUtils.clamp(
       Math.ceil(Math.log2(Math.max(1,outerCellPixels/3)))+1,
       1,
-      Math.min(8,Math.round(this.settings.rings))
+      Math.min(9,Math.round(this.settings.rings))
     );
 
     if (extentChanged || altitudeChanged || desiredRings!==this.activeRingCount) this.rebuild(nextExtent,desiredRings);
