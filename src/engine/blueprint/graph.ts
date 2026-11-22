@@ -65,7 +65,7 @@ export function compileTerrainGraph(graph: TerrainGraph): TerrainBlueprint {
     ${noiseShader}
     float terrainHeight(vec2 p) {
       vec2 pw = p;
-      ${compiled.glHeight.replace(/return (g\\d+);/, 'return $1 + domeHeightOffset(p);')}
+      ${compiled.glHeight.replace(/return (g\d+);/, 'return $1 + domeHeightOffset(p);')}
     }
   `;
   return {
