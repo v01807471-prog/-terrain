@@ -50,6 +50,7 @@ export class PlanetViewport {
     this.controls.maxDistance=this.radius+90000;
     this.controls.setGizmosVisible(false);
     this.controls.update();
+    this.updateDepthRange();
 
     this.resize=new ResizeManager(canvas,(w,h,dpr)=>{
       this.camera.aspect=w/h;
@@ -85,6 +86,14 @@ export class PlanetViewport {
       +this.terrainNoise(direction.x*f*2.13,direction.y*f*2.13,direction.z*f*2.13)*.25
       +this.terrainNoise(direction.x*f*5.7,direction.y*f*5.7,direction.z*f*5.7)*.1;
     return (n-.48)*this.settings.amplitude*.001;
+  }
+
+  private updateDepthRange(){
+    // Keep the perspective depth buffer useful at both planetary and human scales.
+    // A single 5 cm -> 120,000 km range destroys depth precision near the ground.
+    this.camera.near=this.thirdPerson ? .0005 : .5;
+    this.camera.far=this.thirdPerson ? 100 : Math.max(20000,this.camera.position.length()+this.radius*1.5);
+    this.camera.updateProjectionMatrix();
   }
 
   private createAvatar(){
@@ -123,6 +132,7 @@ export class PlanetViewport {
       this.controls.maxDistance=150000;
       this.controls.update();
       this.thirdPerson=true;
+      this.updateDepthRange();
       return;
     }
 
@@ -138,6 +148,7 @@ export class PlanetViewport {
     this.controls.update();
     this.avatar.visible=false;
     this.thirdPerson=false;
+    this.updateDepthRange();
   }
 
   start(){
