@@ -88,7 +88,7 @@ export class PlanetViewport {
       : Math.max(.05,targetDistance*.00001);
     this.camera.far=this.thirdPerson
       ? Math.max(1,targetDistance*1.5+.1)
-      : Math.max(20000,targetDistance+this.radius*2);
+      : Math.max(50000,targetDistance+this.orbitRadius*2+this.radius*2);
     this.camera.updateProjectionMatrix();
   }
 
