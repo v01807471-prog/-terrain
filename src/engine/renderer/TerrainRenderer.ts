@@ -169,6 +169,21 @@ export class TerrainRenderer {
     // The dome is a fixed spherical cap. Camera altitude only reveals more of it
     // and expands the reused clipmap rings; it never deforms the physics surface.
     const horizonDistance = Math.sqrt(2 * DOME_RADIUS * cameraHeight + cameraHeight * cameraHeight);
+    if (camera instanceof THREE.PerspectiveCamera) {
+      const desiredFar = Math.max(2400, horizonDistance * 1.08);
+      const desiredNear = Math.max(0.1, Math.min(cameraHeight * 0.0005, desiredFar * 0.00001));
+      const farChanged = Math.abs(camera.far - desiredFar) / Math.max(camera.far, 1) > 0.015;
+      const nearChanged = Math.abs(camera.near - desiredNear) / Math.max(camera.near, 0.1) > 0.015;
+      if (farChanged || nearChanged) {
+        camera.near = desiredNear;
+        camera.far = desiredFar;
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld(true);
+        camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+        this.projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        this.frustum.setFromProjectionMatrix(this.projectionView);
+      }
+    }
     const baseCoverage = this.gridSize * 0.5 * this.baseCellSize * 2 ** (this.levels - 1);
     const lodScale = THREE.MathUtils.clamp(Math.max(1, horizonDistance / baseCoverage), 1, 256);
     const lodScaleChanged = Math.abs(this.uniforms.uLodScale.value - lodScale) > 0.0005;
