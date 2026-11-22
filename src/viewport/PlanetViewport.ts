@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ResizeManager } from './ResizeManager';
 import { SphericalClipmap } from '../planet/SphericalClipmap';
 import { terrainBlueprint } from '../planet/TerrainBlueprint';
@@ -291,31 +290,36 @@ export class PlanetViewport {
     this.avatar.visible=false;
     this.scene.add(this.avatar);
 
-    // Use the uploaded rigged male character. Normalize its measured model
-    // height to 1.8 metres; project world units are kilometres.
-    const loader=new GLTFLoader();
-    loader.load(
-      '/Universal%20Base%20Characters%5BStandard%5D/Base%20Characters/Godot%20-%20UE/Superhero_Male_FullBody.gltf',
-      (gltf)=>{
-        const model=gltf.scene;
-        model.updateMatrixWorld(true);
-        const bounds=new THREE.Box3().setFromObject(model);
-        const modelHeight=bounds.max.y-bounds.min.y;
-        if(!(modelHeight>0))return;
-        const scale=.0018/modelHeight;
-        model.scale.setScalar(scale);
-        model.position.y=-bounds.min.y*scale;
-        model.traverse((object)=>{
-          if(object instanceof THREE.Mesh){
-            object.castShadow=true;
-            object.receiveShadow=true;
-          }
-        });
-        this.avatar.add(model);
-      },
-      undefined,
-      (error)=>console.error('Не удалось загрузить модель героя:',error)
-    );
+    // Clean built-in humanoid placeholder. All dimensions are kilometres;
+    // the character is 1.8 m tall and its origin is at the feet.
+    const skin=new THREE.MeshStandardMaterial({color:0xd9a77e,roughness:.82});
+    const suit=new THREE.MeshStandardMaterial({color:0x263f59,roughness:.9});
+    const accent=new THREE.MeshStandardMaterial({color:0xe0a43b,roughness:.75});
+    const boot=new THREE.MeshStandardMaterial({color:0x18232d,roughness:.95});
+    const add=(geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number)=>{
+      const mesh=new THREE.Mesh(geometry,material);
+      mesh.position.set(x,y,z);
+      mesh.castShadow=true;
+      mesh.receiveShadow=true;
+      this.avatar.add(mesh);
+      return mesh;
+    };
+    add(new THREE.CapsuleGeometry(.00017,.00048,5,10),suit,0,.00102,0);
+    add(new THREE.SphereGeometry(.00017,12,8),accent,0,.00058,0);
+    add(new THREE.SphereGeometry(.00013,16,12),skin,0,.00161,0);
+    // Neck
+    add(new THREE.CylinderGeometry(.000055,.000065,.00009,8),skin,0,.00143,0);
+    // Arms, slightly angled away from the torso.
+    for(const side of [-1,1]){
+      const arm=add(new THREE.CapsuleGeometry(.000065,.00040,4,8),suit,side*.000255,.00102,0);
+      arm.rotation.z=side*-.16;
+      const hand=add(new THREE.SphereGeometry(.00007,8,6),skin,side*.00030,.00072,-.000015);
+      const leg=add(new THREE.CapsuleGeometry(.00009,.00043,4,8),suit,side*.000095,.00031,0);
+      leg.rotation.z=side*-.025;
+      add(new THREE.BoxGeometry(.00019,.00011,.00034),boot,side*.000095,.000075,-.000065);
+    }
+    // Small chest marker makes the character's facing direction readable.
+    add(new THREE.BoxGeometry(.00019,.00012,.000025),accent,0,.00113,-.000174);
   }
 
   private updateCameraMode(){
