@@ -2,7 +2,7 @@ name: Terrain editor checks
 on:
   pull_request:
   push:
-    branches: [main, 'refactor/**', 'game/**']
+    branches: [main, 'refactor/**']
 
 jobs:
   build:
