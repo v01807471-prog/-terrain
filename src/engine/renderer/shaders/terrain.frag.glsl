@@ -37,18 +37,27 @@ void main() {
   vec3 grassColor = vec3(0.18, 0.34, 0.12);
   vec3 rockColor = vec3(0.34, 0.32, 0.29);
   __TERRAIN_COLOR_GRAPH__
-  float diffuse = max(dot(n,normalize(uSunDirection)),0.0);
-  float shadow = 1.0;
-  if (uSunDirection.y > 0.04) {
-    for (int i = 1; i <= 5; i++) {
-      float rayDistance = float(i) * 3.5;
-      vec2 sampleXZ = vWorld.xz + uSunDirection.xz * rayDistance;
-      float rayHeight = vWorld.y + uSunDirection.y * rayDistance;
-      if (terrainHeight(sampleXZ) > rayHeight + 0.55) { shadow = 0.52; break; }
+  vec3 lightDir = normalize(uSunDirection);
+  float diffuse = max(dot(n, lightDir), 0.0);
+  float terrainShadow = 1.0;
+  // Камерная область теней: трассируем луч к солнцу по той же функции высоты,
+  // что и геометрия. Дальность затухает за пределами активной зоны камеры.
+  if (lightDir.y > 0.035) {
+    for (int i = 1; i <= 16; i++) {
+      float rayDistance = float(i) * 5.5;
+      vec2 sampleXZ = vWorld.xz + lightDir.xz * rayDistance;
+      float rayHeight = vWorld.y + lightDir.y * rayDistance;
+      float blockerHeight = terrainHeight(sampleXZ);
+      if (blockerHeight > rayHeight + 0.65) {
+        terrainShadow = 0.24;
+        break;
+      }
     }
   }
-  float daylight = 0.24 + uSunIntensity * 0.25;
-  vec3 color = base*(daylight+diffuse*uSunIntensity*0.72*shadow)*(1.0-slopeV*0.2);
+  float cameraShadowFade = 1.0 - smoothstep(82.0, 132.0, length(vWorld.xz - uCamera));
+  float shadow = mix(1.0, terrainShadow, cameraShadowFade);
+  float daylight = 0.18 + uSunIntensity * 0.20;
+  vec3 color = base*(daylight+diffuse*uSunIntensity*0.82*shadow)*(1.0-slopeV*0.2);
   float distanceToCamera = length(vWorld-vec3(uCamera.x,0.0,uCamera.y));
   color = mix(color,uFogColor,smoothstep(uFogNear,uFogFar,distanceToCamera));
   terrainFragColor = vec4(color,1.0);
