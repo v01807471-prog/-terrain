@@ -18,7 +18,6 @@ export class PlanetViewport {
   private dragPointer:number|null=null;
   private lastPointerX=0;
   private lastPointerY=0;
-  private readonly worldUp=new THREE.Vector3(0,1,0);
   private settings={rings:16,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.35,rotationSpeed:1,autoRotate:false};
 
   private onPointerDown=(event:PointerEvent)=>{
