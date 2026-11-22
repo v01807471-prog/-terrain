@@ -11,6 +11,7 @@ uniform float uWireLift;
 out vec3 vWorld;
 out vec3 vNormal;
 out float vDistance;
+#include <shadowmap_pars_vertex>
 __TERRAIN_HEIGHT_FUNCTION__
 void main() {
   vec4 world;
@@ -53,5 +54,7 @@ void main() {
   vNormal = normalize(vec3(-(hx-h0)/e, 1.0, -(hz-h0)/e));
   vWorld = vec3(p.x,h + uWireLift,p.y);
   vDistance = d;
+  vec4 worldPosition = vec4(vWorld, 1.0);
+  #include <shadowmap_vertex>
   gl_Position = projectionMatrix*viewMatrix*vec4(vWorld,1.0);
 }
