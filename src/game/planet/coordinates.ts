@@ -7,7 +7,7 @@ export function frameAt(latitude:number,longitude:number):PlanetFrame {
  const lat=latitude*DEG,lon=longitude*DEG;
  const up=new THREE.Vector3(Math.cos(lat)*Math.cos(lon),Math.sin(lat),Math.cos(lat)*Math.sin(lon)).normalize();
  const east=new THREE.Vector3(-Math.sin(lon),0,Math.cos(lon)).normalize();
- const north=new THREE.Vector3().crossVectors(up,east).normalize();
+ const north=new THREE.Vector3().crossVectors(east,up).normalize();
  return {up,east,north};
 }
 export function toWorld(p:GeoPosition):THREE.Vector3{return frameAt(p.latitude,p.longitude).up.multiplyScalar(PLANET_RADIUS+p.altitude);}
