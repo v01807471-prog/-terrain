@@ -99,11 +99,13 @@ export class SphericalClipmap {
       uTexelWorldSize:{value:1},
       uGridColor:{value:new THREE.Color(0x22d3ee)},
       uSunPosition:{value:new THREE.Vector3(0,0,0)},
+      uPlanetInverseRotation:{value:new THREE.Matrix3()},
       uPatchOpacity:{value:1},
       uGlobeGridOpacity:{value:0}
     };
     const vertexShader=`
       uniform float uRadius;
+      uniform mat3 uPlanetInverseRotation;
       varying vec3 vRadial;
       varying vec3 vWorldPosition;
       varying vec3 vViewPosition;
@@ -114,7 +116,8 @@ export class SphericalClipmap {
         vec3 radial=normalize(vec3(plane.x,uRadius,plane.y));
         vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
         // Sample terrain in planet-local coordinates so body motion cannot change the terrain direction.
-        vec3 displaced=displacePlanet(radial*uRadius,uRadius);
+        vec3 planetRadial=normalize(uPlanetInverseRotation*worldRadial);
+        vec3 displaced=displacePlanet(planetRadial*uRadius,uRadius);
         float height=length(displaced)-uRadius;
         vec3 localPosition=radial*(uRadius+height+position.y);
         vec3 worldPosition=(modelMatrix*vec4(localPosition,1.0)).xyz;
@@ -192,6 +195,7 @@ export class SphericalClipmap {
       uniforms:{...uniforms,uPatchOpacity:{value:1}},
       vertexShader:`
         uniform float uRadius;
+        uniform mat3 uPlanetInverseRotation;
         varying vec3 vRadial;
         varying vec3 vWorldPosition;
         varying vec3 vViewPosition;
@@ -200,7 +204,8 @@ export class SphericalClipmap {
         void main(){
           vec3 radial=normalize(position);
           vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
-          vec3 displaced=displacePlanet(radial*uRadius,uRadius);
+          vec3 planetRadial=normalize(uPlanetInverseRotation*worldRadial);
+          vec3 displaced=displacePlanet(planetRadial*uRadius,uRadius);
           float height=length(displaced)-uRadius;
           vec3 localPosition=radial*(uRadius+height);
           vec4 world=modelMatrix*vec4(localPosition,1.0);
@@ -297,6 +302,10 @@ export class SphericalClipmap {
     const parentFrame=new THREE.Quaternion();
     if(this.group.parent)this.group.parent.getWorldQuaternion(parentFrame);
     this.group.quaternion.copy(parentFrame.invert().multiply(worldFrame));
+    const planetRotation=new THREE.Matrix4().makeRotationFromQuaternion(parentFrame);
+    const inversePlanetRotation=new THREE.Matrix3().setFromMatrix4(planetRotation).invert();
+    this.material.uniforms.uPlanetInverseRotation.value.copy(inversePlanetRotation);
+    this.globeMaterial.uniforms.uPlanetInverseRotation.value.copy(inversePlanetRotation);
 
     const altitude=Math.max(0,cameraFromCenter.length()-this.settings.radius);
     this.material.uniforms.uDetailFade.value=THREE.MathUtils.smoothstep(altitude,250,25000);
