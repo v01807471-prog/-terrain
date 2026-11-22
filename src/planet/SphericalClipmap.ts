@@ -163,7 +163,7 @@ export class SphericalClipmap {
         color=mix(color,highRock,smoothstep(.42,.62,h));
         color=mix(color,snow,smoothstep(.72,.95,h));
         color*=.94+pixel*.12;
-        color*=.08+light*1.08;
+        color*=.32+light*.88;
         gl_FragColor=vec4(color,1.0);
       }`;
     this.material=new THREE.ShaderMaterial({
@@ -252,13 +252,20 @@ export class SphericalClipmap {
     this.globeMaterial.uniforms.uTime.value=time;
     const cameraFromCenter=camera.position.clone().sub(planetCenter);
     const radial=cameraFromCenter.clone().normalize();
-    this.group.position.copy(planetCenter);
+    // Clipmaps live under their celestial body node. Convert the body's
+    // world centre and the world tangent frame into that parent's local space.
+    this.group.position.copy(this.group.parent
+      ?this.group.parent.worldToLocal(planetCenter.clone())
+      :planetCenter);
     const northReference=Math.abs(radial.dot(new THREE.Vector3(0,1,0)))>.995
       ?new THREE.Vector3(0,0,1):new THREE.Vector3(0,1,0);
     const east=new THREE.Vector3().crossVectors(northReference,radial).normalize();
     const south=new THREE.Vector3().crossVectors(east,radial).normalize();
     const frame=new THREE.Matrix4().makeBasis(east,radial,south);
-    this.group.quaternion.setFromRotationMatrix(frame);
+    const worldFrame=new THREE.Quaternion().setFromRotationMatrix(frame);
+    const parentFrame=new THREE.Quaternion();
+    if(this.group.parent)this.group.parent.getWorldQuaternion(parentFrame);
+    this.group.quaternion.copy(parentFrame.invert().multiply(worldFrame));
 
     const altitude=Math.max(0,cameraFromCenter.length()-this.settings.radius);
     this.material.uniforms.uDetailFade.value=THREE.MathUtils.smoothstep(altitude,250,25000);
