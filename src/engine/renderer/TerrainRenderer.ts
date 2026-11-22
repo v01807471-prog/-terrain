@@ -139,7 +139,7 @@ export class TerrainRenderer {
     this.uniforms.uSunIntensity.value = Math.max(0, intensity);
   }
 
-  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; altitude: number } {
+  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; readyTiles: number; queuedTiles: number; altitude: number } {
     camera.updateMatrixWorld(true);
     const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
     camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
