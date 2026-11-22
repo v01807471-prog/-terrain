@@ -231,3 +231,44 @@ html,body.physics-v2-page,#physics-v2-root{height:100%;min-height:0;overflow:hid
 .v2g-diagnostics-drawer .pv2-panel:nth-child(5){display:none}
 
 #pv2-blueprint-editor .v2-graph-toolbar button[data-a=close]{display:none!important}
+
+
+/* Godot-like focused preview: full-screen viewport with a docked scene inspector. */
+.v2-graph-world{min-width:1600px;min-height:900px}
+#v2g-world{width:1600px!important;height:900px!important}
+.v2-graph-preview-dock{overflow:hidden}
+.v2g-preview-inspector{display:none;min-width:0;overflow:auto;border-left:1px solid #354b55;background:linear-gradient(180deg,#172630,#101a21);padding:16px}
+.v2g-preview-inspector-title{font-size:13px;font-weight:800;color:#e4f2f1;padding:3px 0 13px;border-bottom:1px solid #344a53;margin-bottom:12px}
+#pv2-blueprint-editor.preview-expanded .v2-graph-toolbar{display:none}
+#pv2-blueprint-editor.preview-expanded .v2-graph-body{display:none}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{
+ position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;
+ transform:none;padding:0;border:0;border-radius:0;display:grid;
+ grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:54px minmax(0,1fr);
+ background:#0b1319;box-shadow:none;z-index:1005
+}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption{
+ grid-column:1/-1;height:54px;padding:0 18px;border-bottom:1px solid #344a53;
+ background:#14232b
+}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption b{font-size:14px}
+#pv2-blueprint-editor.preview-expanded #v2g-preview-slot{
+ grid-column:1;grid-row:2;height:100%;min-height:0;border-radius:0;background:#10191e
+}
+#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector{
+ display:block;grid-column:2;grid-row:2
+}
+#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .pv2-side{
+ display:flex!important;flex-direction:column;gap:10px;padding:0;overflow:visible
+}
+#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .pv2-panel{padding:12px}
+#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .pv2-panel:nth-child(5){display:block}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption span{display:block}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption button{margin-left:auto;width:34px;height:30px;font-size:18px}
+#pv2-blueprint-editor.preview-expanded .v2-graph-preview-caption button::after{content:" Закрыть";font-size:11px}
+.v2-gnode{width:248px}
+@media(max-width:760px){
+ #pv2-blueprint-editor.preview-expanded .v2-graph-preview-dock{grid-template-columns:minmax(0,1fr);grid-template-rows:48px minmax(0,1fr) 38dvh}
+ #pv2-blueprint-editor.preview-expanded .v2g-preview-inspector{grid-column:1;grid-row:3;border-left:0;border-top:1px solid #354b55}
+ #pv2-blueprint-editor.preview-expanded #v2g-preview-slot{grid-column:1;grid-row:2}
+}
