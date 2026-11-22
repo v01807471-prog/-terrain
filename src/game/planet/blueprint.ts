@@ -20,7 +20,7 @@ export function terrainHeight(direction:THREE.Vector3,b:PlanetBlueprint=DEFAULT_
 }
 export function terrainHeightGLSL(b:PlanetBlueprint=DEFAULT_PLANET):string {
  const seed=b.seed.toFixed(1),cs=b.continentalScale.toFixed(3),ms=b.mountainScale.toFixed(3),amp=(b.heightAmplitude*0.58).toFixed(3),peak=(b.heightAmplitude*0.72).toFixed(3),detail=b.detailScale.toFixed(3);
- return 'float hashPlanet(vec3 p,float seed){return fract(sin(dot(p,vec3(127.1,311.7,74.7))+seed*0.013)*43758.5453123)*2.0-1.0;}\\n'
- +'float noisePlanet(vec3 p,float seed){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);float a=mix(hashPlanet(i,seed),hashPlanet(i+vec3(1,0,0),seed),f.x);float b=mix(hashPlanet(i+vec3(0,1,0),seed),hashPlanet(i+vec3(1,1,0),seed),f.x);float c=mix(hashPlanet(i+vec3(0,0,1),seed),hashPlanet(i+vec3(1,0,1),seed),f.x);float d=mix(hashPlanet(i+vec3(0,1,1),seed),hashPlanet(i+vec3(1,1,1),seed),f.x);return mix(mix(a,b,f.y),mix(c,d,f.y),f.z);}\\n'
+ return 'float hashPlanet(vec3 p,float seed){return fract(sin(dot(p,vec3(127.1,311.7,74.7))+seed*0.013)*43758.5453123)*2.0-1.0;}\n'
+ +'float noisePlanet(vec3 p,float seed){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);float a=mix(hashPlanet(i,seed),hashPlanet(i+vec3(1,0,0),seed),f.x);float b=mix(hashPlanet(i+vec3(0,1,0),seed),hashPlanet(i+vec3(1,1,0),seed),f.x);float c=mix(hashPlanet(i+vec3(0,0,1),seed),hashPlanet(i+vec3(1,0,1),seed),f.x);float d=mix(hashPlanet(i+vec3(0,1,1),seed),hashPlanet(i+vec3(1,1,1),seed),f.x);return mix(mix(a,b,f.y),mix(c,d,f.y),f.z);}\n'
  +'float planetHeight(vec3 direction){vec3 n=normalize(direction);float continent=noisePlanet(n*'+cs+','+seed+');float mountain=max(0.0,noisePlanet(n*'+ms+','+(b.seed+31).toFixed(1)+'));float detail=noisePlanet(n*'+(b.mountainScale*4).toFixed(3)+','+(b.seed+97).toFixed(1)+');return continent*'+amp+'+pow(mountain,2.2)*'+peak+'+detail*'+detail+';}';
 }
