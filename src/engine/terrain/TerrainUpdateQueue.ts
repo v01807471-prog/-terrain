@@ -1,3 +1,4 @@
+import type { Terrain } from './Terrain.js';
 import type { TerrainBounds, TerrainChange } from './types.js';
 
 export interface TerrainUpdateQueueOptions {
@@ -55,6 +56,11 @@ export class TerrainUpdateQueue {
 
   get pendingCount(): number {
     return this.pending.length;
+  }
+
+  /** Подписывает очередь на изменения Terrain; возвращает функцию отключения. */
+  connect(terrain: Pick<Terrain, 'subscribeChanges'>): () => void {
+    return terrain.subscribeChanges(change => this.enqueue(change));
   }
 
   enqueue(change: TerrainChange): void {
