@@ -45,7 +45,7 @@ export class PlanetViewport {
     this.controls.enableAnimations=true;
     this.controls.scaleFactor=this.settings.zoomSpeed;
     this.controls.minDistance=this.radius+1;
-    this.controls.maxDistance=this.radius+90000;
+    this.controls.maxDistance=this.radius+250000;
     this.controls.setGizmosVisible(false);
     this.controls.update();
     this.updateDepthRange();
@@ -143,7 +143,7 @@ export class PlanetViewport {
     this.camera.up.set(0,1,0);
     this.camera.lookAt(0,0,0);
     this.controls.minDistance=this.radius+1;
-    this.controls.maxDistance=this.radius+90000;
+    this.controls.maxDistance=this.radius+250000;
     this.avatar.visible=false;
     this.thirdPerson=false;
     this.controls.update();
@@ -207,7 +207,7 @@ export class PlanetViewport {
     this.controls.scaleFactor=Math.max(1.02,Math.min(1.25,this.settings.zoomSpeed));
     if(!this.thirdPerson){
       this.controls.minDistance=this.radius+1;
-      this.controls.maxDistance=this.radius+90000;
+      this.controls.maxDistance=this.radius+250000;
     }
     if(typeof patch.showGrid==='boolean') this.clipmap.setGridVisible(patch.showGrid);
     this.clipmap.setSettings({
