@@ -11,7 +11,7 @@ npm run dev
 
 ## What the preview shows
 
-- Seven nested clipmap levels with square ring geometry (outer levels have a central hole).
+- Seven nested clipmap levels with square ring geometry (outer levels have a central hole). The finest 1 m/cell area covers 96 × 96 world units.
 - A world-aligned checker texture. Checker tiles have a fixed world-space size and do not grow or shrink between levels.
 - A wireframe overlay to inspect the actual mesh topology.
 - Procedural hills and ridges so height continuity is visible.
@@ -46,4 +46,4 @@ Use `ThreeClipmap` to attach the generated levels to a Three.js scene. The debug
 
 ## Current limitations
 
-This is a diagnostic implementation of square clipmap rings, boundary stitching and height geomorphing. It is not yet a production planetary renderer: normals across morph zones, GPU height sampling, skirts/skirts-free edge cases for arbitrary resolutions, and large-world precision still need dedicated validation.
+This is a diagnostic implementation of square clipmap rings, boundary stitching and height geomorphing. Current renderer uses one frustum-cullable surface mesh per LOD level; per-chunk visibility and GPU instancing remain a separate optimization. It is not yet a production planetary renderer: normals across morph zones, GPU height sampling, skirts/skirts-free edge cases for arbitrary resolutions, and large-world precision still need dedicated validation.
