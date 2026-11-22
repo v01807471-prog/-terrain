@@ -107,7 +107,7 @@ void main() {
   if (cameraPosition.y < uSeaLevel + domeHeightOffset(cameraPosition.xz)) {
     vec3 underwater = pow(mix(uShallowColor, uDeepColor, 0.35), vec3(1.0 / 2.2));
     underwater *= 0.6 + 0.4 * smoothstep(-0.3, 0.4, normal.y);
-    underwater = mix(underwater, uFogColor, smoothstep(uFogNear, uFogFar, distanceToCamera));
+    // Keep underwater color clear while inspecting terrain coverage.
     waterColor = vec4(underwater, 0.6 * shore * uOpacity);
     return;
   }
@@ -127,7 +127,7 @@ void main() {
   color = mix(color, vec3(0.9), clamp(foam, 0.0, 1.0) * uFoamStrength);
   float alpha = clamp(max(mix(0.3, 0.96, depthTint), fresnel * 0.8) * shore * uOpacity, 0.0, 1.0);
   color = pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
-  color = mix(color, uFogColor, smoothstep(uFogNear, uFogFar, distanceToCamera));
+  // Distance fog disabled: do not hide distant terrain or water boundaries.
   waterColor = vec4(color, alpha);
 }
 `;
