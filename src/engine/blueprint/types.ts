@@ -5,6 +5,8 @@ export interface TerrainBlueprint {
   heightFunctionGLSL: string;
   /** Optional GLSL color program generated from the V1 graph compiler. */
   fragmentGraphGLSL?: string;
+  /** Asset IDs referenced by texture nodes, in shader uniform-slot order. */
+  textureAssets?: string[];
   terrainColor: string;
   fogColor: string;
   fogNear: number;
