@@ -5,6 +5,7 @@ export const terrainBlueprint = {
     uniform float uTime;
     uniform float uAmplitude;
     uniform float uFrequency;
+    uniform float uDetailFade;
     varying vec3 vNormal;
     varying float vHeight;
     float hash(vec3 p){p=fract(p*0.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
@@ -14,8 +15,15 @@ export const terrainBlueprint = {
                  mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
     }
     vec3 displacePlanet(vec3 p,float radius){
-      vec3 d=normalize(p);float n=noise3(d*uFrequency)*.65+noise3(d*uFrequency*2.13)*.25+noise3(d*uFrequency*5.7)*.1;
-      return d*(radius+(n-.48)*uAmplitude);
+      vec3 d=normalize(p);
+      float broad=noise3(d*uFrequency);
+      float medium=noise3(d*uFrequency*2.13);
+      float fine=noise3(d*uFrequency*5.7);
+      // Fade small-scale octaves with camera altitude, keeping broad landforms.
+      float n=broad*.65+mix(medium,.5,uDetailFade)*.25+mix(fine,.5,uDetailFade)*.1;
+      // Planet units are kilometres; the GUI amplitude is specified in metres.
+      float reliefKm=uAmplitude*.001;
+      return d*(radius+(n-.48)*reliefKm);
     }`,
   height(direction: {x:number;y:number;z:number}, settings:TerrainSettings) {
     const {x,y,z}=direction, f=settings.frequency;
