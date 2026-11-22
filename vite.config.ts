@@ -7,7 +7,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        physicsV2: 'physics-v2.html'
+        physicsV2: 'physics-v2.html',
+        planetGame: 'planet-game.html'
       }
     }
   }
