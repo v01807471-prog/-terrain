@@ -4,6 +4,7 @@ import terrainFragmentShader from './shaders/terrain.frag.glsl?raw';
 import wireFragmentShader from './shaders/wire.frag.glsl?raw';
 import type { Terrain } from '../terrain/Terrain.js';
 import type { TerrainBlueprint } from '../blueprint/types.js';
+import { createBuiltinTexture } from '../textures/assets.js';
 
 export interface TerrainClipmapOptions {
   levels?: number;
@@ -44,6 +45,8 @@ export class TerrainRenderer {
   private readonly frustum = new THREE.Frustum();
   private readonly projectionView = new THREE.Matrix4();
   private readonly tileBounds = new THREE.Box3();
+  private readonly assetTextures = new Map<string, THREE.DataTexture>();
+  private readonly fallbackAssetTexture = (() => { const t = new THREE.DataTexture(new Uint8Array([128,128,128,255]),1,1,THREE.RGBAFormat); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; })();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -96,6 +99,11 @@ export class TerrainRenderer {
       ring.material.fragmentShader = fragmentShader;
       ring.material.uniforms.uBaseColor.value.set(blueprint.terrainColor);
       ring.wireMaterial.vertexShader = vertexShader;
+      for (let i = 0; i < 8; i++) {
+        const texture = this.getAssetTexture(blueprint.textureAssets?.[i]);
+        ring.material.uniforms[`uAsset${i}`].value = texture;
+        ring.wireMaterial.uniforms[`uAsset${i}`].value = texture;
+      }
       ring.material.needsUpdate = true;
       ring.wireMaterial.needsUpdate = true;
     }
@@ -153,6 +161,9 @@ export class TerrainRenderer {
 
   dispose(): void {
     this.unsubscribe();
+    for (const texture of this.assetTextures.values()) texture.dispose();
+    this.assetTextures.clear();
+    this.fallbackAssetTexture.dispose();
     for (const ring of this.rings) {
       ring.material.dispose();
       ring.wireMaterial.dispose();
@@ -180,7 +191,10 @@ export class TerrainRenderer {
       const outer = half - 2 * step;
       // Exactly the previous level's morph boundary, as in the legacy clipmap.
       const cut = level > 0 ? halfGrid * this.baseCellSize * 2 ** (level - 1) - step : 0;
+      const assetUniforms: Record<string, { value: THREE.Texture }> = {};
+      for (let i = 0; i < 8; i++) assetUniforms[`uAsset${i}`] = { value: this.getAssetTexture(blueprint.textureAssets?.[i]) };
       const common = {
+        ...assetUniforms,
         uCamera: this.uniforms.uCamera,
         uAltitude: this.uniforms.uAltitude,
         uStep: { value: step },
@@ -219,6 +233,13 @@ export class TerrainRenderer {
       }
       this.rings.push({ step, half, cut, outer, tiles, material, wireMaterial });
     }
+  }
+
+  private getAssetTexture(id?: string): THREE.Texture {
+    if (!id) return this.fallbackAssetTexture;
+    let texture = this.assetTextures.get(id);
+    if (!texture) { texture = createBuiltinTexture(id); this.assetTextures.set(id, texture); }
+    return texture;
   }
 
   private createTileWireGeometry(tx: number, tz: number): THREE.BufferGeometry {
