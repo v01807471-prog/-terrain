@@ -1,6 +1,7 @@
 precision highp float;
 uniform vec2 uCamera;
 uniform float uAltitude;
+uniform float uLodScale;
 uniform float uStep;
 uniform float uHalf;
 in float aStep;
@@ -46,11 +47,11 @@ void main() {
   float halfSize = uHalf;
   float cutSize = 0.0;
   #ifdef USE_INSTANCING
-    stepSize = aStep;
-    halfSize = aHalf;
+    stepSize = aStep * uLodScale;
+    halfSize = aHalf * uLodScale;
     cutSize = aCut;
   #endif
-  vCut = cutSize;
+  vCut = cutSize * uLodScale;
   float d = max(max(abs(p.x-uCamera.x), abs(p.y-uCamera.y)), uAltitude);
   float h = terrainHeightAtLOD(p, stepSize, halfSize);
   float e = max(0.5 * stepSize, 0.05);
