@@ -32,7 +32,8 @@ export class TerrainRenderer {
     centerX: number;
     centerZ: number;
     instances: THREE.InstancedMesh;
-    tiles: Array<{ ready: boolean; visible: boolean; dirty: boolean; wire: THREE.LineSegments | null; ox: number; oz: number }>;
+    instanceOffset: number;
+    tiles: Array<{ ready: boolean; visible: boolean; dirty: boolean; instanceIndex: number; wire: THREE.LineSegments | null; ox: number; oz: number }>;
     material: THREE.ShaderMaterial;
     wireMaterial: THREE.ShaderMaterial;
   }> = [];
@@ -127,7 +128,7 @@ export class TerrainRenderer {
         ring.material.needsUpdate = true;
       }
       ring.material.uniforms.uBaseColor.value.set(blueprint.terrainColor);
-      if (texturesChanged) for (let i = 0; i < 8; i++) {
+      if (texturesChanged && ring === this.rings[0]) for (let i = 0; i < 8; i++) {
         const texture = this.getAssetTexture(nextTextureIds[i] || undefined);
         ring.material.uniforms[`uAsset${i}`].value = texture;
         ring.wireMaterial.uniforms[`uAsset${i}`].value = texture;
@@ -215,7 +216,7 @@ export class TerrainRenderer {
           this.instanceTransform.rotation.set(0, 0, 0);
           this.instanceTransform.scale.set(visible ? ring.step : 0, visible ? 1 : 0, visible ? ring.step : 0);
           this.instanceTransform.updateMatrix();
-          ring.instances.setMatrixAt(tileIndex, this.instanceTransform.matrix);
+          ring.instances.setMatrixAt(tile.instanceIndex, this.instanceTransform.matrix);
           tile.dirty = false;
           instanceBufferChanged = true;
         }
@@ -233,11 +234,12 @@ export class TerrainRenderer {
     for (const texture of this.assetTextures.values()) texture.dispose();
     this.assetTextures.clear();
     this.fallbackAssetTexture.dispose();
-    for (const ring of this.rings) {
-      this.group.remove(ring.instances);
-      ring.instances.dispose();
-      ring.material.dispose();
-      ring.wireMaterial.dispose();
+    const shared = this.rings[0];
+    if (shared) {
+      this.group.remove(shared.instances);
+      shared.instances.dispose();
+      shared.material.dispose();
+      shared.wireMaterial.dispose();
     }
     for (const geometry of this.geometries) geometry.dispose();
     for (const geometry of this.wireGeometries) geometry?.dispose();
@@ -278,16 +280,47 @@ export class TerrainRenderer {
     // Диагностическая проволочная сетка остаётся отдельным необязательным overlay.
     this.geometries.push(this.createTileGeometry());
     const halfGrid = this.gridSize / 2;
+    const totalInstances = this.levels * this.tilesPerSide ** 2;
+    const steps = new Float32Array(totalInstances);
+    const halves = new Float32Array(totalInstances);
+    const cuts = new Float32Array(totalInstances);
+    const tileGeometry = this.geometries[0];
+    tileGeometry.setAttribute('aStep', new THREE.InstancedBufferAttribute(steps, 1));
+    tileGeometry.setAttribute('aHalf', new THREE.InstancedBufferAttribute(halves, 1));
+    tileGeometry.setAttribute('aCut', new THREE.InstancedBufferAttribute(cuts, 1));
+    const assetUniforms: Record<string, { value: THREE.Texture }> = {};
+    for (let i = 0; i < 8; i++) assetUniforms[`uAsset${i}`] = { value: this.getAssetTexture(blueprint.textureAssets?.[i]) };
+    const common = {
+      ...assetUniforms,
+      uCamera: this.uniforms.uCamera,
+      uAltitude: this.uniforms.uAltitude,
+      uFogColor: this.uniforms.uFogColor,
+      uFogNear: this.uniforms.uFogNear,
+      uFogFar: this.uniforms.uFogFar,
+      uSunDirection: this.uniforms.uSunDirection,
+      uSunIntensity: this.uniforms.uSunIntensity,
+      uBaseColor: { value: new THREE.Color(blueprint.terrainColor) },
+      uWireLift: { value: 0 }
+    };
+    const sharedMaterial = new THREE.ShaderMaterial({
+      uniforms: common, vertexShader, fragmentShader,
+      glslVersion: THREE.GLSL3, side: THREE.FrontSide
+    });
+    const sharedInstances = new THREE.InstancedMesh(tileGeometry, sharedMaterial, totalInstances);
+    sharedInstances.frustumCulled = false;
+    sharedInstances.count = totalInstances;
+    const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < totalInstances; i++) sharedInstances.setMatrixAt(i, hidden);
+    const halfGrid = this.gridSize / 2;
+    let instanceOffset = 0;
     for (let level = 0; level < this.levels; level++) {
       const step = this.baseCellSize * 2 ** level;
       const half = halfGrid * this.baseCellSize * 2 ** level;
       const outer = half - 2 * step;
       // Exactly the previous level's morph boundary, as in the legacy clipmap.
       const cut = level > 0 ? halfGrid * this.baseCellSize * 2 ** (level - 1) - step : 0;
-      const assetUniforms: Record<string, { value: THREE.Texture }> = {};
-      for (let i = 0; i < 8; i++) assetUniforms[`uAsset${i}`] = { value: this.getAssetTexture(blueprint.textureAssets?.[i]) };
       const common = {
-        ...assetUniforms,
+        ...Object.fromEntries(Object.entries(sharedMaterial.uniforms).filter(([key]) => key.startsWith('uAsset'))),
         uCamera: this.uniforms.uCamera,
         uAltitude: this.uniforms.uAltitude,
         uStep: { value: step },
@@ -300,34 +333,32 @@ export class TerrainRenderer {
         uSunDirection: this.uniforms.uSunDirection,
         uSunIntensity: this.uniforms.uSunIntensity,
         uBaseColor: { value: new THREE.Color(blueprint.terrainColor) },
-        // Контрастный цвет для каждого LOD, чтобы было видно границы уровней.
         uWireColor: { value: new THREE.Color().setHSL(0.48 + level * 0.075, 0.88, 0.62) }
       };
-      const material = new THREE.ShaderMaterial({
-        uniforms: { ...common, uWireLift: { value: 0 } }, vertexShader, fragmentShader: terrainFragmentShader.replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL).replace('__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;'),
-        glslVersion: THREE.GLSL3, side: THREE.FrontSide
-      });
+      const material = sharedMaterial;
       const wireMaterial = new THREE.ShaderMaterial({
         uniforms: { ...common, uWireLift: { value: 0.025 } }, vertexShader, fragmentShader: wireFragmentShader,
         glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, side: THREE.FrontSide,
         polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
       });
-      const tiles: Array<{ ready: boolean; visible: boolean; wire: THREE.LineSegments | null; ox: number; oz: number }> = [];
+      const tiles: Array<{ ready: boolean; visible: boolean; dirty: boolean; instanceIndex: number; wire: THREE.LineSegments | null; ox: number; oz: number }> = [];
       for (let i = 0; i < this.tilesPerSide ** 2; i++) {
         const tx = i % this.tilesPerSide, tz = Math.floor(i / this.tilesPerSide);
         const ox = tx * this.tileSize - halfGrid, oz = tz * this.tileSize - halfGrid;
-        tiles.push({ ready: false, visible: false, dirty: true, wire: null, ox, oz });
+        const instanceIndex = instanceOffset + i;
+        tiles.push({ ready: false, visible: false, dirty: true, instanceIndex, wire: null, ox, oz });
+        steps[instanceIndex] = step;
+        halves[instanceIndex] = half;
+        cuts[instanceIndex] = cut;
       }
-      const instances = new THREE.InstancedMesh(this.geometries[0], material, tiles.length);
-      instances.frustumCulled = false;
-      instances.count = tiles.length;
-      // Пока очередь не подготовила экземпляр, он имеет нулевой масштаб.
-      const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
-      for (let i = 0; i < tiles.length; i++) instances.setMatrixAt(i, hidden);
-      instances.instanceMatrix.needsUpdate = true;
-      this.group.add(instances);
-      this.rings.push({ step, half, cut, outer, centerX: 0, centerZ: 0, instances, tiles, material, wireMaterial });
+      this.rings.push({ step, half, cut, outer, centerX: 0, centerZ: 0, instances: sharedInstances, instanceOffset, tiles, material, wireMaterial });
+      instanceOffset += tiles.length;
     }
+    sharedInstances.instanceMatrix.needsUpdate = true;
+    tileGeometry.getAttribute('aStep').needsUpdate = true;
+    tileGeometry.getAttribute('aHalf').needsUpdate = true;
+    tileGeometry.getAttribute('aCut').needsUpdate = true;
+    this.group.add(sharedInstances);
     // Within each LOD, create central tiles first; outer rings are queued later.
     for (let ringIndex = 0; ringIndex < this.rings.length; ringIndex++) {
       const ring = this.rings[ringIndex];
