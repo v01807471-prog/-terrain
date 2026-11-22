@@ -104,18 +104,19 @@ export class SphericalClipmap {
         float s=sin(angle);
         vec3 radial=normalize(vec3(tangent.x*s, cos(angle), tangent.y*s));
 
-        // Terrain height is sampled in planet-local radial coordinates and
-        // is always applied along the local surface normal, never world-up.
-        vec3 displaced=displacePlanet(radial*uRadius,uRadius);
+        // Convert the clipmap-local direction into a fixed planet/world
+        // direction BEFORE sampling terrain. This makes mountains geographic
+        // features of the planet instead of features glued to the moving patch.
+        vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
+        vec3 displaced=displacePlanet(worldRadial*uRadius,uRadius);
         float height=length(displaced)-uRadius;
-        vec3 surfacePosition=radial*(uRadius+height);
+        vec3 worldPosition=worldRadial*(uRadius+height);
 
         vHeight=height;
-        vRadial=radial;
-        vWorldNormal=normalize(mat3(modelMatrix)*radial);
+        vRadial=worldRadial;
+        vWorldNormal=worldRadial;
 
-        vec4 mvPosition=modelViewMatrix*vec4(surfacePosition,1.0);
-        gl_Position=projectionMatrix*mvPosition;
+        gl_Position=projectionMatrix*viewMatrix*vec4(worldPosition,1.0);
       }
     `;
 
