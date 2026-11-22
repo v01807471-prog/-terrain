@@ -59,6 +59,8 @@ export class TerrainRenderer {
   private activeVertexShader = '';
   private activeFragmentShader = '';
   private activeTextureIds: string[] = [];
+  private baseFogNear: number;
+  private baseFogFar: number;
   private readonly fallbackAssetTexture = (() => { const pixels = new Uint8Array([255,0,255,255, 0,0,0,255, 0,0,0,255, 255,0,255,255]); const t = new THREE.DataTexture(pixels,2,2,THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; })();
 
   constructor(
@@ -68,6 +70,8 @@ export class TerrainRenderer {
     options: TerrainClipmapOptions = {}
   ) {
     this.terrain = terrain;
+    this.baseFogNear = blueprint.fogNear;
+    this.baseFogFar = blueprint.fogFar;
     this.levels = options.levels ?? 8;
     this.gridSize = options.gridSize ?? 96;
     this.tileSize = options.tileSize ?? 32;
@@ -117,8 +121,10 @@ export class TerrainRenderer {
     const nextTextureIds = Array.from({ length: 8 }, (_, i) => blueprint.textureAssets?.[i] ?? '');
     const texturesChanged = nextTextureIds.some((id, i) => id !== this.activeTextureIds[i]);
     this.uniforms.uFogColor.value.set(blueprint.fogColor);
-    this.uniforms.uFogNear.value = blueprint.fogNear;
-    this.uniforms.uFogFar.value = blueprint.fogFar;
+    this.baseFogNear = blueprint.fogNear;
+    this.baseFogFar = blueprint.fogFar;
+    this.uniforms.uFogNear.value = this.baseFogNear * this.uniforms.uLodScale.value;
+    this.uniforms.uFogFar.value = this.baseFogFar * this.uniforms.uLodScale.value;
     for (const ring of this.rings) {
       if (vertexChanged) {
         ring.material.vertexShader = vertexShader;
@@ -167,6 +173,8 @@ export class TerrainRenderer {
     const lodScale = THREE.MathUtils.clamp(Math.max(1, horizonDistance / baseCoverage), 1, 256);
     const lodScaleChanged = Math.abs(this.uniforms.uLodScale.value - lodScale) > 0.0005;
     this.uniforms.uLodScale.value = lodScale;
+    this.uniforms.uFogNear.value = this.baseFogNear * lodScale;
+    this.uniforms.uFogFar.value = Math.max(this.baseFogFar, this.baseFogNear + 1) * lodScale;
 
     // Re-prioritize unfinished tiles around the camera every frame: inner LOD first,
     // then nearest tile centers. This keeps the visible center responsive while moving.
