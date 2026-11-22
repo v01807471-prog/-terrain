@@ -46,6 +46,6 @@ export class PlanetViewport {
   start(){if(this.running)return;this.running=true;const tick=()=>{if(!this.running)return;this.frame=requestAnimationFrame(tick);const t=this.clock.getElapsedTime();if(this.settings.autoRotate&&!this.dragging){this.azimuth+=.0007;this.updateCamera();}this.clipmap.update(this.camera,t);this.renderer.render(this.scene,this.camera);};tick();}
   getTelemetry(){return{altitude:Math.max(0,this.camera.position.length()-this.radius),rings:this.settings.rings,lod:this.clipmap.lod};}
   getConfig(){return this.settings;}
-  updateConfig(patch:Record<string,number|boolean>){Object.assign(this.settings,patch);this.clipmap.setSettings({rings:this.settings.rings,baseSegments:this.settings.baseSegments,amplitude:this.settings.amplitude,frequency:this.settings.frequency});this.updateCamera();}
+  updateConfig(patch:Record<string,number|boolean>){Object.assign(this.settings,patch);this.clipmap.setSettings({rings:this.settings.rings,baseSegments:this.settings.baseSegments,amplitude:this.settings.amplitude,frequency:this.settings.frequency,ringGrowth:this.settings.ringGrowth});this.updateCamera();}
   dispose(){this.running=false;cancelAnimationFrame(this.frame);this.resize.dispose();this.clipmap.dispose();this.renderer.dispose();}
 }
