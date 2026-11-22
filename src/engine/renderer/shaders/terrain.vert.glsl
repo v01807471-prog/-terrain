@@ -13,7 +13,8 @@ void main() {
   vec2 p = world.xz;
   float d = max(max(abs(p.x-uCamera.x), abs(p.y-uCamera.y)), uAltitude);
   float morphEnd = uHalf - 2.0*uStep;
-  float morph = smoothstep(morphEnd-uHalf*0.25, morphEnd, d);
+  float morphWidth = max(8.0*uStep, uHalf*0.35);
+  float morph = smoothstep(morphEnd-morphWidth, morphEnd, d);
   float h0 = terrainHeight(p);
   float h = h0;
   vec2 odd = mod(floor(p/uStep + 0.5), 2.0);
