@@ -128,6 +128,7 @@ export class SphericalClipmap {
     const fragmentShader=`
       varying vec3 vRadial;
       varying vec3 vWorldPosition;
+      varying vec3 vViewPosition;
       varying float vHeight;
       uniform float uAmplitude;
       uniform float uRadius;
@@ -190,6 +191,7 @@ export class SphericalClipmap {
         uniform float uRadius;
         varying vec3 vRadial;
         varying vec3 vWorldPosition;
+        varying vec3 vViewPosition;
         ${terrainBlueprint.shader}
         void main(){
           vec3 radial=normalize(position);
