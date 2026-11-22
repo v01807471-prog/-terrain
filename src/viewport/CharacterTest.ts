@@ -79,9 +79,10 @@ export class CharacterTest {
       model.position.x -= (bounds.min.x + bounds.max.x) * 0.5;
       model.position.z -= (bounds.min.z + bounds.max.z) * 0.5;
       model.position.y -= bounds.min.y;
+      const targetMeshes: THREE.SkinnedMesh[] = [];
       model.traverse((object) => {
         if (object instanceof THREE.SkinnedMesh) {
-          this.targetMesh = object;
+          targetMeshes.push(object);
           object.castShadow = false;
           object.receiveShadow = false;
         } else if (object instanceof THREE.Mesh) {
@@ -104,6 +105,14 @@ export class CharacterTest {
           }
         }
       });
+      // Select the main body skin, not a small face/eye accessory mesh.
+      this.targetMesh = targetMeshes.sort((a, b) =>
+        (b.geometry.getAttribute('position')?.count ?? 0) - (a.geometry.getAttribute('position')?.count ?? 0)
+      )[0] ?? null;
+      if (!this.targetMesh) {
+        this.status.textContent = 'В модели не найден SkinnedMesh со скелетом';
+        return;
+      }
       this.scene.add(model);
       this.mixer = new THREE.AnimationMixer(model);
       this.status.textContent = 'Герой загружен · ' + size.y.toFixed(2) + ' м · ищу клипы UAL1…';
@@ -144,14 +153,21 @@ export class CharacterTest {
     this.sourceScene.traverse((object) => {
       if (object instanceof THREE.SkinnedMesh) sourceMeshes.push(object);
     });
-    const sourceMesh = sourceMeshes[0];
-    this.sourceMesh = sourceMesh ?? null;
-    if (!sourceMesh) {
+    if (sourceMeshes.length === 0) {
+      this.sourceMesh = null;
       this.status.textContent = 'UAL1 загружен, но в GLB не найден SkinnedMesh';
       return;
     }
 
     const targetNames = new Set(this.targetMesh.skeleton.bones.map((bone) => bone.name));
+    // Animation packs can contain several skinned meshes. Choose the rig with
+    // the strongest bone-name overlap with the actual hero body, not index 0.
+    const rankedSources = sourceMeshes.map((mesh) => {
+      const names = mesh.skeleton.bones.map((bone) => bone.name);
+      return { mesh, names, overlap: names.filter((name) => targetNames.has(name)).length };
+    }).sort((a, b) => b.overlap - a.overlap || b.names.length - a.names.length);
+    const sourceMesh = rankedSources[0].mesh;
+    this.sourceMesh = sourceMesh;
     const sourceNames = new Set(sourceMesh.skeleton.bones.map((bone) => bone.name));
     const commonBones = [...sourceNames].filter((name) => targetNames.has(name));
     if (commonBones.length < 5) {
@@ -180,11 +196,15 @@ export class CharacterTest {
       );
       if (retargeted.tracks.length === 0) {
         this.status.textContent = 'Клип ' + clip.name + ': нет совпавших анимируемых костей';
+        console.warn('Retarget produced no tracks. Source bones:', this.sourceMesh.skeleton.bones.map((b) => b.name),
+          'Target bones:', this.targetMesh.skeleton.bones.map((b) => b.name),
+          'Clip tracks:', clip.tracks.map((track) => track.name));
         return;
       }
       this.activeAction?.stop();
       this.activeAction = this.mixer.clipAction(retargeted);
       this.activeAction.reset().play();
+      this.mixer.update(0);
       const bonesText = commonBoneCount === undefined ? '' : ' · ' + commonBoneCount + ' общих костей';
       this.status.textContent = 'Анимация: ' + clip.name + bonesText +
         ' · ' + retargeted.tracks.length + ' треков · ' + this.sourceClips.length +
