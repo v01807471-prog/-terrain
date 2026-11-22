@@ -43,8 +43,8 @@ void main() {
   // Камерная область теней: трассируем луч к солнцу по той же функции высоты,
   // что и геометрия. Дальность затухает за пределами активной зоны камеры.
   if (lightDir.y > 0.035) {
-    for (int i = 1; i <= 16; i++) {
-      float rayDistance = float(i) * 5.5;
+    for (int i = 1; i <= 12; i++) {
+      float rayDistance = float(i) * 7.0;
       vec2 sampleXZ = vWorld.xz + lightDir.xz * rayDistance;
       float rayHeight = vWorld.y + lightDir.y * rayDistance;
       float blockerHeight = terrainHeight(sampleXZ);
