@@ -11,7 +11,7 @@ export class PlanetGui {
     camera.add(config,'rotationSpeed',.1,3,.05).name('Orbit speed').onChange((v:number)=>viewport.updateConfig({rotationSpeed:v}));
     camera.add(config,'autoRotate').name('Auto orbit');
     const clip=this.gui.addFolder('02 · CLIPMAP');
-    clip.add(config,'rings',4,16,1).name('Ring count').onChange((v:number)=>viewport.updateConfig({rings:v}));
+    clip.add(config,'rings',4,17,1).name('Ring count').onChange((v:number)=>viewport.updateConfig({rings:v}));
     clip.add(config,'baseSegments',12,64,1).name('Base resolution').onChange((v:number)=>viewport.updateConfig({baseSegments:v}));
     clip.add(config,'ringGrowth',1.05,1.5,.01).name('Resolution growth').onChange((v:number)=>viewport.updateConfig({ringGrowth:v}));
     clip.add(config,'showGrid').name('Show clipmap grid').onChange((v:boolean)=>viewport.updateConfig({showGrid:v}));
