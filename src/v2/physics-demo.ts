@@ -710,7 +710,7 @@ function updateDiagnostics(culling: ReturnType<TerrainRenderer['update']>): void
   setDiagnostic('pv2-diag-edits', `${(terrain.allocatedEditBytes / 1024).toFixed(1)} КБ`);
   setDiagnostic('pv2-diag-dropped', `${(droppedPhysicsTime * 1000).toFixed(1)} ms`);
   const slow = frameCpuMs > 24 || physicsCpuMs > 8 || droppedPhysicsTime > 0.02;
-  const warming = culling.queuedTiles > 0 || programs < 8;
+  const warming = culling.queuedTiles > 0;
   setDiagnostic('pv2-diag-health', slow ? 'Есть нагрузка' : warming ? 'Загрузка по очереди' : 'Норма');
 }
 function animate(now: number): void {
