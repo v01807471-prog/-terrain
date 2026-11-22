@@ -39,6 +39,9 @@ export class PlanetViewport {
   private animationStatus:HTMLDivElement|null=null;
   private animationClips=new Map<string,THREE.AnimationClip>();
   private activeAnimation:THREE.AnimationAction|null=null;
+  private avatarModel:THREE.Object3D|null=null;
+  private avatarModelBaseY=0;
+  private avatarFootBones:THREE.Bone[]=[];
   // Cached world-space positions are read from the Solar scene graph.
   private planetCenter=new THREE.Vector3();
   private moonCenter=new THREE.Vector3();
@@ -317,10 +320,13 @@ export class PlanetViewport {
           }
         });
         this.avatar.add(model);
+        this.avatarModel=model;
+        this.avatarModelBaseY=model.position.y;
         const skins:THREE.SkinnedMesh[]=[];
         model.traverse(object=>{if(object instanceof THREE.SkinnedMesh)skins.push(object);});
         const targetMesh=skins.sort((a,b)=>(b.geometry.getAttribute('position')?.count??0)-(a.geometry.getAttribute('position')?.count??0))[0];
         if(!targetMesh){console.error('В модели героя не найден SkinnedMesh');return;}
+        this.avatarFootBones=targetMesh.skeleton.bones.filter(b=>/foot|ankle/i.test(b.name));
         this.avatarMixer=new THREE.AnimationMixer(targetMesh);
         this.createAnimationPicker();
         this.loadAnimationLibrary('/Universal%20Animation%20Library%5BStandard%5D/Unreal-Godot/UAL1_Standard.glb','UAL1');
@@ -381,6 +387,18 @@ export class PlanetViewport {
       }
       this.updateAnimationStatus();
     },undefined,error=>{console.error(label+' load failed:',error);this.updateAnimationStatus();});
+  }
+
+  private alignGroundedFeet(){
+    if(!this.avatarModel||!this.activeAnimation||!/(idle|walk|run|jog|stand)/i.test(this.activeAnimation.getClip().name)||this.avatarFootBones.length===0)return;
+    this.avatar.updateMatrixWorld(true);
+    let lowest=Infinity;
+    for(const bone of this.avatarFootBones){
+      const world=bone.getWorldPosition(new THREE.Vector3());
+      const local=this.avatar.worldToLocal(world);
+      lowest=Math.min(lowest,local.y);
+    }
+    if(Number.isFinite(lowest))this.avatarModel.position.y=this.avatarModelBaseY-lowest;
   }
 
   private updateAnimationStatus(){
@@ -458,6 +476,7 @@ export class PlanetViewport {
         this.thirdPerson=false;
       }
       this.avatarMixer?.update(deltaTime);
+      this.alignGroundedFeet();
       this.updateDepthRange();
       this.updatePlanetRenderPass(t);
       this.renderer.render(this.scene,this.camera);
