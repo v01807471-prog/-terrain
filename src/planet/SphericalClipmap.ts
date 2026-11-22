@@ -68,28 +68,6 @@ function makeSquareLevel(extent:number, level:number) {
     }
   }
 
-  // Add a short inward skirt along every inner LOD boundary. The next finer
-  // patch has twice the edge resolution, so this overlap hides residual
-  // sub-pixel cracks caused by nonlinear vertex displacement.
-  if (level>0) {
-    const segments=GRID_SEGMENTS/2;
-    const skirtDepth=0.012; // 12 metres in planet-kilometre units
-    for (let side=0; side<4; side++) {
-      for (let i=0; i<segments; i++) {
-        const a=-inner+i*(2*inner/segments);
-        const b=a+2*inner/segments;
-        let ax:number,az:number,bx:number,bz:number;
-        if (side===0) { ax=a; az=-inner; bx=b; bz=-inner; }
-        else if (side===1) { ax=inner; az=a; bx=inner; bz=b; }
-        else if (side===2) { ax=b; az=inner; bx=a; bz=inner; }
-        else { ax=-inner; az=b; bx=-inner; bz=a; }
-        const base=positions.length/3;
-        positions.push(ax,0,az, bx,0,bz, bx,-skirtDepth,bz, ax,-skirtDepth,az);
-        indices.push(base,base+1,base+2, base,base+2,base+3);
-      }
-    }
-  }
-
   const surface=new THREE.BufferGeometry();
   surface.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   surface.setIndex(indices);
@@ -205,7 +183,9 @@ export class SphericalClipmap {
           gl_FragColor=vec4(color,1.0);
         }
       `,
-      side:THREE.DoubleSide
+      side:THREE.DoubleSide,
+      depthTest:true,
+      depthWrite:true
     });
 
     this.scene.add(this.group);
@@ -219,7 +199,7 @@ export class SphericalClipmap {
     return THREE.MathUtils.clamp(
       Math.max(MIN_EXTENT,altitude*2.0),
       MIN_EXTENT,
-      this.settings.radius*1.25
+      this.settings.radius*0.95
     );
   }
 
