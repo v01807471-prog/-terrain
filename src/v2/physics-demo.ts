@@ -821,6 +821,10 @@ function animate(now: number): void {
   const terrainStart = performance.now();
   const culling = terrainRenderer.update(camera);
   waterRenderer.update(camera, now / 1000, culling.lodScale);
+  if (scene.fog instanceof THREE.Fog) {
+    scene.fog.near = blueprint.fogNear * culling.lodScale;
+    scene.fog.far = blueprint.fogFar * culling.lodScale;
+  }
   terrainUpdateCpuMs = performance.now() - terrainStart;
   document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
   updateStats();
