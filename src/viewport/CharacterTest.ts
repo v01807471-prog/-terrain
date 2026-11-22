@@ -114,7 +114,9 @@ export class CharacterTest {
         return;
       }
       this.scene.add(model);
-      this.mixer = new THREE.AnimationMixer(model);
+      // retargetClip creates tracks addressed through the SkinnedMesh's bones[] binding.
+      // The mixer root must therefore be the skinned mesh, not the outer GLTF Group.
+      this.mixer = new THREE.AnimationMixer(this.targetMesh);
       this.status.textContent = 'Герой загружен · ' + size.y.toFixed(2) + ' м · ищу клипы UAL1…';
       this.tryStartRetargetedAnimation();
     }, undefined, (error) => {
