@@ -73,7 +73,12 @@ const patchVertex=`
  ${terrainGLSL}
  void main(){
   vec2 local=position.xy*uPatchScale;vLocal=local;
-  vec3 direction=normalize(uUp+uEast*(local.x/uRadius)+uNorth*(local.y/uRadius));
+  float distance=length(local);
+  vec3 tangent=distance>0.001?(uEast*local.x+uNorth*local.y)/distance:uEast;
+  float angle=distance/uRadius;
+  // Exponential-map projection: every patch vertex lies on the true sphere
+  // at its geodesic distance from the moving patch center.
+  vec3 direction=normalize(uUp*cos(angle)+tangent*sin(angle));
   float h=planetHeight(direction);
   vec3 world=direction*(uRadius+h+1.5);
   vDirection=direction;vHeight=h;vWorld=world;
@@ -185,7 +190,20 @@ function updatePlanetFrame():void {
  for(const ring of patchRings){ring.material.uniforms.uUp.value.copy(f.up);ring.material.uniforms.uEast.value.copy(f.east);ring.material.uniforms.uNorth.value.copy(f.north);}
  atmosphereMaterial.uniforms.uCamera.value.copy(camera.position);
  player.position.copy(worldPosition);
- player.quaternion.setFromUnitVectors(upAxis,f.up);
+ // Align the character to the actual procedural terrain normal, not merely
+ // the planet's radial up vector. This keeps the capsule planted on slopes.
+ const sampleStep=5;
+ const eastPoint=(f.east.clone().multiplyScalar(Math.cos(sampleStep/blueprint.radius))
+  .addScaledVector(f.up,Math.sin(sampleStep/blueprint.radius))).normalize();
+ const northPoint=(f.north.clone().multiplyScalar(Math.cos(sampleStep/blueprint.radius))
+  .addScaledVector(f.up,Math.sin(sampleStep/blueprint.radius))).normalize();
+ const eastTangent=eastPoint.multiplyScalar(surfaceRadius(eastPoint))
+  .sub(f.up.clone().multiplyScalar(surfaceRadius(f.up)));
+ const northTangent=northPoint.multiplyScalar(surfaceRadius(northPoint))
+  .sub(f.up.clone().multiplyScalar(surfaceRadius(f.up)));
+ const terrainNormal=new THREE.Vector3().crossVectors(eastTangent,northTangent).normalize();
+ if(terrainNormal.dot(f.up)<0)terrainNormal.negate();
+ player.quaternion.setFromUnitVectors(upAxis,terrainNormal);
  const altitude=worldPosition.length()-surfaceRadius(f.up);
  coordinates.textContent=`${Math.abs(geo.latitude).toFixed(3)}° ${geo.latitude>=0?'N':'S'} · ${Math.abs(geo.longitude).toFixed(3)}° ${geo.longitude>=0?'E':'W'}`;
  altitudeLabel.textContent=altitude>=1000?`${(altitude/1000).toFixed(2)} km`:`${Math.round(altitude)} m`;
