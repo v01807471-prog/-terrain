@@ -18,67 +18,56 @@ type Level = {
   gridMaterial:THREE.ShaderMaterial;
 };
 
-const GRID_SEGMENTS = 128;
-const MIN_EXTENT = 2;
+const BASE_TILES = 4;
+const MAX_LEVELS = 6;
+const SUBDIVISIONS_PER_TILE = 4;
 
 function makeSquareLevel(extent:number, level:number) {
-  const positions:number[] = [];
-  const indices:number[] = [];
-  const linePositions:number[] = [];
+  const positions:number[]=[];
+  const indices:number[]=[];
+  const linePositions:number[]=[];
   const lineSet=new Set<string>();
   const vertexMap=new Map<string,number>();
-  const step = extent * 2 / GRID_SEGMENTS;
-  const inner = level === 0 ? 0 : extent * 0.5;
+  const tilesPerSide=BASE_TILES*Math.pow(2,level);
+  const segments=tilesPerSide*SUBDIVISIONS_PER_TILE;
+  const step=extent*2/segments;
+  const inner=level===0?0:extent*.5;
 
-  for (let z=0; z<GRID_SEGMENTS; z++) {
-    for (let x=0; x<GRID_SEGMENTS; x++) {
-      const x0=-extent+x*step;
-      const x1=x0+step;
-      const z0=-extent+z*step;
-      const z1=z0+step;
-      const cx=(x0+x1)*0.5;
-      const cz=(z0+z1)*0.5;
+  const vertex=(x:number,z:number)=>{
+    const key=`${x.toFixed(5)},${z.toFixed(5)}`;
+    const old=vertexMap.get(key);
+    if(old!==undefined)return old;
+    const index=positions.length/3;
+    positions.push(x,0,z);
+    vertexMap.set(key,index);
+    return index;
+  };
+  const addLine=(ax:number,az:number,bx:number,bz:number)=>{
+    const a=`${ax.toFixed(5)},${az.toFixed(5)}`;
+    const b=`${bx.toFixed(5)},${bz.toFixed(5)}`;
+    const key=a<b?`${a}|${b}`:`${b}|${a}`;
+    if(lineSet.has(key))return;
+    lineSet.add(key);
+    linePositions.push(ax,0,az,bx,0,bz);
+  };
 
-      // Each outer level is a square ring. Its central square is reserved
-      // for the next, higher-resolution level.
-      if (level>0 && Math.abs(cx)<inner && Math.abs(cz)<inner) continue;
-
-      // Share vertices between adjacent cells. Duplicating four vertices
-      // per quad prevents smooth interpolation and creates visible faceting.
-      const vertex=(vx:number,vz:number)=>{
-        const key=`${vx.toFixed(5)},${vz.toFixed(5)}`;
-        const existing=vertexMap.get(key);
-        if(existing!==undefined) return existing;
-        const index=positions.length/3;
-        positions.push(vx,0,vz);
-        vertexMap.set(key,index);
-        return index;
-      };
-      const a=vertex(x0,z0), b=vertex(x1,z0), c=vertex(x1,z1), d=vertex(x0,z1);
-      indices.push(a,b,c, a,c,d);
-
-      // Draw only the four square edges; never expose the mesh's
-      // internal triangulation diagonal in the debug grid.
-      const addLine=(ax:number,az:number,bx:number,bz:number)=>{
-        const a=`${ax.toFixed(5)},${az.toFixed(5)}`;
-        const b=`${bx.toFixed(5)},${bz.toFixed(5)}`;
-        const key=a<b?`${a}|${b}`:`${b}|${a}`;
-        if(lineSet.has(key)) return;
-        lineSet.add(key);
-        linePositions.push(ax,0,az,bx,0,bz);
-      };
-      addLine(x0,z0,x1,z0);
-      addLine(x1,z0,x1,z1);
-      addLine(x1,z1,x0,z1);
-      addLine(x0,z1,x0,z0);
+  for(let z=0;z<segments;z++){
+    for(let x=0;x<segments;x++){
+      const x0=-extent+x*step,x1=x0+step;
+      const z0=-extent+z*step,z1=z0+step;
+      const cx=(x0+x1)*.5,cz=(z0+z1)*.5;
+      // Each level is a square ring; the next finer level owns its centre.
+      if(level>0&&Math.abs(cx)<inner&&Math.abs(cz)<inner)continue;
+      const a=vertex(x0,z0),b=vertex(x1,z0),c=vertex(x1,z1),d=vertex(x0,z1);
+      indices.push(a,b,c,a,c,d);
+      addLine(x0,z0,x1,z0);addLine(x1,z0,x1,z1);
+      addLine(x1,z1,x0,z1);addLine(x0,z1,x0,z0);
     }
   }
-
   const surface=new THREE.BufferGeometry();
   surface.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   surface.setIndex(indices);
   surface.computeVertexNormals();
-
   const grid=new THREE.BufferGeometry();
   grid.setAttribute('position',new THREE.Float32BufferAttribute(linePositions,3));
   return {surface,grid};
@@ -88,6 +77,8 @@ export class SphericalClipmap {
   readonly group=new THREE.Group();
   private levels:Level[]=[];
   private material:THREE.ShaderMaterial;
+  private globe:THREE.Mesh;
+  private globeMaterial:THREE.ShaderMaterial;
   private gridVisible=true;
   private lastAltitude=-1;
   private currentExtent=0;
@@ -103,282 +94,243 @@ export class SphericalClipmap {
       uRadius:{value:settings.radius},
       uClipExtent:{value:1},
       uDetailFade:{value:0},
+      uTexelWorldSize:{value:1},
       uGridColor:{value:new THREE.Color(0x22d3ee)},
       uSunPosition:{value:new THREE.Vector3(0,0,0)}
     };
-
     const vertexShader=`
       uniform float uRadius;
-      uniform float uClipExtent;
-      varying vec3 vWorldNormal;
       varying vec3 vRadial;
       varying vec3 vWorldPosition;
+      varying float vHeight;
       ${terrainBlueprint.shader}
-
-      void main() {
-        // Project the square clipmap's tangent-plane coordinates onto the
-        // sphere with a gnomonic projection. Unlike a linear angle mapping,
-        // this keeps every vertex on a smooth spherical cap and naturally
-        // compresses larger distances toward the horizon.
-        // Keep the clipmap in its native square tangent-plane coordinates.
-        // The gnomonic projection below still bends this square patch onto
-        // the spherical planet; no square-to-disk warp is applied.
+      void main(){
         vec2 plane=position.xz;
-        vec3 radial=normalize(vec3(plane.x, uRadius, plane.y));
-
-        // Convert the clipmap-local direction into a fixed planet/world
-        // direction BEFORE sampling terrain. This makes mountains geographic
-        // features of the planet instead of features glued to the moving patch.
+        vec3 radial=normalize(vec3(plane.x,uRadius,plane.y));
         vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
         vec3 displaced=displacePlanet(worldRadial*uRadius,uRadius);
         float height=length(displaced)-uRadius;
         vec3 localPosition=radial*(uRadius+height+position.y);
         vec3 worldPosition=(modelMatrix*vec4(localPosition,1.0)).xyz;
-
         vHeight=height;
         vRadial=worldRadial;
-        vWorldNormal=worldRadial;
         vWorldPosition=worldPosition;
-
         gl_Position=projectionMatrix*viewMatrix*vec4(worldPosition,1.0);
+      }`;
+    const fragmentShader=`
+      varying vec3 vRadial;
+      varying vec3 vWorldPosition;
+      varying float vHeight;
+      uniform float uAmplitude;
+      uniform float uRadius;
+      uniform float uTexelWorldSize;
+      uniform vec3 uSunPosition;
+      float hash3(vec3 p){
+        p=fract(p*.3183099+vec3(.13,.17,.11));p*=17.0;
+        return fract(p.x*p.y*p.z*(p.x+p.y+p.z));
       }
-    `;
-
+      float noise3(vec3 p){
+        vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        float a=mix(hash3(i),hash3(i+vec3(1,0,0)),f.x);
+        float b=mix(hash3(i+vec3(0,1,0)),hash3(i+vec3(1,1,0)),f.x);
+        float c=mix(hash3(i+vec3(0,0,1)),hash3(i+vec3(1,0,1)),f.x);
+        float d=mix(hash3(i+vec3(0,1,1)),hash3(i+vec3(1,1,1)),f.x);
+        return mix(mix(a,b,f.y),mix(c,d,f.y),f.z);
+      }
+      void main(){
+        vec3 n=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
+        if(dot(n,vRadial)<0.0)n=-n;
+        vec3 toSun=normalize(uSunPosition-vWorldPosition);
+        float light=max(dot(n,toSun),0.0);
+        float h=vHeight/max(uAmplitude*.001,.001);
+        // A world-space quantized sample behaves like a repeating pixel texture.
+        // Its texel size is derived from the base tile, so adding outer LOD rings
+        // never stretches the pattern across the larger clipmap footprint.
+        vec3 texelCoord=floor(vRadial*uRadius/max(uTexelWorldSize,.0001));
+        float pixel=hash3(texelCoord);
+        float macro=noise3(vRadial*uRadius*.008);
+        vec3 deepOcean=vec3(.012,.045,.085);
+        vec3 shallowOcean=vec3(.025,.19,.23);
+        vec3 lowland=vec3(.12,.27,.12);
+        vec3 forest=vec3(.16,.34,.16);
+        vec3 dryland=vec3(.39,.34,.20);
+        vec3 highRock=vec3(.43,.42,.38);
+        vec3 snow=vec3(.82,.84,.80);
+        vec3 color=mix(deepOcean,shallowOcean,smoothstep(-.72,-.25,h));
+        color=mix(color,lowland,smoothstep(-.28,-.12,h));
+        color=mix(color,forest,smoothstep(-.10,.12,h)*(.65+macro*.35));
+        color=mix(color,dryland,smoothstep(.18,.38,h));
+        color=mix(color,highRock,smoothstep(.42,.62,h));
+        color=mix(color,snow,smoothstep(.72,.95,h));
+        color*=.94+pixel*.12;
+        color*=.08+light*1.08;
+        gl_FragColor=vec4(color,1.0);
+      }`;
     this.material=new THREE.ShaderMaterial({
-      uniforms,
-      vertexShader,
-      fragmentShader:`
-        varying vec3 vWorldNormal;
+      uniforms,vertexShader,fragmentShader,side:THREE.DoubleSide,
+      depthTest:true,depthWrite:true
+    });
+
+    // A complete spherical proxy takes over at orbital distances. The square
+    // tangent clipmap is never stretched into a disk or asked to cover a globe.
+    this.globeMaterial=new THREE.ShaderMaterial({
+      uniforms:{...uniforms},
+      vertexShader:`
+        uniform float uRadius;
         varying vec3 vRadial;
         varying vec3 vWorldPosition;
         varying float vHeight;
-        uniform float uAmplitude;
-        uniform float uRadius;
-        uniform vec3 uSunPosition;
-
-        float hash3(vec3 p) {
-          p=fract(p*.3183099+vec3(.13,.17,.11));
-          p*=17.0;
-          return fract(p.x*p.y*p.z*(p.x+p.y+p.z));
-        }
-        float noise3(vec3 p) {
-          vec3 i=floor(p), f=fract(p);
-          f=f*f*(3.0-2.0*f);
-          float a=mix(hash3(i),hash3(i+vec3(1,0,0)),f.x);
-          float b=mix(hash3(i+vec3(0,1,0)),hash3(i+vec3(1,1,0)),f.x);
-          float c=mix(hash3(i+vec3(0,0,1)),hash3(i+vec3(1,0,1)),f.x);
-          float d=mix(hash3(i+vec3(0,1,1)),hash3(i+vec3(1,1,1)),f.x);
-          return mix(mix(a,b,f.y),mix(c,d,f.y),f.z);
-        }
-
-        void main() {
-          // Derive the actual displaced terrain normal per fragment. Using
-          // only the radial direction lights the planet like a smooth ball
-          // and hides the mountain slopes at orbital viewing distances.
-          vec3 n=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
-          if(dot(n,vRadial)<0.0) n=-n;
-          // Point the lighting vector from each terrain fragment toward the Sun.
-          vec3 toSun=normalize(uSunPosition-vWorldPosition);
-          float light=max(dot(n,toSun),0.0);
-          // Texture coordinates are measured in planet-space kilometres,
-          // not in normalized radial coordinates. Therefore texel scale is
-          // independent of clipmap ring extent and mesh resolution.
-          float macro=noise3(vRadial*uRadius*0.008);
-          float detail=noise3(vRadial*uRadius*0.025);
-          float h=vHeight/max(uAmplitude*.001,0.001);
-
-          vec3 deepOcean=vec3(.012,.045,.085);
-          vec3 shallowOcean=vec3(.025,.19,.23);
-          vec3 lowland=vec3(.12,.27,.12);
-          vec3 forest=vec3(.16,.34,.16);
-          vec3 dryland=vec3(.39,.34,.20);
-          vec3 highRock=vec3(.43,.42,.38);
-          vec3 snow=vec3(.82,.84,.80);
-
-          vec3 color=mix(deepOcean,shallowOcean,smoothstep(-.72,-.25,h));
-          color=mix(color,lowland,smoothstep(-.28,-.12,h));
-          color=mix(color,forest,smoothstep(-.10,.12,h)*(.65+macro*.35));
-          color=mix(color,dryland,smoothstep(.18,.38,h)*(.65+detail*.35));
-          color=mix(color,highRock,smoothstep(.42,.62,h));
-          color=mix(color,snow,smoothstep(.72,.95,h));
-
-          float textureMix=(macro-.5)*.10+(detail-.5)*.045;
-          color*=1.0+textureMix;
-          color*=.08+light*1.08;
-          gl_FragColor=vec4(color,1.0);
-        }
-      `,
-      side:THREE.DoubleSide,
-      depthTest:true,
-      depthWrite:true
+        ${terrainBlueprint.shader}
+        void main(){
+          vec3 worldRadial=normalize(mat3(modelMatrix)*normalize(position));
+          vec3 displaced=displacePlanet(worldRadial*uRadius,uRadius);
+          float height=length(displaced)-uRadius;
+          vec3 localPosition=normalize(position)*(uRadius+height);
+          vec4 world=modelMatrix*vec4(localPosition,1.0);
+          vRadial=worldRadial;vHeight=height;vWorldPosition=world.xyz;
+          gl_Position=projectionMatrix*viewMatrix*world;
+        }`,
+      fragmentShader,
+      side:THREE.FrontSide,depthTest:true,depthWrite:true
     });
-
-    this.scene.add(this.group);
-    this.rebuild(this.calculateExtent(15000-this.settings.radius),4);
-  }
-
-  private calculateExtent(altitude:number) {
-    // The full clipmap footprint follows camera-to-ground distance.
-    // It is capped below a hemisphere so the square-to-sphere projection
-    // cannot wrap around the back side of the planet.
-    return THREE.MathUtils.clamp(
-      Math.max(MIN_EXTENT,altitude*2.0),
-      MIN_EXTENT,
-      this.settings.radius*0.95
+    this.globe=new THREE.Mesh(
+      new THREE.SphereGeometry(settings.radius,192,128),
+      this.globeMaterial
     );
+    this.globe.frustumCulled=false;
+    this.globe.visible=false;
+    this.scene.add(this.group);
+    this.group.add(this.globe);
+    this.rebuild(this.calculateExtent(15000-settings.radius),4);
   }
 
-  private rebuild(totalExtent:number, requestedCount=this.activeRingCount) {
-    for (const level of this.levels) {
-      this.group.remove(level.mesh);
-      this.group.remove(level.lines);
-      level.mesh.geometry.dispose();
-      level.lines.geometry.dispose();
-      level.gridMaterial.dispose();
+  private calculateExtent(altitude:number){
+    return THREE.MathUtils.clamp(Math.max(2,altitude*2),2,this.settings.radius*.95);
+  }
+
+  private rebuild(totalExtent:number,requestedCount=this.activeRingCount){
+    for(const level of this.levels){
+      this.group.remove(level.mesh);this.group.remove(level.lines);
+      level.mesh.geometry.dispose();level.lines.geometry.dispose();level.gridMaterial.dispose();
     }
     this.levels=[];
-
-    const count=THREE.MathUtils.clamp(Math.round(requestedCount),1,Math.min(9,Math.round(this.settings.rings)));
+    const count=THREE.MathUtils.clamp(Math.round(requestedCount),1,Math.min(MAX_LEVELS,Math.round(this.settings.rings)));
     this.activeRingCount=count;
-    const maxLevel=count-1;
-    const baseExtent=totalExtent/Math.pow(2,maxLevel);
-
-    for (let i=0;i<count;i++) {
+    const baseExtent=totalExtent/Math.pow(2,count-1);
+    const palette=[0x22d3ee,0xf59e0b,0xa78bfa,0x4ade80,0xfb7185,0xfacc15];
+    for(let i=0;i<count;i++){
       const extent=baseExtent*Math.pow(2,i);
       const geometry=makeSquareLevel(extent,i);
       const mesh=new THREE.Mesh(geometry.surface,this.material);
-      mesh.frustumCulled=false;
-      mesh.renderOrder=i;
-
-      const palette=[0x22d3ee,0xf59e0b,0xa78bfa,0x4ade80,0xfb7185,0xfacc15,0x60a5fa,0xe879f9];
+      mesh.frustumCulled=false;mesh.renderOrder=i;
       const gridMaterial=new THREE.ShaderMaterial({
         uniforms:{...this.material.uniforms,uGridColor:{value:new THREE.Color(palette[i%palette.length])}},
         vertexShader:this.material.vertexShader,
-        fragmentShader:`
-          uniform vec3 uGridColor;
-          void main() {
-            gl_FragColor=vec4(uGridColor,0.86);
-          }
-        `,
-        transparent:true,
-        depthTest:true,
-        depthWrite:false,
-        polygonOffset:true,
-        polygonOffsetFactor:-1,
-        polygonOffsetUnits:-1,
+        fragmentShader:`uniform vec3 uGridColor;void main(){gl_FragColor=vec4(uGridColor,.86);}`,
+        transparent:true,depthTest:true,depthWrite:false,
+        polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1,
         side:THREE.DoubleSide
       });
       const lines=new THREE.LineSegments(geometry.grid,gridMaterial);
-      lines.frustumCulled=false;
-      lines.renderOrder=100+i;
-      lines.visible=this.gridVisible;
-
+      lines.frustumCulled=false;lines.renderOrder=100+i;lines.visible=this.gridVisible;
       this.group.add(mesh,lines);
       this.levels.push({mesh,lines,extent,level:i,gridMaterial});
     }
     this.currentExtent=totalExtent;
     this.material.uniforms.uClipExtent.value=totalExtent;
+    this.globeMaterial.uniforms.uClipExtent.value=totalExtent;
+    // Four texels per smallest tile: 4x4 tiles -> 16x16 texel pattern.
+    // Doubling the ring tile count doubles total pattern resolution without
+    // changing the world-space size of an individual texel.
+    this.material.uniforms.uTexelWorldSize.value=Math.max(baseExtent/8,.0001);
+    this.globeMaterial.uniforms.uTexelWorldSize.value=Math.max(baseExtent/8,.0001);
   }
 
-  update(camera:THREE.PerspectiveCamera,time:number,planetCenter=new THREE.Vector3()) {
+  update(camera:THREE.PerspectiveCamera,time:number,planetCenter=new THREE.Vector3()){
     this.material.uniforms.uTime.value=time;
-
-    // Each planet owns a local clipmap frame. Camera coordinates are converted
-    // relative to this planet's world-space center, never assumed to be origin.
+    this.globeMaterial.uniforms.uTime.value=time;
     const cameraFromCenter=camera.position.clone().sub(planetCenter);
     const radial=cameraFromCenter.clone().normalize();
     this.group.position.copy(planetCenter);
     const northReference=Math.abs(radial.dot(new THREE.Vector3(0,1,0)))>.995
-      ? new THREE.Vector3(0,0,1)
-      : new THREE.Vector3(0,1,0);
+      ?new THREE.Vector3(0,0,1):new THREE.Vector3(0,1,0);
     const east=new THREE.Vector3().crossVectors(northReference,radial).normalize();
     const south=new THREE.Vector3().crossVectors(east,radial).normalize();
     const frame=new THREE.Matrix4().makeBasis(east,radial,south);
     this.group.quaternion.setFromRotationMatrix(frame);
 
     const altitude=Math.max(0,cameraFromCenter.length()-this.settings.radius);
-    // At orbital distances, suppress fine displacement octaves smoothly;
-    // retain the broad-scale shape so mountains do not pop or collapse.
     this.material.uniforms.uDetailFade.value=THREE.MathUtils.smoothstep(altitude,250,25000);
+    this.globeMaterial.uniforms.uDetailFade.value=THREE.MathUtils.smoothstep(altitude,250,25000);
     const nextExtent=this.calculateExtent(altitude);
     const extentChanged=Math.abs(nextExtent-this.currentExtent)>Math.max(.1,this.currentExtent*.08);
-    const altitudeChanged=this.lastAltitude<0 ||
-      Math.abs(altitude-this.lastAltitude)>Math.max(.1,this.lastAltitude*.08);
-
-    // At ground level we need the full nested stack: otherwise a single
-    // 128x128 mesh spans the whole patch and looks like a coarse, faceted cap.
-    // Reduce levels gradually with altitude instead of using a pixel threshold
-    // that collapsed to one level at zero altitude.
-    const maxRings=Math.min(9,Math.round(this.settings.rings));
+    const maxRings=Math.min(MAX_LEVELS,Math.round(this.settings.rings));
     const desiredRings=THREE.MathUtils.clamp(
-      Math.ceil(9-Math.log2(1+altitude/100)),
-      1,
-      maxRings
+      Math.ceil(6-Math.log2(1+altitude/100)),1,maxRings
     );
-
-    // LOD thresholds are discrete. Require a candidate level count to remain
-    // stable for several frames so tiny camera/altitude changes cannot make
-    // the whole terrain rebuild back and forth while standing on the ground.
     if(desiredRings===this.activeRingCount){
-      this.pendingRingCount=0;
-      this.pendingRingFrames=0;
+      this.pendingRingCount=0;this.pendingRingFrames=0;
     }else if(desiredRings!==this.pendingRingCount){
-      this.pendingRingCount=desiredRings;
-      this.pendingRingFrames=1;
-    }else{
-      this.pendingRingFrames++;
-    }
+      this.pendingRingCount=desiredRings;this.pendingRingFrames=1;
+    }else this.pendingRingFrames++;
     const ringCountStable=this.pendingRingFrames>=8;
-    if(extentChanged || altitudeChanged || ringCountStable){
+    if(extentChanged||ringCountStable){
       this.rebuild(nextExtent,ringCountStable?desiredRings:this.activeRingCount);
       if(ringCountStable){this.pendingRingCount=0;this.pendingRingFrames=0;}
     }
     this.lastAltitude=altitude;
-  }
 
-  setSettings(patch:Partial<ClipmapSettings>) {
-    const rebuild=patch.rings!==undefined ||
-      patch.baseSegments!==undefined ||
-      patch.ringGrowth!==undefined ||
-      patch.radius!==undefined;
-
-    Object.assign(this.settings,patch);
+    // Cross-fade ownership by distance: surface patch near the player,
+    // whole displaced sphere in orbit/space.
+    const globeBlend=THREE.MathUtils.smoothstep(altitude,this.settings.radius*.18,this.settings.radius*.42);
+    this.globe.visible=globeBlend>.001;
+    for(const level of this.levels){
+      level.mesh.visible=globeBlend<.999;
+      level.lines.visible=this.gridVisible&&globeBlend<.999;
+    }
+    this.globeMaterial.uniforms.uAmplitude.value=this.settings.amplitude;
+    this.globeMaterial.uniforms.uFrequency.value=this.settings.frequency;
+    this.globeMaterial.uniforms.uRadius.value=this.settings.radius;
     this.material.uniforms.uAmplitude.value=this.settings.amplitude;
     this.material.uniforms.uFrequency.value=this.settings.frequency;
     this.material.uniforms.uRadius.value=this.settings.radius;
+  }
 
-    if (rebuild) {
+  setSettings(patch:Partial<ClipmapSettings>){
+    const rebuild=patch.rings!==undefined||patch.baseSegments!==undefined||
+      patch.ringGrowth!==undefined||patch.radius!==undefined;
+    Object.assign(this.settings,patch);
+    for(const material of [this.material,this.globeMaterial]){
+      material.uniforms.uAmplitude.value=this.settings.amplitude;
+      material.uniforms.uFrequency.value=this.settings.frequency;
+      material.uniforms.uRadius.value=this.settings.radius;
+    }
+    if(rebuild){
+      this.globe.geometry.dispose();
+      this.globe.geometry=new THREE.SphereGeometry(this.settings.radius,192,128);
       this.rebuild(this.calculateExtent(Math.max(0,this.lastAltitude)),this.activeRingCount);
     }
   }
 
-  setGridVisible(visible:boolean) {
+  setGridVisible(visible:boolean){
     this.gridVisible=visible;
-    for(const level of this.levels) level.lines.visible=visible;
+    for(const level of this.levels)level.lines.visible=visible;
   }
 
-  get lod() {
-    return GRID_SEGMENTS;
-  }
-
-  get triangleCount() {
+  get lod(){return BASE_TILES*Math.pow(2,this.activeRingCount-1);}
+  get triangleCount(){
     return this.levels.reduce((sum,level)=>{
       const index=level.mesh.geometry.index;
-      return sum+(index ? index.count/3 : 0);
-    },0);
+      return sum+(index?index.count/3:0);
+    },0)+(this.globe.visible?this.globe.geometry.index?.count/3||0:0);
   }
+  get activeLevels(){return this.activeRingCount;}
 
-  get activeLevels() {
-    return this.activeRingCount;
-  }
-
-  dispose() {
-    for (const level of this.levels) {
-      level.mesh.geometry.dispose();
-      level.lines.geometry.dispose();
-      level.gridMaterial.dispose();
+  dispose(){
+    for(const level of this.levels){
+      level.mesh.geometry.dispose();level.lines.geometry.dispose();level.gridMaterial.dispose();
     }
-    this.material.dispose();
+    this.globe.geometry.dispose();this.globeMaterial.dispose();this.material.dispose();
     this.scene.remove(this.group);
   }
 }
