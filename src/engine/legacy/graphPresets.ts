@@ -55,7 +55,7 @@ function createColorNodes(offset: number): PresetNode[] {
   ];
 }
 
-function ensureEnvironment(graph: LegacyGraph): LegacyGraph {
+export function ensureEnv(graph: LegacyGraph): LegacyGraph {
   const nextId = (): number => graph.nodes.reduce((max, node) => Math.max(max, node.id), 0) + 1;
   if (!graph.nodes.some(node => node.type === 'out_water')) {
     graph.nodes.push({ id: nextId(), type: 'out_water', x: 1180, y: 40, p: {}, d: {}, in: {} });
@@ -67,7 +67,7 @@ function ensureEnvironment(graph: LegacyGraph): LegacyGraph {
 }
 
 function createPreset(seed: number, heightNodes: PresetNode[]): LegacyGraph {
-  return ensureEnvironment(createGraph(seed, [...heightNodes, ...createColorNodes(heightNodes.length)]));
+  return ensureEnv(createGraph(seed, [...heightNodes, ...createColorNodes(heightNodes.length)]));
 }
 
 /** Пресеты legacy-редактора вынесены без изменения состава узлов и их связей. */
