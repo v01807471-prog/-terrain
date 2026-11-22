@@ -53,15 +53,16 @@ export class PlanetViewport {
     this.scene.add(this.solar);
 
     // Diagnostic-only flat clipmap: fixed topology, no terrain shader, no LOD.
-    const flatGeometry=new THREE.PlaneGeometry(200,200,256,256);
+    // Units in this project are kilometres: a 20 km square patch,
+    // with one-kilometre reference grid lines.
+    const flatGeometry=new THREE.PlaneGeometry(20,20,128,128);
     flatGeometry.rotateX(-Math.PI/2);
     const flatMaterial=new THREE.ShaderMaterial({
       vertexShader:`void main(){vec4 worldPosition=modelMatrix*vec4(position,1.0);gl_Position=projectionMatrix*viewMatrix*worldPosition;}`,
-      fragmentShader:`void main(){gl_FragColor=vec4(0.62,0.79,0.91,1.0);}`,
-      wireframe:true
+      fragmentShader:`void main(){gl_FragColor=vec4(0.18,0.48,0.72,1.0);}`
     });
     const flatSurface=new THREE.Mesh(flatGeometry,flatMaterial);
-    const flatGrid=new THREE.GridHelper(200,40,0x22d3ee,0x36516a);
+    const flatGrid=new THREE.GridHelper(20,20,0x22d3ee,0x36516a);
     flatGrid.position.y=0.015;
     this.flatTestGroup.add(flatSurface,flatGrid);
     this.flatTestGroup.visible=false;
@@ -125,13 +126,13 @@ export class PlanetViewport {
     this.flatTestGroup.visible=true;
     this.flatTestGroup.position.set(worldOffset,0,0);
     const center=this.flatTestGroup.position;
-    this.camera.position.set(center.x+0,center.y+140,center.z+180);
+    this.camera.position.set(center.x+0,center.y+14,center.z+18);
     this.camera.up.set(0,1,0);
     this.controls.target.copy(center);
     this.controls.minDistance=.1;
     this.controls.maxDistance=this.systemViewDistance;
-    this.camera.near=.01;
-    this.camera.far=this.systemViewDistance;
+    this.camera.near=.001;
+    this.camera.far=1000;
     this.camera.lookAt(center);
     this.camera.updateProjectionMatrix();
     this.controls.update();
@@ -388,7 +389,11 @@ export class PlanetViewport {
 
   getTelemetry(){
     return{
-      altitude:this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.activeCenter)-this.activeRadius),
+      altitude:this.flatTestActive
+        ? this.camera.position.distanceTo(this.flatTestGroup.position)
+        : this.thirdPerson ? this.camera.position.distanceTo(this.controls.target) : Math.max(0,this.camera.position.distanceTo(this.activeCenter)-this.activeRadius),
+      testMode:this.flatTestActive,
+      testOffset:this.flatTestActive?this.flatTestGroup.position.x:0,
       rings:this.settings.rings,
       lod:this.activeClipmap.lod,
       levels:this.activeClipmap.activeLevels,
