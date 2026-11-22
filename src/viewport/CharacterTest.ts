@@ -16,6 +16,8 @@ export class CharacterTest {
   private targetMesh: THREE.SkinnedMesh | null = null;
   private sourceScene: THREE.Object3D | null = null;
   private sourceClips: THREE.AnimationClip[] = [];
+  private sourceMesh: THREE.SkinnedMesh | null = null;
+  private animationSelect: HTMLSelectElement;
   private activeAction: THREE.AnimationAction | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
@@ -54,6 +56,12 @@ export class CharacterTest {
     this.status.className = 'character-test-status';
     this.status.textContent = 'Загрузка героя и библиотеки анимаций…';
     document.body.appendChild(this.status);
+
+    this.animationSelect = document.createElement('select');
+    this.animationSelect.className = 'character-test-animation-select';
+    this.animationSelect.disabled = true;
+    this.animationSelect.addEventListener('change', () => this.playSelectedAnimation());
+    document.body.appendChild(this.animationSelect);
 
     const loader = new GLTFLoader();
     const modelUrl = '/Universal%20Base%20Characters%5BStandard%5D/Base%20Characters/Godot%20-%20UE/Superhero_Male_FullBody.gltf';
@@ -108,7 +116,17 @@ export class CharacterTest {
     loader.load(animationUrl, (gltf) => {
       this.sourceScene = gltf.scene;
       this.sourceClips = gltf.animations;
-      console.info('UAL1 clips:', this.sourceClips.map((clip) => clip.name));
+      console.info('UAL1 clips:', this.sourceClips.map((clip) => ({
+        name: clip.name, duration: clip.duration, tracks: clip.tracks.length
+      })));
+      this.animationSelect.replaceChildren();
+      this.sourceClips.forEach((clip, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = clip.name || 'Clip ' + (index + 1);
+        this.animationSelect.appendChild(option);
+      });
+      this.animationSelect.disabled = this.sourceClips.length === 0;
       this.tryStartRetargetedAnimation();
     }, undefined, (error) => {
       console.error('UAL1 animation library load failed:', error);
@@ -127,6 +145,7 @@ export class CharacterTest {
       if (object instanceof THREE.SkinnedMesh) sourceMeshes.push(object);
     });
     const sourceMesh = sourceMeshes[0];
+    this.sourceMesh = sourceMesh ?? null;
     if (!sourceMesh) {
       this.status.textContent = 'UAL1 загружен, но в GLB не найден SkinnedMesh';
       return;
@@ -142,25 +161,37 @@ export class CharacterTest {
       return;
     }
 
-    const preferred = this.sourceClips.find((clip) => /idle|stand|breath/i.test(clip.name)) ?? this.sourceClips[0];
+    const preferredIndex = this.sourceClips.findIndex((clip) => /idle|stand|breath/i.test(clip.name));
+    this.animationSelect.value = String(preferredIndex >= 0 ? preferredIndex : 0);
+    this.playSelectedAnimation(commonBones.length);
+  }
+
+  private playSelectedAnimation(commonBoneCount?: number) {
+    if (!this.mixer || !this.targetMesh || !this.sourceMesh) return;
+    const index = Number(this.animationSelect.value);
+    const clip = this.sourceClips[index];
+    if (!clip) return;
     try {
       const retargeted = SkeletonUtils.retargetClip(
         this.targetMesh,
-        sourceMesh,
-        preferred,
+        this.sourceMesh,
+        clip,
         { preservePosition: true }
       );
       if (retargeted.tracks.length === 0) {
-        this.status.textContent = 'Клип ' + preferred.name + ' найден, но не совпали имена анимируемых костей';
+        this.status.textContent = 'Клип ' + clip.name + ': нет совпавших анимируемых костей';
         return;
       }
+      this.activeAction?.stop();
       this.activeAction = this.mixer.clipAction(retargeted);
-      this.activeAction.play();
-      this.status.textContent = 'Герой · ' + commonBones.length + ' общих костей · анимация: ' + preferred.name +
-        ' · клипов в UAL1: ' + this.sourceClips.length + ' · ЛКМ — вращение, колесо — масштаб';
+      this.activeAction.reset().play();
+      const bonesText = commonBoneCount === undefined ? '' : ' · ' + commonBoneCount + ' общих костей';
+      this.status.textContent = 'Анимация: ' + clip.name + bonesText +
+        ' · ' + retargeted.tracks.length + ' треков · ' + this.sourceClips.length +
+        ' клипов в библиотеке · выбери другой клип в списке';
     } catch (error) {
-      console.error('UAL1 retarget failed:', error);
-      this.status.textContent = 'Не удалось перенести анимацию UAL1 — детали в консоли';
+      console.error('UAL1 retarget failed:', clip.name, error);
+      this.status.textContent = 'Не удалось перенести клип ' + clip.name + ' — детали в консоли';
     }
   }
 
@@ -190,5 +221,6 @@ export class CharacterTest {
     this.mixer?.stopAllAction();
     this.renderer.dispose();
     this.status.remove();
+    this.animationSelect.remove();
   }
 }
