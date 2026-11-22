@@ -121,7 +121,7 @@ class BlueprintNodeEditor {
     for(const n of this.graph.nodes){
       const t=(NODE_TYPES as any)[n.type];if(!t)continue;const nodeParams=n.p??(n.p={}),nodeDefaults=n.d??(n.d={}),nodeInputs=n.in??(n.in={});
       const card=document.createElement('section');card.className='v2-gnode'+(t.o==='c'?' color':'')+(this.selected===n.id?' selected':'');card.dataset.id=String(n.id);card.style.left=(n.x||0)+'px';card.style.top=(n.y||0)+'px';
-      const head=document.createElement('header');head.textContent=t.t;head.onpointerdown=e=>this.drag(e,n,card);card.append(head);
+      const head=document.createElement('header');const mark=document.createElement('span');mark.className='v2g-node-mark';mark.textContent=t.sink?'◉':t.o==='c'?'◈':'ƒ';const title=document.createElement('span');title.textContent=t.t;head.append(mark,title);head.onpointerdown=e=>this.drag(e,n,card);card.append(head);
       const cv=document.createElement('canvas');cv.width=cv.height=80;cv.className='v2-gnode-preview';card.append(cv);
       for(const [port,ty,def] of t.i){
         const row=document.createElement('div');row.className='v2-gport';
@@ -174,7 +174,7 @@ class BlueprintNodeEditor {
   }
   
   private drawLinks():void{
-    const world=this.el('v2g-world'),svg=this.el<SVGSVGElement>('v2g-links'),r=world.getBoundingClientRect();svg.innerHTML='';svg.setAttribute('width','3200');svg.setAttribute('height','2000');
+    const world=this.el('v2g-world'),svg=this.el<SVGSVGElement>('v2g-links'),r=world.getBoundingClientRect();svg.innerHTML='';svg.setAttribute('width',String(world.offsetWidth));svg.setAttribute('height',String(world.offsetHeight));
     for(const n of this.graph.nodes)for(const [port,source] of Object.entries(n.in||{})){
       const src=this.node(source as number);if(!src)continue;
       const a=this.host.querySelector<HTMLElement>('.v2-gout[data-node="'+src.id+'"]'),b=this.host.querySelector<HTMLElement>('.v2-gin[data-node="'+n.id+'"][data-port="'+port+'"]');if(!a||!b)continue;
