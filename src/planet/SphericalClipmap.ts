@@ -18,7 +18,7 @@ type Level = {
   gridMaterial:THREE.ShaderMaterial;
 };
 
-const GRID_SEGMENTS = 64;
+const GRID_SEGMENTS = 128;
 const MIN_EXTENT = 40;
 
 function makeSquareLevel(extent:number, level:number) {
@@ -26,6 +26,7 @@ function makeSquareLevel(extent:number, level:number) {
   const indices:number[] = [];
   const linePositions:number[] = [];
   const lineSet=new Set<string>();
+  const vertexMap=new Map<string,number>();
   const step = extent * 2 / GRID_SEGMENTS;
   const inner = level === 0 ? 0 : extent * 0.5;
 
@@ -42,14 +43,19 @@ function makeSquareLevel(extent:number, level:number) {
       // for the next, higher-resolution level.
       if (level>0 && Math.abs(cx)<inner && Math.abs(cz)<inner) continue;
 
-      const base=positions.length/3;
-      positions.push(
-        x0,0,z0,
-        x1,0,z0,
-        x1,0,z1,
-        x0,0,z1
-      );
-      indices.push(base,base+1,base+2, base,base+2,base+3);
+      // Share vertices between adjacent cells. Duplicating four vertices
+      // per quad prevents smooth interpolation and creates visible faceting.
+      const vertex=(vx:number,vz:number)=>{
+        const key=`${vx.toFixed(5)},${vz.toFixed(5)}`;
+        const existing=vertexMap.get(key);
+        if(existing!==undefined) return existing;
+        const index=positions.length/3;
+        positions.push(vx,0,vz);
+        vertexMap.set(key,index);
+        return index;
+      };
+      const a=vertex(x0,z0), b=vertex(x1,z0), c=vertex(x1,z1), d=vertex(x0,z1);
+      indices.push(a,b,c, a,c,d);
 
       // Draw only the four square edges; never expose the mesh's
       // internal triangulation diagonal in the debug grid.
@@ -101,6 +107,7 @@ export class SphericalClipmap {
       uniform float uRadius;
       varying vec3 vWorldNormal;
       varying vec3 vRadial;
+      varying vec3 vWorldPosition;
       ${terrainBlueprint.shader}
 
       void main() {
@@ -122,6 +129,7 @@ export class SphericalClipmap {
         vHeight=height;
         vRadial=worldRadial;
         vWorldNormal=worldRadial;
+        vWorldPosition=worldPosition;
 
         gl_Position=projectionMatrix*viewMatrix*vec4(worldPosition,1.0);
       }
@@ -133,6 +141,7 @@ export class SphericalClipmap {
       fragmentShader:`
         varying vec3 vWorldNormal;
         varying vec3 vRadial;
+        varying vec3 vWorldPosition;
         varying float vHeight;
         uniform float uAmplitude;
 
@@ -152,7 +161,11 @@ export class SphericalClipmap {
         }
 
         void main() {
-          vec3 n=normalize(vWorldNormal);
+          // Derive the actual displaced terrain normal per fragment. Using
+          // only the radial direction lights the planet like a smooth ball
+          // and hides the mountain slopes at orbital viewing distances.
+          vec3 n=normalize(cross(dFdx(vWorldPosition),dFdy(vWorldPosition)));
+          if(dot(n,vRadial)<0.0) n=-n;
           float light=max(dot(n,normalize(vec3(.4,.8,.3))),0.0);
           float macro=noise3(vRadial*34.0);
           float detail=noise3(vRadial*180.0);
