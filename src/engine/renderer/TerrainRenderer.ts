@@ -206,8 +206,8 @@ export class TerrainRenderer {
           Math.abs(z0 - cz), Math.abs(z1 - cz), altitude
         );
         // Conservative vertical bounds include procedural peaks and valleys.
-        this.tileBounds.min.set(x0, -40, z0);
-        this.tileBounds.max.set(x1, 65, z1);
+        this.tileBounds.min.set(x0, -512, z0);
+        this.tileBounds.max.set(x1, 512, z1);
         const inCameraFrustum = this.frustum.intersectsBox(this.tileBounds);
         const inRing = maxDistance >= ring.cut && (last || minDistance < ring.outer);
         const visible = inCameraFrustum && inRing;
