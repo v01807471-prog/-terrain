@@ -98,7 +98,9 @@ export class SphericalClipmap {
       uDetailFade:{value:0},
       uTexelWorldSize:{value:1},
       uGridColor:{value:new THREE.Color(0x22d3ee)},
-      uSunPosition:{value:new THREE.Vector3(0,0,0)}
+      uSunPosition:{value:new THREE.Vector3(0,0,0)},
+      uPatchOpacity:{value:1},
+      uGlobeGridOpacity:{value:0}
     };
     const vertexShader=`
       uniform float uRadius;
@@ -126,6 +128,7 @@ export class SphericalClipmap {
       uniform float uRadius;
       uniform float uTexelWorldSize;
       uniform vec3 uSunPosition;
+      uniform float uPatchOpacity;
       float hash3(vec3 p){
         p=fract(p*.3183099+vec3(.13,.17,.11));p*=17.0;
         return fract(p.x*p.y*p.z*(p.x+p.y+p.z));
@@ -165,11 +168,12 @@ export class SphericalClipmap {
         color=mix(color,snow,smoothstep(.72,.95,h));
         color*=.94+pixel*.12;
         color*=.32+light*.88;
-        gl_FragColor=vec4(color,1.0);
+        gl_FragColor=vec4(color,uPatchOpacity);
       }`;
     this.material=new THREE.ShaderMaterial({
       uniforms,vertexShader,fragmentShader,side:THREE.DoubleSide,
-      depthTest:true,depthWrite:true
+      depthTest:true,depthWrite:false,transparent:true,
+      polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1
     });
 
     // A complete spherical proxy takes over at orbital distances. The square
@@ -200,9 +204,9 @@ export class SphericalClipmap {
     this.globe.frustumCulled=false;
     this.globe.visible=false;
     this.globeGridMaterial=new THREE.ShaderMaterial({
-      uniforms:{uGridColor:{value:new THREE.Color(0x22d3ee)}},
+      uniforms:{uGridColor:{value:new THREE.Color(0x22d3ee)},uGlobeGridOpacity:{value:0}},
       vertexShader:this.globeMaterial.vertexShader,
-      fragmentShader:`uniform vec3 uGridColor;void main(){gl_FragColor=vec4(uGridColor,.34);}`,
+      fragmentShader:`uniform vec3 uGridColor;uniform float uGlobeGridOpacity;void main(){gl_FragColor=vec4(uGridColor,.34*uGlobeGridOpacity);}`,
       transparent:true,depthTest:true,depthWrite:false,
       wireframe:true,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1
     });
@@ -237,7 +241,7 @@ export class SphericalClipmap {
       const gridMaterial=new THREE.ShaderMaterial({
         uniforms:{...this.material.uniforms,uGridColor:{value:new THREE.Color(palette[i%palette.length])}},
         vertexShader:this.material.vertexShader,
-        fragmentShader:`uniform vec3 uGridColor;void main(){gl_FragColor=vec4(uGridColor,.86);}`,
+        fragmentShader:`uniform vec3 uGridColor;uniform float uPatchOpacity;void main(){gl_FragColor=vec4(uGridColor,.86*uPatchOpacity);}`,
         transparent:true,depthTest:true,depthWrite:false,
         polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1,
         side:THREE.DoubleSide
@@ -301,12 +305,18 @@ export class SphericalClipmap {
 
     // Cross-fade ownership by distance: surface patch near the player,
     // whole displaced sphere in orbit/space.
-    const globeBlend=THREE.MathUtils.smoothstep(altitude,this.settings.radius*.18,this.settings.radius*.42);
-    this.globe.visible=globeBlend>.001;
-    this.globeGrid.visible=this.gridVisible&&this.globe.visible;
+    // Keep one displaced spherical surface throughout ascent. Local clipmap
+    // detail fades gradually while the matching spherical grid fades in.
+    const globeBlend=THREE.MathUtils.smoothstep(
+      altitude,this.settings.radius*.12,this.settings.radius*.8
+    );
+    this.globe.visible=true;
+    this.material.uniforms.uPatchOpacity.value=1-globeBlend;
+    this.globeGridMaterial.uniforms.uGlobeGridOpacity.value=globeBlend;
+    this.globeGrid.visible=this.gridVisible;
     for(const level of this.levels){
-      level.mesh.visible=globeBlend<.999;
-      level.lines.visible=this.gridVisible&&globeBlend<.999;
+      level.mesh.visible=true;
+      level.lines.visible=this.gridVisible;
     }
     this.globeMaterial.uniforms.uAmplitude.value=this.settings.amplitude;
     this.globeMaterial.uniforms.uFrequency.value=this.settings.frequency;
@@ -335,7 +345,7 @@ export class SphericalClipmap {
 
   setGridVisible(visible:boolean){
     this.gridVisible=visible;
-    this.globeGrid.visible=visible&&this.globe.visible;
+    this.globeGrid.visible=visible;
     for(const level of this.levels)level.lines.visible=visible&&level.mesh.visible;
   }
 
