@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ResizeManager } from './ResizeManager';
 import { SphericalClipmap } from '../planet/SphericalClipmap';
 import { terrainBlueprint } from '../planet/TerrainBlueprint';
@@ -9,7 +9,7 @@ export class PlanetViewport {
   readonly scene=new THREE.Scene();
   readonly camera=new THREE.PerspectiveCamera(48,1,.00005,120000);
   readonly clipmap:SphericalClipmap;
-  private controls:ArcballControls;
+  private controls:OrbitControls;
   private resize:ResizeManager;
   private radius=6371;
   private running=false;
@@ -38,13 +38,14 @@ export class PlanetViewport {
     this.camera.position.set(this.radius+8629,0,0);
     this.camera.up.set(0,1,0);
     this.camera.lookAt(0,0,0);
-    this.controls=new ArcballControls(this.camera,this.canvas,this.scene);
+    this.controls=new OrbitControls(this.camera,this.canvas);
     this.controls.target.set(0,0,0);
     this.controls.enableRotate=true;
     this.controls.enablePan=false;
     this.controls.enableZoom=true;
-    this.controls.enableAnimations=true;
-    this.controls.scaleFactor=this.settings.zoomSpeed;
+    this.controls.enableDamping=false;
+    this.controls.rotateSpeed=0.65;
+    this.controls.zoomSpeed=this.settings.zoomSpeed;
     this.controls.minDistance=this.radius+1;
     this.controls.maxDistance=this.radius+250000;
     this.controls.setGizmosVisible(false);
@@ -117,6 +118,10 @@ export class PlanetViewport {
       this.camera.lookAt(target);
       this.controls.minDistance=.003;
       this.controls.maxDistance=150000;
+      this.controls.minPolarAngle=.12;
+      this.controls.maxPolarAngle=Math.PI-.12;
+      this.controls.rotateSpeed=0.65;
+      this.controls.zoomSpeed=this.settings.zoomSpeed;
       this.thirdPerson=true;
       this.controls.update();
       this.updateDepthRange();
@@ -154,6 +159,10 @@ export class PlanetViewport {
       }
       this.controls.update();
       if (this.thirdPerson) {
+        // Keep local gravity aligned with the avatar's radial surface normal.
+        // OrbitControls uses camera.up to constrain rotation, preventing roll.
+        const localUp=this.avatar.position.clone().normalize();
+        this.camera.up.copy(localUp);
         // Prevent the local camera from passing below the displaced ground.
         const cameraRadial=this.camera.position.clone().normalize();
         const groundRadius=this.radius+this.terrainHeightKm(cameraRadial);
@@ -192,7 +201,7 @@ export class PlanetViewport {
 
   updateConfig(patch:Record<string,number|boolean>){
     Object.assign(this.settings,patch);
-    this.controls.scaleFactor=Math.max(1.02,Math.min(1.25,this.settings.zoomSpeed));
+    this.controls.zoomSpeed=Math.max(.1,Math.min(3,this.settings.zoomSpeed));
     if(!this.thirdPerson){
       this.controls.minDistance=this.radius+1;
       this.controls.maxDistance=this.radius+250000;
