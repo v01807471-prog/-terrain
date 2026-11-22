@@ -107,6 +107,7 @@ export class SphericalClipmap {
       varying vec3 vRadial;
       varying vec3 vWorldPosition;
       varying vec3 vViewPosition;
+      varying vec3 vViewRadial;
       ${terrainBlueprint.shader}
       void main(){
         vec2 plane=position.xz;
@@ -123,12 +124,14 @@ export class SphericalClipmap {
         // Compose camera-relative coordinates on the CPU before GPU upload.
         vec3 viewPosition=(modelViewMatrix*vec4(localPosition,1.0)).xyz;
         vViewPosition=viewPosition;
+        vViewRadial=normalize(mat3(viewMatrix)*worldRadial);
         gl_Position=projectionMatrix*vec4(viewPosition,1.0);
       }`;
     const fragmentShader=`
       varying vec3 vRadial;
       varying vec3 vWorldPosition;
       varying vec3 vViewPosition;
+      varying vec3 vViewRadial;
       varying float vHeight;
       uniform float uAmplitude;
       uniform float uRadius;
@@ -150,7 +153,7 @@ export class SphericalClipmap {
       void main(){
         // Derivatives in camera-relative view space avoid precision loss at large world coordinates.
         vec3 n=normalize(cross(dFdx(vViewPosition),dFdy(vViewPosition)));
-        if(dot(n,vRadial)<0.0)n=-n;
+        if(dot(n,vViewRadial)<0.0)n=-n;
         vec3 toSun=normalize(uSunPosition-vWorldPosition);
         float light=max(dot(n,toSun),0.0);
         float h=vHeight/max(uAmplitude*.001,.001);
@@ -192,6 +195,7 @@ export class SphericalClipmap {
         varying vec3 vRadial;
         varying vec3 vWorldPosition;
         varying vec3 vViewPosition;
+      varying vec3 vViewRadial;
         ${terrainBlueprint.shader}
         void main(){
           vec3 radial=normalize(position);
@@ -203,6 +207,7 @@ export class SphericalClipmap {
           vec3 viewPosition=(modelViewMatrix*vec4(localPosition,1.0)).xyz;
           vRadial=worldRadial;vHeight=height;vWorldPosition=world.xyz;
           vViewPosition=viewPosition;
+          vViewRadial=normalize(mat3(viewMatrix)*worldRadial);
           gl_Position=projectionMatrix*vec4(viewPosition,1.0);
         }`,
       fragmentShader,
