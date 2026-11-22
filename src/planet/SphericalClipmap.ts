@@ -124,7 +124,8 @@ export class SphericalClipmap {
         vec3 worldRadial=normalize(mat3(modelMatrix)*radial);
         vec3 displaced=displacePlanet(worldRadial*uRadius,uRadius);
         float height=length(displaced)-uRadius;
-        vec3 worldPosition=worldRadial*(uRadius+height+position.y);
+        vec3 localPosition=radial*(uRadius+height+position.y);
+        vec3 worldPosition=(modelMatrix*vec4(localPosition,1.0)).xyz;
 
         vHeight=height;
         vRadial=worldRadial;
@@ -268,13 +269,14 @@ export class SphericalClipmap {
     this.currentExtent=totalExtent;
   }
 
-  update(camera:THREE.PerspectiveCamera,time:number) {
+  update(camera:THREE.PerspectiveCamera,time:number,planetCenter=new THREE.Vector3()) {
     this.material.uniforms.uTime.value=time;
 
-    // Anchor the patch to the player's spherical coordinates. Build a stable
-    // tangent frame from planet north so the patch does not acquire arbitrary
-    // twist as the camera moves around the globe.
-    const radial=camera.position.clone().normalize();
+    // Each planet owns a local clipmap frame. Camera coordinates are converted
+    // relative to this planet's world-space center, never assumed to be origin.
+    const cameraFromCenter=camera.position.clone().sub(planetCenter);
+    const radial=cameraFromCenter.clone().normalize();
+    this.group.position.copy(planetCenter);
     const northReference=Math.abs(radial.dot(new THREE.Vector3(0,1,0)))>.995
       ? new THREE.Vector3(0,0,1)
       : new THREE.Vector3(0,1,0);
@@ -283,7 +285,7 @@ export class SphericalClipmap {
     const frame=new THREE.Matrix4().makeBasis(east,radial,south);
     this.group.quaternion.setFromRotationMatrix(frame);
 
-    const altitude=Math.max(0,camera.position.length()-this.settings.radius);
+    const altitude=Math.max(0,cameraFromCenter.length()-this.settings.radius);
     // At orbital distances, suppress fine displacement octaves smoothly;
     // retain the broad-scale shape so mountains do not pop or collapse.
     this.material.uniforms.uDetailFade.value=THREE.MathUtils.smoothstep(altitude,250,25000);
