@@ -111,3 +111,13 @@ html,body.physics-v2-page,#physics-v2-root{height:100%;min-height:0;overflow:hid
 .v2-gnode footer button:not(.v2-gdot){background:#263a43;color:#cbd9dc;border:1px solid #465d66;border-radius:5px;padding:4px 7px;font-size:10px}
 .v2-g-help{margin-top:20px;font-size:11px;line-height:1.65;color:#829ba4}
 @media(max-width:760px){.v2-graph-body{grid-template-columns:minmax(0,1fr)}.v2-graph-inspector{display:none}.v2-graph-toolbar{gap:4px}.v2-graph-toolbar #v2g-status{display:none}}
+
+/* Keep the live 3D viewport visible beside the graph while editing. */
+#pv2-blueprint-editor{inset:0 0 0 auto;width:min(74vw,1120px);background:linear-gradient(90deg,transparent 0%,#070d12cc 10%,#070d12f2 24%);pointer-events:none}
+#pv2-blueprint-editor.open{display:block}
+#pv2-blueprint-editor .v2-graph-window{width:100%;pointer-events:auto;box-shadow:-18px 0 60px #0009}
+.v2-graph-world{position:relative;transform-origin:0 0}
+#v2g-nodes{position:absolute;left:0;top:0}
+#v2g-links{position:absolute;left:0;top:0;pointer-events:none}
+.v2-graph-scroll{cursor:grab}
+@media(max-width:700px){#pv2-blueprint-editor{width:88vw;background:#070d12eF}.v2-graph-toolbar{max-height:130px;overflow:auto}}
