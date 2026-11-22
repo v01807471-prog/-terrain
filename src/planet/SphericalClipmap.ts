@@ -104,15 +104,12 @@ export class SphericalClipmap {
       ${terrainBlueprint.shader}
 
       void main() {
-        // position.xz is a flat square clipmap coordinate. Map that tangent
-        // plane to a spherical cap using the exponential-map projection.
+        // Project the square clipmap's tangent-plane coordinates onto the
+        // sphere with a gnomonic projection. Unlike a linear angle mapping,
+        // this keeps every vertex on a smooth spherical cap and naturally
+        // compresses larger distances toward the horizon.
         vec2 plane=position.xz;
-        float planarDistance=length(plane);
-        float angle=planarDistance/uRadius;
-        vec2 tangent=planarDistance>0.00001 ? plane/planarDistance : vec2(0.0);
-
-        float s=sin(angle);
-        vec3 radial=normalize(vec3(tangent.x*s, cos(angle), tangent.y*s));
+        vec3 radial=normalize(vec3(plane.x, uRadius, plane.y));
 
         // Convert the clipmap-local direction into a fixed planet/world
         // direction BEFORE sampling terrain. This makes mountains geographic
