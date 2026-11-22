@@ -22,6 +22,7 @@ export class PlanetViewport {
   private planetCenter=new THREE.Vector3(30000,0,0);
   private moonCenter=new THREE.Vector3(0,0,0);
   private moonRadius=1737;
+  private moonTerrainSettings={amplitude:950,frequency:7.4};
   private moonOrbitRadius=38440;
   private moonOrbitAngle=0;
   private moonOrbitSpeed=0.00012;
@@ -80,7 +81,7 @@ export class PlanetViewport {
     this.clipmap=new SphericalClipmap(this.scene,this.settings);
     this.moonClipmap=new SphericalClipmap(this.scene,{
       rings:17,baseSegments:24,ringGrowth:1.22,radius:this.moonRadius,
-      amplitude:950,frequency:7.4
+      amplitude:this.moonTerrainSettings.amplitude,frequency:this.moonTerrainSettings.frequency
     });
     const moonOrbitPoints:THREE.Vector3[]=[];
     for(let i=0;i<256;i++){
@@ -130,6 +131,11 @@ export class PlanetViewport {
   private get activeRadius(){return this.focusedMoon?this.moonRadius:this.radius;}
   private get activeClipmap(){return this.focusedMoon?this.moonClipmap:this.clipmap;}
   private get activeGravity(){return this.focusedMoon?1.62:9.81;}
+  private activeTerrainHeightKm(direction:THREE.Vector3){
+    return this.focusedMoon
+      ?terrainBlueprint.heightKm(direction,this.moonTerrainSettings,0)
+      :this.terrainHeightKm(direction);
+  }
 
   private updateMoonPosition(){
     this.moonCenter.set(
@@ -216,7 +222,7 @@ export class PlanetViewport {
       const worldNorth=new THREE.Vector3(0,1,0);
       const reference=Math.abs(radial.dot(worldNorth))>.995 ? new THREE.Vector3(0,0,1) : worldNorth;
       const north=new THREE.Vector3().crossVectors(radial,new THREE.Vector3().crossVectors(reference,radial)).normalize();
-      const terrainRadius=this.activeRadius+(this.focusedMoon?0:this.terrainHeightKm(radial));
+      const terrainRadius=this.activeRadius+this.activeTerrainHeightKm(radial);
       const surface=this.activeCenter.clone().addScaledVector(radial,terrainRadius);
 
       // The avatar's origin is at its feet; local up is the planet radial.
@@ -300,7 +306,7 @@ export class PlanetViewport {
         // Prevent the local camera from passing below the displaced ground.
         const cameraOffset=this.camera.position.clone().sub(this.activeCenter);
         const cameraRadial=cameraOffset.clone().normalize();
-        const groundRadius=this.activeRadius+(this.focusedMoon?0:this.terrainHeightKm(cameraRadial));
+        const groundRadius=this.activeRadius+this.activeTerrainHeightKm(cameraRadial);
         const minCameraRadius=groundRadius+.0018;
         if (cameraOffset.length()<minCameraRadius) {
           this.camera.position.copy(this.activeCenter).addScaledVector(cameraRadial,minCameraRadius);
