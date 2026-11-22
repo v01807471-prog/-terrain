@@ -237,10 +237,11 @@ export class WaterRenderer {
     this.uniforms.uExclusionCount.value = count;
   }
 
-  update(camera: THREE.Camera, elapsedSeconds: number): void {
+  update(camera: THREE.Camera, elapsedSeconds: number, lodScale = 1): void {
     camera.getWorldPosition(this.cameraPosition);
     this.mesh.position.x = this.cameraPosition.x;
     this.mesh.position.z = this.cameraPosition.z;
+    this.mesh.scale.set(this.extent * lodScale, 1, this.extent * lodScale);
     this.uniforms.uTime.value = elapsedSeconds;
   }
 
