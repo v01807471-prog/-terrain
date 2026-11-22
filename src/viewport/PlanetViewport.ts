@@ -97,14 +97,23 @@ export class PlanetViewport {
 
       // Re-anchor the orbit target to the local ground without moving the camera.
       const radial=this.camera.position.clone().normalize();
+      const worldNorth=new THREE.Vector3(0,1,0);
+      const reference=Math.abs(radial.dot(worldNorth))>.995 ? new THREE.Vector3(0,0,1) : worldNorth;
+      const north=new THREE.Vector3().crossVectors(radial,new THREE.Vector3().crossVectors(reference,radial)).normalize();
       const terrainRadius=this.radius+this.terrainHeightKm(radial);
       const surface=radial.clone().multiplyScalar(terrainRadius);
+
+      // The avatar's origin is at its feet; local up is the planet radial.
       this.avatar.position.copy(surface).addScaledVector(radial,-.000325);
       this.avatar.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),radial);
       this.avatar.visible=true;
-      const target=surface.clone().addScaledVector(radial,.0012);
+
+      // Third-person shoulder camera: target at eye level, a few metres
+      // behind the character. Camera up follows local gravity, not world Y.
+      const target=surface.clone().addScaledVector(radial,.0016);
       this.controls.target.copy(target);
       this.camera.up.copy(radial);
+      this.camera.position.copy(target).addScaledVector(radial,.0008).addScaledVector(north,-.004);
       this.camera.lookAt(target);
       this.controls.minDistance=.003;
       this.controls.maxDistance=150000;
