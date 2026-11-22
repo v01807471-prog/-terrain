@@ -59,6 +59,34 @@ export class PlanetViewport {
     });
   }
 
+  private fract(value:number){return value-Math.floor(value);}
+
+  private terrainNoise(x:number,y:number,z:number){
+    const hash=(ix:number,iy:number,iz:number)=>{
+      let px=this.fract(ix*.3183099+.13)*17;
+      let py=this.fract(iy*.3183099+.17)*17;
+      let pz=this.fract(iz*.3183099+.11)*17;
+      return this.fract(px*py*pz*(px+py+pz));
+    };
+    const ix=Math.floor(x),iy=Math.floor(y),iz=Math.floor(z);
+    const fx=this.fract(x),fy=this.fract(y),fz=this.fract(z);
+    const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy),sz=fz*fz*(3-2*fz);
+    const mix=(a:number,b:number,t:number)=>a+(b-a)*t;
+    const x00=mix(hash(ix,iy,iz),hash(ix+1,iy,iz),sx);
+    const x10=mix(hash(ix,iy+1,iz),hash(ix+1,iy+1,iz),sx);
+    const x01=mix(hash(ix,iy,iz+1),hash(ix+1,iy,iz+1),sx);
+    const x11=mix(hash(ix,iy+1,iz+1),hash(ix+1,iy+1,iz+1),sx);
+    return mix(mix(x00,x10,sy),mix(x01,x11,sy),sz);
+  }
+
+  private terrainHeightKm(direction:THREE.Vector3){
+    const f=this.settings.frequency;
+    const n=this.terrainNoise(direction.x*f,direction.y*f,direction.z*f)*.65
+      +this.terrainNoise(direction.x*f*2.13,direction.y*f*2.13,direction.z*f*2.13)*.25
+      +this.terrainNoise(direction.x*f*5.7,direction.y*f*5.7,direction.z*f*5.7)*.1;
+    return (n-.48)*this.settings.amplitude*.001;
+  }
+
   private createAvatar(){
     // Simple scale-correct placeholder (metres converted to planet kilometres).
     const skin=new THREE.MeshStandardMaterial({color:0xe0a16a,roughness:.85});
@@ -81,8 +109,9 @@ export class PlanetViewport {
       const reference=Math.abs(radial.dot(worldUp))>.995 ? new THREE.Vector3(0,0,1) : worldUp;
       const east=new THREE.Vector3().crossVectors(reference,radial).normalize();
       const north=new THREE.Vector3().crossVectors(radial,east).normalize();
-      const surface=radial.clone().multiplyScalar(this.radius+this.settings.amplitude*.001);
-      this.avatar.position.copy(surface);
+      const terrainRadius=this.radius+this.terrainHeightKm(radial);
+      const surface=radial.clone().multiplyScalar(terrainRadius);
+      this.avatar.position.copy(surface).addScaledVector(radial,-.0003);
       this.avatar.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),radial);
       this.avatar.visible=true;
       const target=surface.clone().addScaledVector(radial,.0012);
