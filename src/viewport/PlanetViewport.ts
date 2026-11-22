@@ -16,7 +16,7 @@ type PlanetRenderEntry = {
 export class PlanetViewport {
   readonly renderer:THREE.WebGLRenderer;
   readonly scene=new THREE.Scene();
-  readonly camera=new THREE.PerspectiveCamera(48,1,.00005,120000);
+  readonly camera=new THREE.PerspectiveCamera(48,1,.00005,300000000);
   readonly clipmap:SphericalClipmap;
   readonly moonClipmap:SphericalClipmap;
   readonly planets:PlanetRenderEntry[]=[];
@@ -24,6 +24,7 @@ export class PlanetViewport {
   private controls:OrbitControls;
   private resize:ResizeManager;
   private radius=6371;
+  private readonly systemViewDistance=300000000;
   private running=false;
   private frame=0;
   private clock=new THREE.Clock();
@@ -38,7 +39,7 @@ export class PlanetViewport {
   private settings={rings:17,baseSegments:24,ringGrowth:1.22,radius:6371,amplitude:1100,frequency:5.2,zoomSpeed:1.1,rotationSpeed:1,autoRotate:false,showGrid:true};
 
   constructor(private canvas:HTMLCanvasElement) {
-    this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});
+    this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance',logarithmicDepthBuffer:true});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.setSize(innerWidth,innerHeight,false);
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -79,7 +80,7 @@ export class PlanetViewport {
     this.controls.rotateSpeed=0.65;
     this.controls.zoomSpeed=this.settings.zoomSpeed;
     this.controls.minDistance=this.activeRadius+1;
-    this.controls.maxDistance=this.activeRadius+250000;
+    this.controls.maxDistance=this.systemViewDistance;
     // OrbitControls has no setGizmosVisible method; gizmo visibility is not
     // part of its API. Keep the standard controls without this unsupported call.
     this.controls.update();
@@ -158,7 +159,7 @@ export class PlanetViewport {
     this.avatar.visible=false;
     this.camera.up.set(0,1,0);
     this.controls.minDistance=this.moonRadius+1;
-    this.controls.maxDistance=250000;
+    this.controls.maxDistance=this.systemViewDistance;
     this.controls.update();
     this.updateDepthRange();
   }
@@ -173,7 +174,7 @@ export class PlanetViewport {
     this.avatar.visible=false;
     this.camera.up.set(0,1,0);
     this.controls.minDistance=this.radius+1;
-    this.controls.maxDistance=this.radius+250000;
+    this.controls.maxDistance=this.systemViewDistance;
     this.controls.update();
     this.updateDepthRange();
   }
@@ -198,7 +199,7 @@ export class PlanetViewport {
       : Math.max(.05,targetDistance*.00001);
     this.camera.far=this.thirdPerson
       ? Math.max(1,targetDistance*1.5+.1)
-      : Math.max(100000,targetDistance+100000);
+      : Math.max(this.systemViewDistance,targetDistance+this.systemViewDistance);
     this.camera.updateProjectionMatrix();
   }
 
@@ -259,7 +260,7 @@ export class PlanetViewport {
     this.camera.up.set(0,1,0);
     this.camera.lookAt(this.activeCenter);
     this.controls.minDistance=this.activeRadius+1;
-    this.controls.maxDistance=this.activeRadius+250000;
+    this.controls.maxDistance=this.systemViewDistance;
     this.avatar.visible=false;
     this.thirdPerson=false;
     this.controls.update();
