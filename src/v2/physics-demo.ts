@@ -20,7 +20,7 @@ root.innerHTML = `
           <h1 class="pv2-title">Исследование рельефа V2</h1>
           <p class="pv2-subtitle">Управляй персонажем на процедурном ландшафте. Камера следует за героем, а Clipmap перестраивает детализацию вокруг активной камеры.</p>
         </div>
-        <span class="pv2-status">● LEGACY НЕ ИЗМЕНЁН</span>
+        <div class="pv2-header-actions"><button class="pv2-button" id="pv2-toggle-editor" aria-expanded="true">Скрыть редактор</button><span class="pv2-status">● LEGACY НЕ ИЗМЕНЁН</span></div>
       </header>
       <div class="pv2-viewport" id="pv2-viewport">
         <div class="pv2-overlay">
@@ -84,6 +84,14 @@ root.innerHTML = `
 `;
 
 const viewport = document.querySelector<HTMLDivElement>('#pv2-viewport')!;
+const shell = document.querySelector<HTMLElement>('.pv2-shell')!;
+const editorToggle = document.querySelector<HTMLButtonElement>('#pv2-toggle-editor')!;
+editorToggle.addEventListener('click', () => {
+  const collapsed = shell.classList.toggle('pv2-editor-collapsed');
+  editorToggle.textContent = collapsed ? 'Показать редактор' : 'Скрыть редактор';
+  editorToggle.setAttribute('aria-expanded', String(!collapsed));
+  requestAnimationFrame(resize);
+});
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#91aeb4');
 scene.fog = new THREE.Fog('#91aeb4', 100, 320);
@@ -323,12 +331,29 @@ function updatePlayer(frameDelta: number): void {
 }
 function updateFollowCamera(): void {
   const horizontal = Math.cos(cameraPitch) * cameraDistance;
+  const target = new THREE.Vector3(player.x, player.y + 0.55, player.z);
   camera.position.set(
     player.x + Math.sin(cameraYaw) * horizontal,
     player.y + 0.25 + Math.sin(cameraPitch) * cameraDistance,
     player.z + Math.cos(cameraYaw) * horizontal
   );
-  camera.lookAt(player.x, player.y + 0.55, player.z);
+
+  // Не позволяем камере пересекать поверхность ни в конечной точке,
+  // ни на отрезке между героем и камерой (например, за гребнем холма).
+  const clearance = 0.7;
+  let requiredLift = Math.max(
+    0,
+    terrain.getGroundHeight(camera.position.x, camera.position.z, LOD0_CELL_SIZE) + clearance - camera.position.y
+  );
+  const ray = new THREE.Vector3();
+  for (let i = 1; i <= 12; i++) {
+    const t = i / 12;
+    ray.lerpVectors(target, camera.position, t);
+    const ground = terrain.getGroundHeight(ray.x, ray.z, LOD0_CELL_SIZE);
+    requiredLift = Math.max(requiredLift, ground + clearance - ray.y);
+  }
+  if (requiredLift > 0) camera.position.y += requiredLift;
+  camera.lookAt(target);
 }
 
 renderer.domElement.addEventListener('pointerdown', (event) => {
