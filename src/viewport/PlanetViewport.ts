@@ -156,6 +156,27 @@ export class PlanetViewport {
         this.camera.lookAt(this.controls.target);
       }
       this.controls.update();
+      if (this.thirdPerson) {
+        // Keep the local camera above the displaced ground while Arcball
+        // supplies shooter-like mouse look around the stationary character.
+        const cameraRadial=this.camera.position.clone().normalize();
+        const groundRadius=this.radius+this.terrainHeightKm(cameraRadial);
+        const minCameraRadius=groundRadius+0.0018;
+        if (this.camera.position.length()<minCameraRadius) {
+          this.camera.position.copy(cameraRadial.multiplyScalar(minCameraRadius));
+        }
+
+        // Turn the character toward the horizontal view direction and keep
+        // its up axis aligned with the local surface normal.
+        const up=this.avatar.position.clone().normalize();
+        const forward=this.controls.target.clone().sub(this.camera.position);
+        forward.addScaledVector(up,-forward.dot(up)).normalize();
+        if (forward.lengthSq()>1e-8) {
+          const right=new THREE.Vector3().crossVectors(forward,up).normalize();
+          const back=forward.clone().negate();
+          this.avatar.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,back));
+        }
+      }
       this.clipmap.update(this.camera,t);
       this.renderer.render(this.scene,this.camera);
     };
