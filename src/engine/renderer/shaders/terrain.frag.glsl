@@ -43,25 +43,7 @@ void main() {
   __TERRAIN_COLOR_GRAPH__
   vec3 lightDir = normalize(uSunDirection);
   float diffuse = max(dot(n, lightDir), 0.0);
-  float terrainShadow = 1.0;
-  // Камерная область теней: трассируем луч к солнцу по той же функции высоты,
-  // что и геометрия. Дальность затухает за пределами активной зоны камеры.
-  float shadowDistance = length(vWorld.xz - uCamera);
-  if (lightDir.y > 0.035 && shadowDistance < 150.0) {
-    // Более плотная трассировка ловит узкие гребни и длинные горные склоны.
-    for (int i = 1; i <= 16; i++) {
-      float rayDistance = float(i) * 6.75;
-      vec2 sampleXZ = vWorld.xz + lightDir.xz * rayDistance;
-      float rayHeight = vWorld.y + lightDir.y * rayDistance;
-      float blockerHeight = terrainHeight(sampleXZ);
-      if (blockerHeight > rayHeight + 0.28) {
-        terrainShadow = 0.18;
-        break;
-      }
-    }
-  }
-  float cameraShadowFade = 1.0 - smoothstep(92.0, 150.0, shadowDistance);
-  float shadow = mix(1.0, terrainShadow, cameraShadowFade);
+  // Тени берутся из настоящей shadow map DirectionalLight Three.js.
   float threeShadow = 1.0;
   #if NUM_DIR_LIGHT_SHADOWS > 0
     threeShadow = getShadow(directionalShadowMap[0], directionalLightShadows[0], vDirectionalShadowCoord[0]);
