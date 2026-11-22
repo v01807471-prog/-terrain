@@ -92,9 +92,9 @@ export class TerrainRenderer {
   /** Recompiles the visible terrain materials without rebuilding clipmap geometry. */
   setBlueprint(blueprint: TerrainBlueprint): void {
     const vertexShader = terrainVertexShader.replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL);
-    const fragmentShader = terrainFragmentShader.replace(
-      '__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;'
-    );
+    const fragmentShader = terrainFragmentShader
+      .replace('__TERRAIN_HEIGHT_FUNCTION__', blueprint.heightFunctionGLSL)
+      .replace('__TERRAIN_COLOR_GRAPH__', blueprint.fragmentGraphGLSL ?? 'vec3 base = uBaseColor;');
     this.uniforms.uFogColor.value.set(blueprint.fogColor);
     this.uniforms.uFogNear.value = blueprint.fogNear;
     this.uniforms.uFogFar.value = blueprint.fogFar;
