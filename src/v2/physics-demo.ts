@@ -19,18 +19,25 @@ class BlueprintNodeEditor {
     this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
   }
   private el<T extends Element=HTMLElement>(id:string):T{return this.host.querySelector<T>('#'+id)!;}
-  open():void{this.host.classList.add('open');this.el('v2g-preview-slot').append(this.viewport);this.viewport.classList.add('v2g-live-preview');requestAnimationFrame(()=>{this.fit();window.dispatchEvent(new Event('resize'));});}
+  open():void{
+    this.host.classList.add('open');
+    this.el('v2g-preview-slot').append(this.viewport);
+    this.viewport.classList.add('v2g-live-preview');
+    const side=document.querySelector<HTMLElement>('.pv2-side');
+    if(side)this.el('v2g-diagnostics-slot').append(side);
+    requestAnimationFrame(()=>{this.fit();window.dispatchEvent(new Event('resize'));});
+  }
   private close():void{this.viewport.classList.remove('v2g-live-preview');this.viewportMarker.parentNode?.insertBefore(this.viewport,this.viewportMarker);this.host.classList.remove('open','preview-expanded');window.dispatchEvent(new Event('resize'));}
   private node(id:number):any{return this.graph.nodes.find(n=>n.id===id);}
   private shell():void{
     this.host.innerHTML=`<div class="v2-graph-window"><header class="v2-graph-toolbar">
     <b>◈ Граф мира</b><select id="v2g-preset"><option value="regions">🌍 Регионы</option><option value="plains">🌾 Равнины</option><option value="mountains">⛰️ Горы</option><option value="desert">🏜️ Пустыня</option><option value="islands">🏝️ Острова</option></select><button data-a="preset">Загрузить пресет</button><label>Сид <input id="v2g-seed" type="number"></label><button data-a="random">🎲</button>
-    <select id="v2g-add"></select><button data-a="add">+ Узел</button><button data-a="assets">Материалы</button><button data-a="physics">Физика</button><button data-a="wire">Сетка</button><label class="v2g-sun-control">☀ <input id="v2g-sun-time" type="range" min="0" max="1" step="0.001" value="0.36"></label><button data-a="fit">Уместить</button>
+    <select id="v2g-add"></select><button data-a="add">+ Узел</button><button data-a="assets">Материалы</button><button data-a="diagnostics">Диагностика</button><button data-a="physics">Физика</button><button data-a="wire">Сетка</button><label class="v2g-sun-control">☀ <input id="v2g-sun-time" type="range" min="0" max="1" step="0.001" value="0.36"></label><button data-a="fit">Уместить</button>
     <button data-a="minus">−</button><span id="v2g-zoom">100%</span><button data-a="plus">+</button>
     <button data-a="export">Экспорт</button><button data-a="import">Импорт</button><input id="v2g-file" type="file" accept=".json" hidden>
     <span id="v2g-status">Граф готов</span><button data-a="apply">Применить</button><button data-a="close">← В игру</button></header>
     <div class="v2-graph-preview-dock"><div class="v2-graph-preview-caption"><b>Живой предпросмотр</b><span>Нажми, чтобы увеличить</span><button data-a="preview" aria-label="Увеличить предпросмотр">⤢</button></div><div id="v2g-preview-slot"></div></div>
-    <div class="v2g-asset-drawer"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Выбери текстуру и добавь её узлом в граф</span></div><div id="v2g-assets-list"></div></div><div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world"><svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div></div></div>`;
+    <div class="v2g-asset-drawer"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Выбери текстуру и добавь её узлом в граф</span></div><div id="v2g-assets-list"></div></div><div class="v2g-diagnostics-drawer"><div id="v2g-diagnostics-slot"></div></div><div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world"><svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div></div></div>`;
     const sel=this.el<HTMLSelectElement>('v2g-add');
     for(const [type,t] of Object.entries(NODE_TYPES)){const o=document.createElement('option');o.value=type;o.textContent=(t as any).t;sel.append(o);}
     this.host.querySelectorAll<HTMLButtonElement>('[data-a]').forEach(b=>b.onclick=()=>this.action(b.dataset.a||''));
@@ -42,7 +49,8 @@ class BlueprintNodeEditor {
   private action(a:string):void{
     if(a==='close'){this.close();return;}
     if(a==='preview'){this.host.classList.toggle('preview-expanded');requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));return;}
-    if(a==='assets'){this.host.classList.toggle('assets-open');return;}
+    if(a==='assets'){this.host.classList.toggle('assets-open');this.host.classList.remove('diagnostics-open');return;}
+    if(a==='diagnostics'){this.host.classList.toggle('diagnostics-open');this.host.classList.remove('assets-open');return;}
     if(a==='physics'){const input=document.querySelector<HTMLInputElement>('#pv2-physics-debug')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
     if(a==='wire'){const input=document.querySelector<HTMLInputElement>('#pv2-wire')!;input.checked=!input.checked;input.dispatchEvent(new Event('change'));}
     if(a==='add')this.add(this.el<HTMLSelectElement>('v2g-add').value);
@@ -316,7 +324,13 @@ sun.shadow.camera.left = -55;
 sun.shadow.camera.right = 55;
 sun.shadow.camera.top = 55;
 sun.shadow.camera.bottom = -55;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 220;
+sun.shadow.bias = -0.00018;
+sun.shadow.normalBias = 0.035;
+sun.shadow.radius = 5;
 scene.add(sun);
+scene.add(sun.target);
 
 const LOD0_CELL_SIZE = 1;
 let blueprintCompileMs = 0;
@@ -367,14 +381,17 @@ function updateDayNight(delta: number): void {
   const angle = (dayTime - 0.25) * Math.PI * 2;
   const height = Math.sin(angle);
   const daylight = THREE.MathUtils.smoothstep(height, -0.12, 0.28);
-  sun.position.set(Math.cos(angle) * 65, Math.max(-8, height * 65), 18);
+  const sunDirection = new THREE.Vector3(Math.cos(angle), Math.max(-0.12, height), 0.28).normalize();
+  sun.position.copy(playerMesh.position).addScaledVector(sunDirection, 90);
+  sun.target.position.copy(playerMesh.position);
+  sun.shadow.camera.updateProjectionMatrix();
   sun.intensity = 0.06 + daylight * 3.0;
   sun.color.set('#7189bd').lerp(new THREE.Color('#fff0d5'), daylight);
   hemisphere.intensity = 0.25 + daylight * 1.55;
   const sky = new THREE.Color('#071323').lerp(new THREE.Color(blueprint.fogColor), daylight);
   scene.background = sky;
   if (scene.fog instanceof THREE.Fog) scene.fog.color.copy(sky);
-  terrainRenderer.setLighting(sun.position.clone().normalize(), sun.intensity);
+  terrainRenderer.setLighting(sunDirection, sun.intensity);
   const hours = Math.floor(dayTime * 24), minutes = Math.floor((dayTime * 24 - hours) * 60);
   dayTimeLabel.textContent = String(hours).padStart(2,'0')+':'+String(minutes).padStart(2,'0');
   if (document.activeElement !== dayTimeInput) dayTimeInput.value = String(dayTime);
@@ -564,7 +581,7 @@ function updatePlayer(frameDelta: number): void {
   playerMesh.rotation.y = player.yaw;
   const shadowGround = terrain.getGroundHeight(player.x, player.z, LOD0_CELL_SIZE);
   const shadowHeight = Math.max(0, player.y - playerHeight * 0.5 - playerRadius - shadowGround);
-  const sunDir = sun.position.clone().normalize();
+  const sunDir = new THREE.Vector3(Math.cos((dayTime - 0.25) * Math.PI * 2), Math.max(-0.12, Math.sin((dayTime - 0.25) * Math.PI * 2)), 0.28).normalize();
   playerShadow.position.set(
     player.x - sunDir.x * shadowHeight * 0.42,
     shadowGround + 0.045,
