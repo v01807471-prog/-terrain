@@ -225,6 +225,7 @@ export class SphericalClipmap {
         }
       `,
       fragmentShader:`
+        uniform float uAmplitude;
         varying vec3 vGlobeRadial;
         varying float vGlobeHeight;
         void main(){
