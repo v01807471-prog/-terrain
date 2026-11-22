@@ -79,6 +79,8 @@ void main() {
 
   // Ключевой принцип: шейдер не рисует воду над сушей.
   if (depth <= 0.0) discard;
+  // Water is restricted to the same spherical cap as the terrain and fallback planet.
+  if (dot(p, p) >= TERRAIN_DOME_RADIUS * TERRAIN_DOME_RADIUS) discard;
   float exclusionFoam = 0.0;
   for (int i = 0; i < 16; i++) {
     if (i >= uExclusionCount) break;
@@ -243,14 +245,14 @@ export class WaterRenderer {
     this.uniforms.uExclusionCount.value = count;
   }
 
-  update(camera: THREE.Camera, elapsedSeconds: number, lodScale = 1): void {
+  update(camera: THREE.Camera, elapsedSeconds: number, horizonScale = 1, fogScale = horizonScale): void {
     camera.getWorldPosition(this.cameraPosition);
     this.mesh.position.x = this.cameraPosition.x;
     this.mesh.position.z = this.cameraPosition.z;
-    this.mesh.scale.set(this.extent * lodScale, 1, this.extent * lodScale);
-    this.uniforms.uFadeDistance.value = this.baseFadeDistance * lodScale;
-    this.uniforms.uFogNear.value = this.baseFogNear * lodScale;
-    this.uniforms.uFogFar.value = this.baseFogFar * lodScale;
+    this.mesh.scale.set(this.extent * horizonScale, 1, this.extent * horizonScale);
+    this.uniforms.uFadeDistance.value = Math.max(this.baseFadeDistance * horizonScale, this.extent * horizonScale * 0.95);
+    this.uniforms.uFogNear.value = this.baseFogNear * fogScale;
+    this.uniforms.uFogFar.value = this.baseFogFar * fogScale;
     this.uniforms.uTime.value = elapsedSeconds;
   }
 
