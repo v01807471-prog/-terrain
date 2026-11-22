@@ -100,11 +100,11 @@ export class TerrainRenderer {
     };
     const planetGeometry = new THREE.SphereGeometry(DOME_RADIUS, 128, 64);
     planetGeometry.translate(0, -DOME_RADIUS, 0);
-    const planetMaterial = new THREE.MeshStandardMaterial({ color: '#607d55', roughness: 1, metalness: 0, side: THREE.FrontSide });
+    const planetMaterial = new THREE.MeshStandardMaterial({ color: '#607d55', roughness: 1, metalness: 0, side: THREE.FrontSide, depthWrite: false, depthTest: true });
     this.fallbackPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
     this.fallbackPlanet.frustumCulled = false;
     this.fallbackPlanet.renderOrder = -10;
-    this.fallbackPlanet.receiveShadow = true;
+    this.fallbackPlanet.receiveShadow = false;
     this.build(blueprint);
     this.scene.add(this.fallbackPlanet);
     this.scene.add(this.group);
