@@ -67,6 +67,7 @@ export class TerrainRenderer {
   private activeTextureIds: string[] = [];
   private baseFogNear: number;
   private baseFogFar: number;
+  private currentFogScale = 1;
   private readonly fallbackAssetTexture = (() => { const pixels = new Uint8Array([255,0,255,255, 0,0,0,255, 0,0,0,255, 255,0,255,255]); const t = new THREE.DataTexture(pixels,2,2,THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; })();
 
   constructor(
@@ -230,8 +231,8 @@ export class TerrainRenderer {
     this.localEditMaterial.color.set(blueprint.terrainColor);
     this.baseFogNear = blueprint.fogNear;
     this.baseFogFar = blueprint.fogFar;
-    this.uniforms.uFogNear.value = this.baseFogNear * this.uniforms.uLodScale.value;
-    this.uniforms.uFogFar.value = this.baseFogFar * this.uniforms.uLodScale.value;
+    this.uniforms.uFogNear.value = this.baseFogNear * this.currentFogScale;
+    this.uniforms.uFogFar.value = this.baseFogFar * this.currentFogScale;
     for (const ring of this.rings) {
       if (vertexChanged) {
         ring.material.vertexShader = vertexShader;
@@ -260,7 +261,7 @@ export class TerrainRenderer {
     this.uniforms.uSunIntensity.value = Math.max(0, intensity);
   }
 
-  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; readyTiles: number; queuedTiles: number; altitude: number; horizonDistance: number; lodScale: number } {
+  update(camera: THREE.Camera): { visibleTiles: number; totalTiles: number; readyTiles: number; queuedTiles: number; altitude: number; horizonDistance: number; lodScale: number; horizonScale: number; fogScale: number } {
     camera.updateMatrixWorld(true);
     const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
     camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
@@ -294,10 +295,13 @@ export class TerrainRenderer {
     // Near rings retain their exact world-space spacing. Far coverage comes from
     // additional preallocated LOD rings, never from stretching the near field.
     const lodScale = 1;
+    const horizonScale = Math.max(1, horizonDistance / 8192);
+    const fogScale = Math.max(1, horizonDistance / Math.max(this.baseFogFar, 1));
+    this.currentFogScale = fogScale;
     const lodScaleChanged = Math.abs(this.uniforms.uLodScale.value - lodScale) > 0.0005;
     this.uniforms.uLodScale.value = lodScale;
-    this.uniforms.uFogNear.value = this.baseFogNear * lodScale;
-    this.uniforms.uFogFar.value = Math.max(this.baseFogFar, this.baseFogNear + 1) * lodScale;
+    this.uniforms.uFogNear.value = this.baseFogNear * fogScale;
+    this.uniforms.uFogFar.value = Math.max(this.baseFogFar, this.baseFogNear + 1) * fogScale;
 
     // Re-prioritize unfinished tiles around the camera every frame: inner LOD first,
     // then nearest tile centers. This keeps the visible center responsive while moving.
@@ -372,7 +376,7 @@ export class TerrainRenderer {
       if (instanceBufferChanged) ring.instances.instanceMatrix.needsUpdate = true;
       if (lodScaleChanged) for (const tile of ring.tiles) if (tile.wire) tile.wire.scale.set(ring.step * lodScale, 1, ring.step * lodScale);
     }
-    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.ready).length, 0), queuedTiles: this.creationQueue.length, altitude, horizonDistance, lodScale };
+    return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.ready).length, 0), queuedTiles: this.creationQueue.length, altitude, horizonDistance, lodScale, horizonScale, fogScale };
   }
 
   dispose(): void {
