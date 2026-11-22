@@ -28,7 +28,7 @@ export class PlanetPlayerController {
   private gravity = 9.81;
   private yaw = 0;
   private pitch = 0.18;
-  private cameraDistance = 0.0045;
+  private cameraDistance = 0.0036;
   private grounded = true;
   private jumpQueued = false;
   private pointerLocked = false;
@@ -58,12 +58,13 @@ export class PlanetPlayerController {
     this.radius = radius;
     this.velocity.set(0, 0, 0);
     this.grounded = true;
-    this.cameraDistance = 0.0045;
+    this.cameraDistance = 0.0036;
     this.up.copy(direction).normalize();
     this.position.copy(center).addScaledVector(this.up, radius + this.sampleHeight(this.up) + 0.00008);
     this.yaw = 0;
     this.pitch = 0.18;
     this.avatar.visible = true;
+    this.avatar.position.copy(this.position);
     this.controls.enabled = false;
     this.updateFrame();
     this.updateCamera();
@@ -180,12 +181,15 @@ export class PlanetPlayerController {
   }
 
   private updateCamera(): void {
-    this.target.copy(this.position).addScaledVector(this.up, 0.00145);
+    // Aim at the character's chest and place the camera over the right shoulder.
+    // The previous 12 m look-ahead pushed the character out of the frame.
+    this.target.copy(this.position).addScaledVector(this.up, 0.00102);
     const horizontalDistance = this.cameraDistance * Math.cos(this.pitch);
     this.cameraOffset.copy(this.forward).multiplyScalar(-horizontalDistance)
-      .addScaledVector(this.up, this.cameraDistance * (0.32 + Math.sin(this.pitch)));
+      .addScaledVector(this.right, 0.00062)
+      .addScaledVector(this.up, this.cameraDistance * (0.20 + Math.sin(this.pitch)));
     this.camera.position.copy(this.target).add(this.cameraOffset);
-    this.camera.lookAt(this.target.clone().addScaledVector(this.forward, 0.012));
+    this.camera.lookAt(this.target.clone().addScaledVector(this.forward, 0.00022));
     this.camera.up.copy(this.up);
     this.controls.target.copy(this.target);
 
