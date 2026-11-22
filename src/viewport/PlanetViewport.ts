@@ -343,7 +343,10 @@ export class PlanetViewport {
       this.controls.minDistance=this.activeRadius+1;
       this.controls.maxDistance=this.activeRadius+250000;
     }
-    if(typeof patch.showGrid==='boolean') this.clipmap.setGridVisible(patch.showGrid);
+    if(typeof patch.showGrid==='boolean'){
+      this.clipmap.setGridVisible(patch.showGrid);
+      this.moonClipmap.setGridVisible(patch.showGrid);
+    }
     this.clipmap.setSettings({
       rings:this.settings.rings,
       baseSegments:this.settings.baseSegments,
