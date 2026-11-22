@@ -12,9 +12,8 @@ export const BUILTIN_TEXTURE_ASSETS = [
 
 export type BuiltinTextureAssetId = typeof BUILTIN_TEXTURE_ASSETS[number]['id'];
 
-export function createBuiltinTexture(id: string, size = 256): THREE.DataTexture {
-  const data = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y++) {
+function fillTextureRows(id: string, size: number, data: Uint8Array, startY: number, endY: number): void {
+  for (let y = startY; y < endY; y++) {
     for (let x = 0; x < size; x++) {
       const u = x / size, v = y / size;
       let rgb: number[];
@@ -44,6 +43,9 @@ export function createBuiltinTexture(id: string, size = 256): THREE.DataTexture 
       data[i + 3] = 255;
     }
   }
+}
+
+function makeTexture(data: Uint8Array, size: number): THREE.DataTexture {
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.magFilter = THREE.LinearFilter;
@@ -52,4 +54,29 @@ export function createBuiltinTexture(id: string, size = 256): THREE.DataTexture 
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
   return texture;
+}
+
+export function createBuiltinTexture(id: string, size = 256): THREE.DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  fillTextureRows(id, size, data, 0, size);
+  return makeTexture(data, size);
+}
+
+/** Builds texture rows over separate tasks so adding a graph texture never stalls the first frame. */
+export function createBuiltinTextureAsync(id: string, size = 128): Promise<THREE.DataTexture> {
+  const data = new Uint8Array(size * size * 4);
+  return new Promise((resolve) => {
+    let y = 0;
+    const renderChunk = () => {
+      const endY = Math.min(size, y + 8);
+      fillTextureRows(id, size, data, y, endY);
+      y = endY;
+      if (y < size) {
+        setTimeout(renderChunk, 0);
+      } else {
+        resolve(makeTexture(data, size));
+      }
+    };
+    renderChunk();
+  });
 }
