@@ -379,7 +379,7 @@ const terrain = new Terrain(blueprint.heightAt, {
   seed: 17, editCellSize: 0.5, editChunkSize: 32, normalSampleDistance: 0.35
 });
 const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
-  levels: 8, gridSize: 128, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
+  levels: 20, gridSize: 128, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
 });
 const waterRenderer = new WaterRenderer(scene, { seaLevel: 8, extent: 8192 });
 waterRenderer.applyBlueprint(blueprint.water, blueprint.heightFunctionGLSL, blueprint.fog);
@@ -400,7 +400,7 @@ const graphEditor = new BlueprintNodeEditor(graphEditorHost, blueprintGraph, (ne
   blueprintStatus.style.color = '#8affc1';
 }, viewport);
 document.querySelector('#pv2-open-blueprint')!.addEventListener('click', () => graphEditor.open());
-graphEditor.open();
+// Keep the initial game view lightweight; open the expensive node-preview workspace on demand.
 document.querySelector<HTMLInputElement>('#pv2-water')!.addEventListener('change', (event) => {
   waterRenderer.mesh.visible = (event.currentTarget as HTMLInputElement).checked;
 });
@@ -571,7 +571,7 @@ function updatePlayer(frameDelta: number): void {
     const f = forwardInput / inputLength, s = sideInput / inputLength;
     const forwardX = -Math.sin(cameraYaw), forwardZ = -Math.cos(cameraYaw);
     const rightX = Math.cos(cameraYaw), rightZ = -Math.sin(cameraYaw);
-    const moveSpeed = flightMode ? 180 : 7.5;
+    const moveSpeed = flightMode ? Math.min(100_000, Math.max(180, (Math.max(0, player.y) + 100) * 0.25)) : 7.5;
     targetX = (forwardX * f + rightX * s) * moveSpeed;
     targetZ = (forwardZ * f + rightZ * s) * moveSpeed;
     player.yaw = Math.atan2(targetX, targetZ);
@@ -585,7 +585,9 @@ function updatePlayer(frameDelta: number): void {
     player.vz += (targetZ - player.vz) * blend;
     if (flightMode) {
       const verticalInput = (keys.has('Space') ? 1 : 0) - (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 1 : 0);
-      player.vy = verticalInput * 300;
+      // Flight accelerates with altitude so reaching a planetary overview does not take hours.
+      const flightSpeed = Math.min(250_000, Math.max(300, (Math.max(0, player.y) + 100) * 0.35));
+      player.vy = verticalInput * flightSpeed;
       player.grounded = false;
     } else {
       if (keys.has('Space') && player.grounded) {
@@ -598,11 +600,15 @@ function updatePlayer(frameDelta: number): void {
     player.z += player.vz * dt;
     player.y += player.vy * dt;
 
-    const supportY = getPlayerSupportHeight(player.x, player.z);
-    if (player.y <= supportY) {
-      player.y = supportY;
-      player.vy = 0;
-      player.grounded = true;
+    if (!flightMode) {
+      const supportY = getPlayerSupportHeight(player.x, player.z);
+      if (player.y <= supportY) {
+        player.y = supportY;
+        player.vy = 0;
+        player.grounded = true;
+      } else {
+        player.grounded = false;
+      }
     } else {
       player.grounded = false;
     }
@@ -629,19 +635,21 @@ function updateFollowCamera(): void {
 
   // Не позволяем камере пересекать поверхность ни в конечной точке,
   // ни на отрезке между героем и камерой (например, за гребнем холма).
-  const clearance = 0.7;
-  let requiredLift = Math.max(
-    0,
-    terrain.getGroundHeight(camera.position.x, camera.position.z, LOD0_CELL_SIZE) + clearance - camera.position.y
-  );
-  const ray = new THREE.Vector3();
-  for (let i = 1; i <= 12; i++) {
-    const t = i / 12;
-    ray.lerpVectors(target, camera.position, t);
-    const ground = terrain.getGroundHeight(ray.x, ray.z, LOD0_CELL_SIZE);
-    requiredLift = Math.max(requiredLift, ground + clearance - ray.y);
+  if (!flightMode) {
+    const clearance = 0.7;
+    let requiredLift = Math.max(
+      0,
+      terrain.getGroundHeight(camera.position.x, camera.position.z, LOD0_CELL_SIZE) + clearance - camera.position.y
+    );
+    const ray = new THREE.Vector3();
+    for (let i = 1; i <= 12; i++) {
+      const t = i / 12;
+      ray.lerpVectors(target, camera.position, t);
+      const ground = terrain.getGroundHeight(ray.x, ray.z, LOD0_CELL_SIZE);
+      requiredLift = Math.max(requiredLift, ground + clearance - ray.y);
+    }
+    if (requiredLift > 0) camera.position.y += requiredLift;
   }
-  if (requiredLift > 0) camera.position.y += requiredLift;
   camera.lookAt(target);
 }
 
