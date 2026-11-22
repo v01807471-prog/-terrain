@@ -80,7 +80,7 @@ const fragmentShader = [
 
 export class WaterRenderer {
   readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
-  private readonly uniforms: Record<string, THREE.IUniform>;
+  private readonly uniforms: Record<string, { value: any }>;
   private readonly exclusionData = Array.from({ length: MAX_EXCLUSIONS }, () => new THREE.Vector4());
   private readonly cameraPosition = new THREE.Vector3();
   private readonly extent: number;
