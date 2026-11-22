@@ -93,7 +93,9 @@ export class PlanetViewport {
     this.camera.near=this.thirdPerson
       ? Math.max(.0005,targetDistance*.000001)
       : Math.max(.05,targetDistance*.00001);
-    this.camera.far=Math.max(200000,targetDistance+this.radius*2);
+    this.camera.far=this.thirdPerson
+      ? Math.max(1,targetDistance*1.5+.1)
+      : Math.max(20000,targetDistance+this.radius*2);
     this.camera.updateProjectionMatrix();
   }
 
@@ -116,10 +118,6 @@ export class PlanetViewport {
 
       // Re-anchor the orbit target to the local ground without moving the camera.
       const radial=this.camera.position.clone().normalize();
-      const worldUp=new THREE.Vector3(0,1,0);
-      const reference=Math.abs(radial.dot(worldUp))>.995 ? new THREE.Vector3(0,0,1) : worldUp;
-      const east=new THREE.Vector3().crossVectors(reference,radial).normalize();
-      const north=new THREE.Vector3().crossVectors(radial,east).normalize();
       const terrainRadius=this.radius+this.terrainHeightKm(radial);
       const surface=radial.clone().multiplyScalar(terrainRadius);
       this.avatar.position.copy(surface).addScaledVector(radial,-.0003);
