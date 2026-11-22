@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Terrain } from '../engine/terrain/Terrain.js';
 import { createDefaultTerrainGraph, compileTerrainGraph } from '../engine/blueprint/graph.js';
 import { TerrainRenderer } from '../engine/renderer/TerrainRenderer.js';
+import { WaterRenderer } from '../engine/renderer/WaterRenderer.js';
 import { PhysicsWorld } from '../engine/physics/PhysicsWorld.js';
 import { FixedStepLoop } from '../engine/physics/FixedStepLoop.js';
 import { CpuTerrainSurfaceDebug } from './CpuTerrainSurfaceDebug.js';
@@ -71,6 +72,11 @@ root.innerHTML = `
         <h2>Blueprint рельефа</h2>
         <p class="pv2-note">V2 теперь получает высоту и цвет из узлового Blueprint-компилятора V1. Один граф компилируется в CPU-функцию для Terrain/физики и GLSL для GPU. В демо подключён граф холмов с шумом, арифметическими узлами, маской уклона и смешиванием цветов.</p>
         <p class="pv2-note">Выходы воды и тумана также читаются компилятором; отдельный рендер воды и перенос пользовательских текстурных ассетов в V2 ещё не подключены.</p>
+        <textarea id="pv2-blueprint-json" rows="9" spellcheck="false" style="width:100%;resize:vertical;font:11px/1.45 monospace;background:#101a20;color:#d6e7e2;border:1px solid #40545a;border-radius:8px;padding:10px"></textarea>
+        <button class="pv2-button primary" id="pv2-apply-blueprint">Применить Blueprint без перезапуска</button>
+        <p id="pv2-blueprint-status" class="pv2-note">Граф можно изменить в JSON и применить во время работы сцены.</p>
+        <label class="pv2-toggle"><input id="pv2-water" type="checkbox" checked> Показывать процедурную воду</label>
+        <label class="pv2-toggle"><input id="pv2-water-hole" type="checkbox"> Пример сухой пещеры в центре</label>
         <p class="pv2-footer">Отсечение тайлов выполняется по пирамиде видимости активной камеры. Обратные грани поверхности отсекаются материалом FrontSide и проверкой gl_FrontFacing.</p>
       </section>
     </aside>
@@ -104,8 +110,8 @@ sun.shadow.camera.bottom = -55;
 scene.add(sun);
 
 const LOD0_CELL_SIZE = 1;
-const blueprintGraph = createDefaultTerrainGraph(17);
-const blueprint = compileTerrainGraph(blueprintGraph);
+let blueprintGraph = createDefaultTerrainGraph(17);
+let blueprint = compileTerrainGraph(blueprintGraph);
 scene.background = new THREE.Color(blueprint.fogColor);
 scene.fog = new THREE.Fog(blueprint.fogColor, blueprint.fogNear, blueprint.fogFar);
 const terrain = new Terrain(blueprint.heightAt, {
@@ -113,6 +119,34 @@ const terrain = new Terrain(blueprint.heightAt, {
 });
 const terrainRenderer = new TerrainRenderer(scene, terrain, blueprint, {
   levels: 8, gridSize: 128, tileSize: 32, baseCellSize: LOD0_CELL_SIZE, showWireframe: false
+});
+const waterRenderer = new WaterRenderer(scene, { seaLevel: -6, extent: 8192 });
+const blueprintJsonInput = document.querySelector<HTMLTextAreaElement>('#pv2-blueprint-json')!;
+const blueprintStatus = document.querySelector<HTMLParagraphElement>('#pv2-blueprint-status')!;
+blueprintJsonInput.value = JSON.stringify(blueprintGraph, null, 2);
+document.querySelector('#pv2-apply-blueprint')!.addEventListener('click', () => {
+  try {
+    const nextGraph = JSON.parse(blueprintJsonInput.value) as Parameters<typeof compileTerrainGraph>[0];
+    const nextBlueprint = compileTerrainGraph(nextGraph);
+    terrain.setBaseHeight(nextBlueprint.heightAt);
+    terrainRenderer.setBlueprint(nextBlueprint);
+    blueprintGraph = nextGraph;
+    blueprint = nextBlueprint;
+    scene.background = new THREE.Color(nextBlueprint.fogColor);
+    scene.fog = new THREE.Fog(nextBlueprint.fogColor, nextBlueprint.fogNear, nextBlueprint.fogFar);
+    blueprintStatus.textContent = 'Blueprint применён: CPU, физика и GPU получили новую функцию высоты.';
+    blueprintStatus.style.color = '#8affc1';
+  } catch (error) {
+    blueprintStatus.textContent = error instanceof Error ? error.message : 'Не удалось скомпилировать Blueprint';
+    blueprintStatus.style.color = '#ff8a8a';
+  }
+});
+document.querySelector<HTMLInputElement>('#pv2-water')!.addEventListener('change', (event) => {
+  waterRenderer.mesh.visible = (event.currentTarget as HTMLInputElement).checked;
+});
+document.querySelector<HTMLInputElement>('#pv2-water-hole')!.addEventListener('change', (event) => {
+  const enabled = (event.currentTarget as HTMLInputElement).checked;
+  waterRenderer.setExclusionCircles(enabled ? [{ x: 0, z: 0, radius: 18, feather: 5 }] : []);
 });
 const cpuSurfaceDebug = new CpuTerrainSurfaceDebug(scene, terrain, LOD0_CELL_SIZE, 16);
 
@@ -426,6 +460,7 @@ function animate(now: number): void {
     }
   }
   updateFollowCamera();
+  waterRenderer.update(camera, now / 1000);
   const culling = terrainRenderer.update(camera);
   document.querySelector('#pv2-tiles')!.textContent = `${culling.visibleTiles}/${culling.totalTiles}`;
   updateStats();
@@ -435,6 +470,6 @@ resetPlayer();
 updateFollowCamera();
 requestAnimationFrame(animate);
 window.addEventListener('beforeunload', () => {
-  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); cpuSurfaceDebug.dispose();
+  resizeObserver.disconnect(); renderer.dispose(); terrainRenderer.dispose(); waterRenderer.dispose(scene); cpuSurfaceDebug.dispose();
   sphereGeometry.dispose(); sphereMaterial.dispose();
 });
