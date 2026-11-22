@@ -29,10 +29,14 @@ export class TerrainRenderer {
     half: number;
     cut: number;
     outer: number;
-    tiles: Array<{ mesh: THREE.Mesh | null; wire: THREE.LineSegments | null; ox: number; oz: number }>;
+    centerX: number;
+    centerZ: number;
+    instances: THREE.InstancedMesh;
+    tiles: Array<{ ready: boolean; visible: boolean; wire: THREE.LineSegments | null; ox: number; oz: number }>;
     material: THREE.ShaderMaterial;
     wireMaterial: THREE.ShaderMaterial;
   }> = [];
+  private readonly instanceTransform = new THREE.Object3D();
   private readonly uniforms: {
     uCamera: { value: THREE.Vector2 };
     uAltitude: { value: number };
@@ -92,8 +96,8 @@ export class TerrainRenderer {
       const ring = this.rings[level];
       for (let i = 0; i < ring.tiles.length; i++) {
         const tile = ring.tiles[i];
-        if (enabled && tile.mesh && !tile.wire) this.createWireForTile(ring, tile, i);
-        if (tile.wire) tile.wire.visible = enabled && !!tile.mesh?.visible;
+        if (enabled && tile.ready && !tile.wire) this.createWireForTile(ring, tile, i);
+        if (tile.wire) tile.wire.visible = enabled && tile.visible;
       }
     }
   }
@@ -170,11 +174,13 @@ export class TerrainRenderer {
       const item = this.creationQueue.shift()!;
       const ring = this.rings[item.ringIndex];
       const tile = ring.tiles[item.tileIndex];
-      const mesh = new THREE.Mesh(this.geometries[item.tileIndex], ring.material);
-      mesh.scale.set(ring.step, 1, ring.step);
-      mesh.frustumCulled = false;
-      tile.mesh = mesh;
-      this.group.add(mesh);
+      tile.ready = true;
+      this.instanceTransform.position.set(ring.centerX + tile.ox * ring.step, 0, ring.centerZ + tile.oz * ring.step);
+      this.instanceTransform.rotation.set(0, 0, 0);
+      this.instanceTransform.scale.set(ring.step, 1, ring.step);
+      this.instanceTransform.updateMatrix();
+      ring.instances.setMatrixAt(item.tileIndex, this.instanceTransform.matrix);
+      ring.instances.instanceMatrix.needsUpdate = true;
       if (this.showWireframe) this.createWireForTile(ring, tile, item.tileIndex);
     }
     let visibleTiles = 0;
@@ -184,12 +190,12 @@ export class TerrainRenderer {
       const centerX = Math.round(cx / snap) * snap;
       const centerZ = Math.round(cz / snap) * snap;
       const last = level === this.rings.length - 1;
-      for (const tile of ring.tiles) {
-        if (!tile.mesh) continue;
-        if (tile.mesh.position.x !== centerX || tile.mesh.position.z !== centerZ) {
-          tile.mesh.position.set(centerX, 0, centerZ);
-          if (tile.wire) tile.wire.position.set(centerX, 0, centerZ);
-        }
+      ring.centerX = centerX;
+      ring.centerZ = centerZ;
+      for (let tileIndex = 0; tileIndex < ring.tiles.length; tileIndex++) {
+        const tile = ring.tiles[tileIndex];
+        if (!tile.ready) continue;
+        if (tile.wire && (tile.wire.position.x !== centerX || tile.wire.position.z !== centerZ)) tile.wire.position.set(centerX, 0, centerZ);
         const size = this.tileSize * ring.step;
         const x0 = centerX + tile.ox * ring.step, x1 = x0 + size;
         const z0 = centerZ + tile.oz * ring.step, z1 = z0 + size;
@@ -207,9 +213,20 @@ export class TerrainRenderer {
         const inCameraFrustum = this.frustum.intersectsBox(this.tileBounds);
         const inRing = maxDistance >= ring.cut && (last || minDistance < ring.outer);
         const visible = inCameraFrustum && inRing;
-        tile.mesh.visible = visible;
+        tile.visible = visible;
+        this.instanceTransform.position.set(
+          centerX + tile.ox * ring.step,
+          0,
+          centerZ + tile.oz * ring.step
+        );
+        this.instanceTransform.rotation.set(0, 0, 0);
+        this.instanceTransform.scale.set(visible ? ring.step : 0, visible ? 1 : 0, visible ? ring.step : 0);
+        this.instanceTransform.updateMatrix();
+        ring.instances.setMatrixAt(tileIndex, this.instanceTransform.matrix);
         if (tile.wire) tile.wire.visible = visible && this.showWireframe;
         if (visible) visibleTiles++;
+      }
+      ring.instances.instanceMatrix.needsUpdate = true;
       }
     }
     return { visibleTiles, totalTiles: this.rings.length * this.tilesPerSide ** 2, readyTiles: this.rings.reduce((n, r) => n + r.tiles.filter(t => t.mesh !== null).length, 0), queuedTiles: this.creationQueue.length, altitude };
@@ -221,6 +238,8 @@ export class TerrainRenderer {
     this.assetTextures.clear();
     this.fallbackAssetTexture.dispose();
     for (const ring of this.rings) {
+      this.group.remove(ring.instances);
+      ring.instances.dispose();
       ring.material.dispose();
       ring.wireMaterial.dispose();
     }
@@ -233,11 +252,11 @@ export class TerrainRenderer {
   }
 
   private createWireForTile(
-    ring: { step: number; wireMaterial: THREE.ShaderMaterial },
-    tile: { mesh: THREE.Mesh | null; wire: THREE.LineSegments | null },
+    ring: { step: number; centerX: number; centerZ: number; wireMaterial: THREE.ShaderMaterial },
+    tile: { ready: boolean; wire: THREE.LineSegments | null },
     tileIndex: number
   ): void {
-    if (tile.wire) return;
+    if (tile.wire || !tile.ready) return;
     let wireGeometry = this.wireGeometries[tileIndex];
     if (!wireGeometry) {
       const tx = tileIndex % this.tilesPerSide, tz = Math.floor(tileIndex / this.tilesPerSide);
@@ -247,7 +266,7 @@ export class TerrainRenderer {
     const wire = new THREE.LineSegments(wireGeometry, ring.wireMaterial);
     wire.scale.set(ring.step, 1, ring.step);
     wire.frustumCulled = false;
-    wire.position.copy(tile.mesh?.position ?? new THREE.Vector3());
+    wire.position.set(ring.centerX, 0, ring.centerZ);
     wire.visible = this.showWireframe && !!tile.mesh?.visible;
     tile.wire = wire;
     this.group.add(wire);
@@ -260,10 +279,9 @@ export class TerrainRenderer {
     this.activeFragmentShader = fragmentShader;
     this.activeTextureIds = Array.from({ length: 8 }, (_, i) => blueprint.textureAssets?.[i] ?? '');
     for (let tz = 0; tz < this.tilesPerSide; tz++) {
-      for (let tx = 0; tx < this.tilesPerSide; tx++) {
-        this.geometries.push(this.createTileGeometry(tx, tz));
-        // Diagnostic wire geometry is generated only if the user enables the wire overlay.
-      }
+    this.geometries.push(this.createTileGeometry());
+    // Одна локальная геометрия повторно используется всеми экземплярами всех LOD.
+    // Диагностическая проволочная сетка остаётся отдельным необязательным overlay.
     }
     const halfGrid = this.gridSize / 2;
     for (let level = 0; level < this.levels; level++) {
@@ -300,13 +318,21 @@ export class TerrainRenderer {
         glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, side: THREE.FrontSide,
         polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
       });
-      const tiles: Array<{ mesh: THREE.Mesh | null; wire: THREE.LineSegments | null; ox: number; oz: number }> = [];
-      for (let i = 0; i < this.geometries.length; i++) {
+      const tiles: Array<{ ready: boolean; visible: boolean; wire: THREE.LineSegments | null; ox: number; oz: number }> = [];
+      for (let i = 0; i < this.tilesPerSide ** 2; i++) {
         const tx = i % this.tilesPerSide, tz = Math.floor(i / this.tilesPerSide);
         const ox = tx * this.tileSize - halfGrid, oz = tz * this.tileSize - halfGrid;
-        tiles.push({ mesh: null, wire: null, ox, oz });
+        tiles.push({ ready: false, visible: false, wire: null, ox, oz });
       }
-      this.rings.push({ step, half, cut, outer, tiles, material, wireMaterial });
+      const instances = new THREE.InstancedMesh(this.geometries[0], material, tiles.length);
+      instances.frustumCulled = false;
+      instances.count = tiles.length;
+      // Пока очередь не подготовила экземпляр, он имеет нулевой масштаб.
+      const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+      for (let i = 0; i < tiles.length; i++) instances.setMatrixAt(i, hidden);
+      instances.instanceMatrix.needsUpdate = true;
+      this.group.add(instances);
+      this.rings.push({ step, half, cut, outer, centerX: 0, centerZ: 0, instances, tiles, material, wireMaterial });
     }
     // Within each LOD, create central tiles first; outer rings are queued later.
     for (let ringIndex = 0; ringIndex < this.rings.length; ringIndex++) {
@@ -345,15 +371,13 @@ export class TerrainRenderer {
     return geometry;
   }
 
-  private createTileGeometry(tx: number, tz: number): THREE.BufferGeometry {
+  private createTileGeometry(): THREE.BufferGeometry {
     const side = this.tileSize + 1;
     const positions = new Float32Array(side * side * 3);
     const indices: number[] = [];
-    const ox = tx * this.tileSize - this.gridSize / 2;
-    const oz = tz * this.tileSize - this.gridSize / 2;
     for (let z = 0; z < side; z++) for (let x = 0; x < side; x++) {
       const i = (z * side + x) * 3;
-      positions[i] = ox + x; positions[i + 2] = oz + z;
+      positions[i] = x; positions[i + 2] = z;
     }
     for (let z = 0; z < this.tileSize; z++) for (let x = 0; x < this.tileSize; x++) {
       const a = z * side + x, b = a + 1, c = a + side, d = c + 1;
