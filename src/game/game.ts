@@ -190,8 +190,10 @@ function updateCamera():void {
  camera.position.copy(cameraTarget).add(cameraOffset);
  camera.up.copy(f.up);
  camera.lookAt(cameraTarget.clone().addScaledVector(look,20));
- camera.near=Math.max(0.1,Math.min(10,geo.altitude*0.00001+0.1));
- camera.far=Math.max(80_000_000,geo.altitude+40_000_000);
+ const cameraHeight=Math.max(1,worldPosition.length()-surfaceRadius(f.up));
+ camera.near=Math.max(0.1,Math.min(5,cameraHeight*0.00001+0.1));
+ const horizon=Math.sqrt(2*blueprint.radius*cameraHeight+cameraHeight*cameraHeight);
+ camera.far=Math.max(100_000,horizon*1.5+cameraDistance+100_000);
  camera.updateProjectionMatrix();
  atmosphereMaterial.uniforms.uCamera.value.copy(camera.position);
 }
