@@ -46,7 +46,7 @@ export class TerrainRenderer {
   private readonly projectionView = new THREE.Matrix4();
   private readonly tileBounds = new THREE.Box3();
   private readonly assetTextures = new Map<string, THREE.DataTexture>();
-  private readonly fallbackAssetTexture = (() => { const t = new THREE.DataTexture(new Uint8Array([128,128,128,255]),1,1,THREE.RGBAFormat); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; })();
+  private readonly fallbackAssetTexture = (() => { const pixels = new Uint8Array([255,0,255,255, 0,0,0,255, 0,0,0,255, 255,0,255,255]); const t = new THREE.DataTexture(pixels,2,2,THREE.RGBAFormat); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; })();
 
   constructor(
     private readonly scene: THREE.Scene,
