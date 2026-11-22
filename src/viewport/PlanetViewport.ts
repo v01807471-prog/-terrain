@@ -4,6 +4,7 @@ import { ResizeManager } from './ResizeManager';
 import { SphericalClipmap } from '../planet/SphericalClipmap';
 import { terrainBlueprint } from '../planet/TerrainBlueprint';
 import { Solar } from '../planet/Solar';
+import { PlanetPlayerController } from '../planet/PlanetPlayerController';
 
 type PlanetRenderEntry = {
   name:string;
@@ -22,6 +23,7 @@ export class PlanetViewport {
   readonly planets:PlanetRenderEntry[]=[];
   private solar:Solar;
   private controls:OrbitControls;
+  private player:PlanetPlayerController;
   private resize:ResizeManager;
   private radius=6371;
   private readonly systemViewDistance=300000000;
@@ -105,6 +107,7 @@ export class PlanetViewport {
     // OrbitControls has no setGizmosVisible method; gizmo visibility is not
     // part of its API. Keep the standard controls without this unsupported call.
     this.controls.update();
+    this.player=new PlanetPlayerController(this.canvas,this.camera,this.controls,this.avatar,(direction)=>this.activeTerrainHeightKm(direction));
     this.updateDepthRange();
 
     this.resize=new ResizeManager(canvas,(w,h,dpr)=>{
@@ -219,6 +222,8 @@ export class PlanetViewport {
 
   focusMoon(){
     if(this.focusedMoon)return;
+    this.player.detach();
+    this.thirdPerson=false;
     const shift=this.moonCenter.clone().sub(this.planetCenter);
     this.camera.position.add(shift);
     this.controls.target.add(shift);
@@ -234,6 +239,8 @@ export class PlanetViewport {
 
   focusEarth(){
     if(!this.focusedMoon)return;
+    this.player.detach();
+    this.thirdPerson=false;
     const shift=this.planetCenter.clone().sub(this.moonCenter);
     this.camera.position.add(shift);
     this.controls.target.add(shift);
@@ -284,54 +291,16 @@ export class PlanetViewport {
   }
 
   private updateCameraMode(){
-    if(!this.thirdPerson){
-      const altitude=this.camera.position.distanceTo(this.activeCenter)-this.activeRadius;
-      if(altitude>80) return;
+    this.thirdPerson=this.player.isActive;
+    if(this.thirdPerson)return;
+    const altitude=this.camera.position.distanceTo(this.activeCenter)-this.activeRadius;
+    if(altitude>80)return;
 
-      // Re-anchor the orbit target to the local ground without moving the camera.
-      const radial=this.camera.position.clone().sub(this.activeCenter).normalize();
-      const worldNorth=new THREE.Vector3(0,1,0);
-      const reference=Math.abs(radial.dot(worldNorth))>.995 ? new THREE.Vector3(0,0,1) : worldNorth;
-      const north=new THREE.Vector3().crossVectors(radial,new THREE.Vector3().crossVectors(reference,radial)).normalize();
-      const terrainRadius=this.activeRadius+this.activeTerrainHeightKm(radial);
-      const surface=this.activeCenter.clone().addScaledVector(radial,terrainRadius);
-
-      // The avatar's origin is at its feet; local up is the planet radial.
-      this.avatar.position.copy(surface).addScaledVector(radial,-.000325);
-      this.avatar.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),radial);
-      this.avatar.visible=true;
-
-      // Third-person shoulder camera: target at eye level, a few metres
-      // behind the character. Camera up follows local gravity, not world Y.
-      const target=surface.clone().addScaledVector(radial,.0016);
-      this.controls.target.copy(target);
-      this.camera.up.copy(radial);
-      this.camera.position.copy(target).addScaledVector(radial,.0008).addScaledVector(north,-.004);
-      this.camera.lookAt(target);
-      this.controls.minDistance=.003;
-      this.controls.maxDistance=150000;
-      this.controls.minPolarAngle=.12;
-      this.controls.maxPolarAngle=Math.PI-.12;
-      this.controls.rotateSpeed=0.65;
-      this.controls.zoomSpeed=this.settings.zoomSpeed;
-      this.thirdPerson=true;
-      this.controls.update();
-      this.updateDepthRange();
-      return;
-    }
-
-    if(this.camera.position.distanceTo(this.controls.target)<150) return;
-
-    // Switch back to planet-centred orbit by changing only the target.
-    // Preserve camera position and orientation: no teleport or zoom snap.
-    this.controls.target.copy(this.activeCenter);
-    this.camera.up.set(0,1,0);
-    this.camera.lookAt(this.activeCenter);
-    this.controls.minDistance=this.activeRadius+1;
-    this.controls.maxDistance=this.systemViewDistance;
-    this.avatar.visible=false;
-    this.thirdPerson=false;
-    this.controls.update();
+    // Enter surface mode at the exact procedural ground height. The player
+    // controller owns movement, gravity, mouse look and the local camera.
+    const radial=this.camera.position.clone().sub(this.activeCenter).normalize();
+    this.player.enter(this.activeCenter,this.activeRadius,radial);
+    this.thirdPerson=true;
     this.updateDepthRange();
   }
 
@@ -358,7 +327,7 @@ export class PlanetViewport {
       const activeDelta=this.focusedMoon?moonDelta:orbitDelta;
       this.camera.position.add(activeDelta);
       this.controls.target.add(activeDelta);
-      if(this.avatar.visible) this.avatar.position.add(activeDelta);
+      if(this.player.isActive) this.player.shiftWorld(activeDelta);
       this.updateCameraMode();
       if(this.settings.autoRotate && !this.thirdPerson){
         const offset=this.camera.position.clone().sub(this.controls.target);
@@ -366,29 +335,12 @@ export class PlanetViewport {
         this.camera.position.copy(this.controls.target).add(offset);
         this.camera.lookAt(this.controls.target);
       }
-      this.controls.update();
-      if (this.thirdPerson) {
-        // Keep local gravity aligned with the avatar's radial surface normal.
-        // OrbitControls uses camera.up to constrain rotation, preventing roll.
-        const localUp=this.avatar.position.clone().sub(this.activeCenter).normalize();
-        this.camera.up.copy(localUp);
-        // Prevent the local camera from passing below the displaced ground.
-        const cameraOffset=this.camera.position.clone().sub(this.activeCenter);
-        const cameraRadial=cameraOffset.clone().normalize();
-        const groundRadius=this.activeRadius+this.activeTerrainHeightKm(cameraRadial);
-        const minCameraRadius=groundRadius+.0018;
-        if (cameraOffset.length()<minCameraRadius) {
-          this.camera.position.copy(this.activeCenter).addScaledVector(cameraRadial,minCameraRadius);
-        }
-
-        const up=this.avatar.position.clone().sub(this.activeCenter).normalize();
-        const forward=this.controls.target.clone().sub(this.camera.position);
-        forward.addScaledVector(up,-forward.dot(up)).normalize();
-        if (forward.lengthSq()>1e-8) {
-          const right=new THREE.Vector3().crossVectors(forward,up).normalize();
-          const back=forward.clone().negate();
-          this.avatar.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,back));
-        }
+      if(this.player.isActive){
+        this.player.update(deltaTime,this.activeCenter,this.activeRadius,this.activeGravity);
+        this.thirdPerson=true;
+      }else{
+        this.controls.update();
+        this.thirdPerson=false;
       }
       this.updateDepthRange();
       this.updatePlanetRenderPass(t);
@@ -438,6 +390,7 @@ export class PlanetViewport {
     this.running=false;
     cancelAnimationFrame(this.frame);
     this.controls.dispose();
+    this.player.dispose();
     this.scene.remove(this.avatar);
     this.scene.remove(this.flatTestGroup);
     this.flatTestGroup.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();const material=object.material;if(Array.isArray(material))material.forEach(m=>m.dispose());else material.dispose();}else if(object instanceof THREE.Line){object.geometry.dispose();const material=object.material;if(Array.isArray(material))material.forEach(m=>m.dispose());else material.dispose();}});
