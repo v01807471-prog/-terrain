@@ -22,7 +22,6 @@ export interface WaterRendererOptions {
 const MAX_EXCLUSIONS = 16;
 
 const vertexShader = [
-  '#version 300 es',
   'precision highp float;',
   'uniform float uTime;',
   'uniform float uSeaLevel;',
