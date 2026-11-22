@@ -3,6 +3,7 @@ import { Terrain } from '../engine/terrain/Terrain.js';
 import { createDefaultTerrainGraph, compileTerrainGraph } from '../engine/blueprint/graph.js';
 import { NODE_TYPES } from '../engine/graph/nodes.js';
 import { previewGraph } from '../engine/graph/compiler.js';
+import { BUILTIN_TEXTURE_ASSETS, createBuiltinTexture } from '../engine/textures/assets.js';
 import { TerrainRenderer } from '../engine/renderer/TerrainRenderer.js';
 import { WaterRenderer } from '../engine/renderer/WaterRenderer.js';
 import { PhysicsWorld } from '../engine/physics/PhysicsWorld.js';
@@ -13,7 +14,7 @@ import './physics-demo.css';
 class BlueprintNodeEditor {
   private graph: ReturnType<typeof createDefaultTerrainGraph>;
   private host: HTMLElement; private viewport: HTMLElement; private viewportMarker: Comment; private apply: (g: ReturnType<typeof createDefaultTerrainGraph>) => void;
-  private zoom=1; private selected:number|null=null; private pending:number|null=null; private timer=0; private previewTimer=0;
+  private zoom=1; private assetCanvases=new Map<string,HTMLCanvasElement>(); private selected:number|null=null; private pending:number|null=null; private timer=0; private previewTimer=0;
   constructor(host:HTMLElement,graph:ReturnType<typeof createDefaultTerrainGraph>,apply:(g:ReturnType<typeof createDefaultTerrainGraph>)=>void,viewport:HTMLElement){
     this.host=host;this.viewport=viewport;this.viewportMarker=document.createComment("terrain-preview-home");viewport.parentNode!.insertBefore(this.viewportMarker,viewport);this.graph=structuredClone(graph);this.graph.nodes.forEach((n,i)=>{n.x??=30+(i%5)*250;n.y??=30+Math.floor(i/5)*250;});this.apply=apply;this.shell();this.render();
   }
@@ -31,7 +32,7 @@ class BlueprintNodeEditor {
     <div class="v2-graph-preview-dock"><div class="v2-graph-preview-caption"><b>Живой предпросмотр</b><span>Нажми, чтобы увеличить</span><button data-a="preview" aria-label="Увеличить предпросмотр">⤢</button></div><div id="v2g-preview-slot"></div></div>
     <div class="v2-graph-body"><div id="v2g-scroll" class="v2-graph-scroll"><div id="v2g-world" class="v2-graph-world">
     <svg id="v2g-links"></svg><div id="v2g-nodes"></div></div></div><aside class="v2-graph-inspector"><b>Узел</b><div id="v2g-info">Выбери узел</div>
-    <p>Перетаскивай узлы за заголовок. Выход → вход создаёт связь. Нажми на подключённый вход, чтобы отключить. Ctrl + колесо — масштаб.</p></aside></div></div>`;
+    <p>Перетаскивай узлы за заголовок. Выход → вход создаёт связь. Нажми на подключённый вход, чтобы отключить. Ctrl + колесо — масштаб.</p><section class="v2g-asset-library"><div class="v2g-asset-heading"><b>Библиотека материалов</b><span>Встроенные текстуры</span></div><div id="v2g-assets-list"></div></section></aside></div></div>`;
     const sel=this.el<HTMLSelectElement>('v2g-add');
     for(const [type,t] of Object.entries(NODE_TYPES)){const o=document.createElement('option');o.value=type;o.textContent=(t as any).t;sel.append(o);}
     this.host.querySelectorAll<HTMLButtonElement>('[data-a]').forEach(b=>b.onclick=()=>this.action(b.dataset.a||''));
@@ -94,17 +95,42 @@ class BlueprintNodeEditor {
       }
       for(const [key,def,kind] of t.p){
         const row=document.createElement('div');row.className='v2-gparam';const label=document.createElement('label');label.textContent=key;row.append(label);
-        const input=document.createElement('input');input.type=kind==='color'?'color':'number';input.step='any';input.value=String(n.p[key]??def);
-        input.onchange=()=>{n.p[key]=kind==='color'?input.value:Number(input.value);this.schedule();};row.append(input);card.append(row);
+        if(kind==='asset'){
+          const select=document.createElement('select');for(const asset of BUILTIN_TEXTURE_ASSETS){const option=document.createElement('option');option.value=asset.id;option.textContent=asset.name;select.append(option);}select.value=String(n.p[key]??def);select.onchange=()=>{n.p[key]=select.value;this.schedule();};row.append(select);
+        }else{
+          const input=document.createElement('input');input.type=kind==='color'?'color':'number';input.step='any';input.value=String(n.p[key]??def);
+          input.onchange=()=>{n.p[key]=kind==='color'?input.value:Number(input.value);this.schedule();};row.append(input);
+        }
+        card.append(row);
       }
       const foot=document.createElement('footer');
       if(!t.sink){const out=document.createElement('button');out.className='v2-gdot v2-gout'+(this.pending===n.id?' active':'');out.dataset.node=String(n.id);out.textContent='●';out.onclick=()=>{this.pending=this.pending===n.id?null:n.id;this.render();};foot.append('Выход ',out);}
       if(!['out_height','out_color','out_water','out_fog'].includes(n.type)){const del=document.createElement('button');del.textContent='Удалить';del.onclick=()=>this.remove(n.id);foot.append(del);}
       card.append(foot);card.onpointerdown=()=>{this.selected=n.id;this.info(n);};host.append(card);
     }
-    this.drawLinks();this.info(this.selected===null?null:this.node(this.selected));
+    this.drawLinks();this.info(this.selected===null?null:this.node(this.selected));this.renderAssetLibrary();
     this.el('v2g-world').style.transform='scale('+this.zoom+')';this.el('v2g-world').style.width='3200px';this.el('v2g-world').style.height='2000px';
     this.el('v2g-zoom').textContent=Math.round(this.zoom*100)+'%';this.preview();
+  }
+  private assetCanvas(id:string):HTMLCanvasElement{
+    let canvas=this.assetCanvases.get(id);if(canvas)return canvas;
+    const texture=createBuiltinTexture(id,128),data=texture.image.data as Uint8Array,ctxCanvas=document.createElement('canvas');ctxCanvas.width=ctxCanvas.height=128;
+    const ctx=ctxCanvas.getContext('2d')!;const pixels=new Uint8ClampedArray(data);ctx.putImageData(new ImageData(pixels,128,128),0,0);texture.dispose();this.assetCanvases.set(id,ctxCanvas);return ctxCanvas;
+  }
+  private renderAssetLibrary():void{
+    const host=this.el('v2g-assets-list');host.innerHTML='';
+    for(const asset of BUILTIN_TEXTURE_ASSETS){
+      const card=document.createElement('button');card.className='v2g-asset-card';card.type='button';card.title=asset.description;
+      const preview=document.createElement('canvas');preview.width=preview.height=96;preview.getContext('2d')!.drawImage(this.assetCanvas(asset.id),0,0,96,96);
+      const name=document.createElement('b');name.textContent=asset.name;const category=document.createElement('span');category.textContent=asset.category;
+      const action=document.createElement('small');action.textContent='+ Добавить узел';
+      card.append(preview,name,category,action);card.onclick=()=>this.addAsset(asset.id);host.append(card);
+    }
+  }
+  private addAsset(assetId:string):void{
+    const id=Math.max(0,...this.graph.nodes.map(n=>n.id))+1,sc=this.el('v2g-scroll');
+    this.graph.nodes.push({id,type:'tex_asset',x:(sc.scrollLeft+120)/this.zoom,y:(sc.scrollTop+100)/this.zoom,p:{asset:assetId,tile:4,tri:0},d:{},in:{}});
+    this.selected=id;this.render();this.schedule();this.status('Текстура добавлена в граф. Соедини выход с узлом цвета.');
   }
   private info(n:any):void{
     const box=this.el('v2g-info');box.innerHTML='';if(!n){box.textContent='Выбери узел';return;}
