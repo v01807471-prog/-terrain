@@ -1,7 +1,7 @@
 precision highp float;
 uniform vec2 uCamera;
 uniform float uAltitude;
-uniform float uCut;
+in float vCut;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
@@ -25,7 +25,7 @@ void main() {
   if (!gl_FrontFacing) discard;
   vec2 delta = abs(vWorld.xz-uCamera);
   float d = max(max(delta.x,delta.y),uAltitude);
-  if (d < uCut) discard;
+  if (d < vCut) discard;
   vec3 n = normalize(vNormal);
   vec2 pw = vWorld.xz;
   float vHeight = vWorld.y;
