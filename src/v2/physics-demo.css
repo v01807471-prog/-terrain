@@ -272,3 +272,12 @@ html,body.physics-v2-page,#physics-v2-root{height:100%;min-height:0;overflow:hid
  #pv2-blueprint-editor.preview-expanded .v2g-preview-inspector{grid-column:1;grid-row:3;border-left:0;border-top:1px solid #354b55}
  #pv2-blueprint-editor.preview-expanded #v2g-preview-slot{grid-column:1;grid-row:2}
 }
+
+/* The preview inspector owns the scene controls while preview is maximized. */
+#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .v2g-diagnostics-drawer{
+ display:block;position:static;width:auto;max-height:none;overflow:visible;padding:0;
+ border:0;background:transparent;box-shadow:none
+}
+#pv2-blueprint-editor.preview-expanded .v2g-preview-inspector .v2g-diagnostics-drawer .pv2-side{
+ display:flex!important
+}
