@@ -8,6 +8,7 @@ import { compileGraph, previewGraph } from "./graph/compiler.js";
 import { QUALITY_PRESETS } from "./config/quality.js";
 import { f32ToB64, b64ToF32 } from "./persistence/float32.js";
 import { PRESET_GRAPHS, defaultGraph, ensureEnv } from "./legacy/graphPresets.js";
+import { StrokeHistory } from "./legacy/StrokeHistory.js";
 
 (async()=>{
 try{
@@ -45,9 +46,8 @@ scene.add(sun);
 
 // WORLD DATA
 
-const undoStack=[],redoStack=[];
-
-const MAX_HISTORY=30;
+const history = new StrokeHistory(30);
+const { undoStack, redoStack } = history;
 
 let selectedTool="raise";
 let brushRadius=4.5;
@@ -638,8 +638,7 @@ function resetDelta(area){
  deltaData.fill(0);
  baseCache.fill(NaN);
  uniforms.uDeltaInfo.value.set(deltaOrg,deltaOrg,1/deltaRes,DELTA_T);
- undoStack.length=0;
- redoStack.length=0;
+ history.clear();
  deltaDirty=true;
 }
 
@@ -668,9 +667,7 @@ function endStroke(){
   const idx=Int32Array.from(journalIdx),old=Float32Array.from(journalOld);
   const nw=new Float32Array(idx.length);
   for(let i=0;i<idx.length;i++)nw[i]=deltaData[idx[i]];
-  undoStack.push({idx,old,nw});
-  if(undoStack.length>MAX_HISTORY)undoStack.shift();
-  redoStack.length=0;
+  history.record({idx,old,nw});
  }
  journalIdx=[];
  journalOld=[];
@@ -779,17 +776,11 @@ function applyEntry(e,useNew){
 }
 
 function undo(){
- const e=undoStack.pop();
- if(!e)return;
- applyEntry(e,false);
- redoStack.push(e);
+ history.undo(applyEntry);
 }
 
 function redo(){
- const e=redoStack.pop();
- if(!e)return;
- applyEntry(e,true);
- undoStack.push(e);
+ history.redo(applyEntry);
 }
 
 function clearEdits(){
@@ -800,8 +791,7 @@ function clearEdits(){
  if(!idx.length)return;
  const e={idx:Int32Array.from(idx),old:Float32Array.from(old),nw:new Float32Array(idx.length)};
  applyEntry(e,true);
- undoStack.push(e);
- redoStack.length=0;
+  history.record(e);
 }
 
 let deltaLast=0;
@@ -2175,8 +2165,7 @@ document.getElementById("importFile").onchange=async e=>{
 
   const entry={idx:Int32Array.from(idx),old:Float32Array.from(old),nw:new Float32Array(idx.length)};
   for(let i=0;i<idx.length;i++)entry.nw[i]=deltaData[idx[i]];
-  undoStack.push(entry);
-  redoStack.length=0;
+  history.record(entry);
   deltaDirty=true;
 
   console.info("Импортировано текселей:",idx.length);
