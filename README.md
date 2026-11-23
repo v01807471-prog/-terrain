@@ -23,8 +23,9 @@ This avoids using huge solar-system coordinates for terrain sampling. It is a pl
 - `math/PlanetLocalFrame.ts` — world-camera to planet-local conversion.
 - `quadtree/QuadNode.ts`, `QuadTile.ts` — stable spatial node identity and bounds.
 - `lod/QuadtreeLodSelector.ts` — distance-based adaptive subdivision.
+- `culling/ChunkFrustumCuller.ts` — CPU frustum rejection in planet-local coordinates before mesh allocation.
 - `geometry/TerrainHeight.ts`, `TerrainGeometryFactory.ts` — deterministic height field and chunk mesh generation.
-- `render/ChunkRenderer.ts` — active chunk set, mesh reuse pool and per-chunk frustum culling.
+- `render/ChunkRenderer.ts` — active chunk set, mesh reuse pool and Three.js per-mesh frustum culling.
 - `render/TerrainMaterial.ts` — shader material setup.
 - `shaders/*.glsl` — vertex and fragment shaders, kept outside TypeScript classes.
 - `QuadtreeTerrain.ts` — high-level terrain facade.
@@ -33,8 +34,8 @@ This avoids using huge solar-system coordinates for terrain sampling. It is a pl
 
 - Stable tile coordinates relative to the planet root; camera motion changes LOD selection, not chunk positions.
 - Quadtree recursively splits tiles based on camera distance, with a minimum-distance floor to avoid runaway subdivision at tile boundaries.
-- Chunks are reused through a mesh pool when the selected leaf set changes.
-- Each chunk is a separate Three.js Mesh, so Three.js can frustum-cull chunks independently.
+- CPU frustum culling rejects chunks behind/outside the camera before geometry is allocated; each resulting Mesh also has Three.js frustum culling enabled.
+- Chunks are reused through a mesh pool when the selected visible leaf set changes.
 - Edge skirts currently hide cracks between different LOD resolutions. Skirts are a first-pass seam solution; exact neighbor-level stitching and geomorphing are future work.
 - Height is generated deterministically from planet-local coordinates.
 - Shader source is stored in standalone GLSL files.
