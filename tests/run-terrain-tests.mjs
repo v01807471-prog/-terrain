@@ -1,8 +1,10 @@
 import { runTerrainSelfTests } from '../.test-dist/engine/terrain/selfTest.js';
 import { runTerrainPhysicsSelfTests } from '../.test-dist/engine/physics/selfTest.js';
+import { runStrokeHistorySelfTests } from '../.test-dist/engine/legacy/StrokeHistory.selfTest.js';
 
 const suites = [
   ['Terrain и TerrainEditStore', runTerrainSelfTests()],
+  ['История мазков', runStrokeHistorySelfTests()],
   ['Физический прототип', runTerrainPhysicsSelfTests()]
 ];
 let total = 0;
