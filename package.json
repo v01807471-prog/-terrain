@@ -1,5 +1,5 @@
 {
-  "name": "clipmap-from-zero",
+  "name": "quadtree-terrain",
   "version": "0.1.0",
   "private": true,
   "type": "module",
