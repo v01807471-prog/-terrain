@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { DEFAULT_TERRAIN_CONFIG, validateTerrainConfig, type TerrainConfig } from './config/TerrainConfig.ts';
 import { PlanetLocalFrame } from './math/PlanetLocalFrame.ts';
 import { QuadtreeLodSelector } from './lod/QuadtreeLodSelector.ts';
+import { ChunkFrustumCuller } from './culling/ChunkFrustumCuller.ts';
 import { TerrainGeometryFactory } from './geometry/TerrainGeometryFactory.ts';
 import { TerrainMaterial } from './render/TerrainMaterial.ts';
 import { ChunkRenderer } from './render/ChunkRenderer.ts';
@@ -11,6 +12,7 @@ export class QuadtreeTerrain {
   readonly renderer: ChunkRenderer;
   private readonly frame: PlanetLocalFrame;
   private readonly selector: QuadtreeLodSelector;
+  private readonly frustumCuller: ChunkFrustumCuller;
 
   constructor(
     readonly planetRoot: THREE.Object3D,
@@ -20,6 +22,7 @@ export class QuadtreeTerrain {
     validateTerrainConfig(resolved);
     this.frame = new PlanetLocalFrame(planetRoot);
     this.selector = new QuadtreeLodSelector(resolved);
+    this.frustumCuller = new ChunkFrustumCuller(planetRoot);
     this.renderer = new ChunkRenderer(
       new TerrainGeometryFactory(resolved),
       new TerrainMaterial().create()
@@ -30,8 +33,9 @@ export class QuadtreeTerrain {
 
   update(camera: THREE.Camera): void {
     const localCamera = this.frame.cameraPosition(camera);
-    const tiles = this.selector.select(localCamera.x, localCamera.z);
-    this.renderer.sync(tiles);
+    const lodTiles = this.selector.select(localCamera.x, localCamera.z);
+    const visibleTiles = this.frustumCuller.filter(lodTiles, camera);
+    this.renderer.sync(visibleTiles);
   }
 
   dispose(): void {
