@@ -1,49 +1,44 @@
-# clipmap-from-zero
+# Quadtree Terrain from Zero
 
-A TypeScript clipmap core with a Three.js debug renderer.
+A modular Three.js terrain prototype built around an adaptive quadtree chunk system.
 
 ## Run
 
 ```bash
 npm install
 npm run dev
+npm run typecheck
+npm run build
 ```
 
-## What the preview shows
+## Coordinate model
 
-- Seven nested clipmap levels with square ring geometry (outer levels have a central hole). The finest 1 m/cell area covers 96 × 96 world units.
-- A world-aligned checker texture. Checker tiles have a fixed world-space size and do not grow or shrink between levels.
-- A wireframe overlay to inspect the actual mesh topology.
-- Procedural hills and ridges so height continuity is visible.
-- An automatically moving camera to demonstrate snapped clipmap updates.
+Terrain tiles use a **planet-local coordinate frame**. The planet root is the local origin; camera world position is transformed into that frame before LOD selection. Chunks never follow the camera and their local positions remain stable while the planet root can be translated or rotated in a larger solar-system scene.
 
-## Seam handling
+This avoids using huge solar-system coordinates for terrain sampling. It is a planet-centred local frame, not yet a full scene-wide floating-origin rebasing system for arbitrary astronomical distances.
 
-- All levels derive their origins from one shared camera-following anchor, snapped once at the finest-level interval. Levels are never snapped independently, so a coarse ring's inner boundary cannot drift away from the fine ring's outer boundary.
-- Odd vertices along a fine level's outer boundary collapse onto the matching coarser boundary samples. This removes boundary T-junctions instead of merely hiding them with material.
-- An eight-cell transition band geo-morphs fine-level heights toward the coarser level's interpolated surface. At the shared boundary, both levels evaluate to the same coarse edge profile.
-- Coarser ring inner boundaries line up with the finer ring outer boundaries.
+## Architecture
 
-## Core API
+- `config/TerrainConfig.ts` — validated quadtree and mesh settings.
+- `math/PlanetLocalFrame.ts` — world-camera to planet-local conversion.
+- `quadtree/QuadNode.ts`, `QuadTile.ts` — stable spatial node identity and bounds.
+- `lod/QuadtreeLodSelector.ts` — distance-based adaptive subdivision.
+- `geometry/TerrainHeight.ts`, `TerrainGeometryFactory.ts` — deterministic height field and chunk mesh generation.
+- `render/ChunkRenderer.ts` — active chunk set, mesh reuse pool and per-chunk frustum culling.
+- `render/TerrainMaterial.ts` — shader material setup.
+- `shaders/*.glsl` — vertex and fragment shaders, kept outside TypeScript classes.
+- `QuadtreeTerrain.ts` — high-level terrain facade.
 
-The renderer-agnostic `Clipmap` accepts camera and world center independently:
+## Current implementation
 
-```ts
-const clipmap = new Clipmap({ levels: 7, baseCellSize: 1, resolution: 64 });
+- Stable tile coordinates relative to the planet root; camera motion changes LOD selection, not chunk positions.
+- Quadtree recursively splits tiles based on camera distance, with a minimum-distance floor to avoid runaway subdivision at tile boundaries.
+- Chunks are reused through a mesh pool when the selected leaf set changes.
+- Each chunk is a separate Three.js Mesh, so Three.js can frustum-cull chunks independently.
+- Edge skirts currently hide cracks between different LOD resolutions. Skirts are a first-pass seam solution; exact neighbor-level stitching and geomorphing are future work.
+- Height is generated deterministically from planet-local coordinates.
+- Shader source is stored in standalone GLSL files.
 
-clipmap.setCamera({ x: 120, y: 80, z: -45 });
-clipmap.setCenter({ x: 0, z: 0 });
-const frame = clipmap.refresh();
+## Deliberate limitations
 
-// Or update both inputs atomically:
-clipmap.update({
-  camera: { x: 120, y: 80, z: -45 },
-  center: { x: 0, z: 0 }
-});
-```
-
-Use `ThreeClipmap` to attach the generated levels to a Three.js scene. The debug height function and checker material are deliberately simple and can be replaced by a terrain/planet height source without changing the core API.
-
-## Current limitations
-
-This is a diagnostic implementation of square clipmap rings, boundary stitching and height geomorphing. Current renderer uses one frustum-cullable surface mesh per LOD level; per-chunk visibility and GPU instancing remain a separate optimization. It is not yet a production planetary renderer: normals across morph zones, GPU height sampling, skirts/skirts-free edge cases for arbitrary resolutions, and large-world precision still need dedicated validation.
+This is the first architectural foundation, not a production planetary renderer. It does not yet include balanced-neighbor enforcement, stitch index patterns, geomorphing, asynchronous terrain data, GPU height sampling, instanced vegetation/rocks, or full scene-wide floating-origin rebasing. The planet-local frame keeps terrain coordinates small and stable for a planet-sized scene; a separate floating-origin coordinator will be needed if the whole scene spans astronomical distances.
