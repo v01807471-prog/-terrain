@@ -9,6 +9,7 @@ import { QUALITY_PRESETS } from "./config/quality.js";
 import { f32ToB64, b64ToF32 } from "./persistence/float32.js";
 import { PRESET_GRAPHS, defaultGraph, ensureEnv } from "./legacy/graphPresets.js";
 import { StrokeHistory } from "./legacy/StrokeHistory.js";
+import { StrokeJournal } from "./legacy/StrokeJournal.js";
 
 (async()=>{
 try{
@@ -141,7 +142,7 @@ const DELTA_T=1024;
 let deltaArea=Q.area,deltaRes=deltaArea/DELTA_T,deltaOrg=-deltaArea/2;
 const deltaData=new Float32Array(DELTA_T*DELTA_T);
 const baseCache=new Float32Array(DELTA_T*DELTA_T).fill(NaN);
-const strokeMark=new Uint32Array(DELTA_T*DELTA_T);
+const strokeJournal=new StrokeJournal(DELTA_T*DELTA_T);
 const deltaTexture=new THREE.DataTexture(deltaData,DELTA_T,DELTA_T,THREE.RedFormat,THREE.FloatType);
 deltaTexture.minFilter=THREE.NearestFilter;
 deltaTexture.magFilter=THREE.NearestFilter;
@@ -652,25 +653,17 @@ function baseAtTexel(i,j){
  return b;
 }
 
-let strokeId=0,journalIdx=[],journalOld=[],strokeAnchor=null,strokeDir=[0,-1],brushButton=-1;
+let strokeAnchor=null,strokeDir=[0,-1],brushButton=-1;
 
 function beginStroke(){
- strokeId++;
- journalIdx=[];
- journalOld=[];
+ strokeJournal.begin();
  strokeAnchor=null;
  flattenTarget=null;
 }
 
 function endStroke(){
- if(journalIdx.length){
-  const idx=Int32Array.from(journalIdx),old=Float32Array.from(journalOld);
-  const nw=new Float32Array(idx.length);
-  for(let i=0;i<idx.length;i++)nw[i]=deltaData[idx[i]];
-  history.record({idx,old,nw});
- }
- journalIdx=[];
- journalOld=[];
+ const entry=strokeJournal.finish(index=>deltaData[index]);
+ if(entry)history.record(entry);
  strokeAnchor=null;
  flattenTarget=null;
 }
@@ -730,11 +723,7 @@ function stamp(x,z,dt,reverse){
    else if(tool==="slope")nd+=(strokeAnchor.h+(px-strokeAnchor.x)*sx+(pz-strokeAnchor.z)*sz-cur)*w0*f;
    else if(tool==="noise")nd+=dir*noise2(px*1.3,pz*1.3)*rate*f*.6;
 
-   if(strokeMark[k]!==strokeId){
-    strokeMark[k]=strokeId;
-    journalIdx.push(k);
-    journalOld.push(deltaData[k]);
-   }
+   strokeJournal.capture(k,deltaData[k]);
 
    deltaData[k]=nd;
   }
