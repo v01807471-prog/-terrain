@@ -13,9 +13,9 @@ export interface TerrainConfig {
 }
 
 export const DEFAULT_TERRAIN_CONFIG: Readonly<TerrainConfig> = Object.freeze({
-  rootSize: 8192,
+  rootSize: 32768,
   minChunkSize: 128,
-  maxLevel: 6,
+  maxLevel: 8,
   chunkResolution: 32,
   splitDistanceFactor: 2.6,
   skirtDepth: 18
