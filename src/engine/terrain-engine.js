@@ -10,6 +10,7 @@ import { f32ToB64, b64ToF32 } from "./persistence/float32.js";
 import { PRESET_GRAPHS, defaultGraph, ensureEnv } from "./legacy/graphPresets.js";
 import { StrokeHistory } from "./legacy/StrokeHistory.js";
 import { StrokeJournal } from "./legacy/StrokeJournal.js";
+import { brushEdgeFactor, calculateBrushDelta, sampleSmoothHeight, smoothFalloff } from "./legacy/brushMath.js";
 
 (async()=>{
 try{
@@ -77,15 +78,6 @@ let skipMouse=0;
 
 let baseHeightFn=originalBaseHeight;
 function baseHeightAt(x,z){return baseHeightFn(x,z);}
-
-function smoothFalloff(d,r,soft){
- if(d>=r)return 0;
-
- const t=1-d/r;
- const edge=Math.pow(t,.4+(1-soft)*3);
-
- return edge*edge*(3-2*edge);
-}
 
 function heightAt(x,z){
  return baseHeightAt(x,z)+deltaAtCPU(x,z);
@@ -685,18 +677,10 @@ function stamp(x,z,dt,reverse){
 
  if(tool==="smooth"){
   blur=new Float32Array(W*(j1-j0+1));
+  const readHeight=(ii,jj)=>baseAtTexel(ii,jj)+deltaData[jj*T+ii];
   for(let j=j0;j<=j1;j++){
    for(let i=i0;i<=i1;i++){
-    let sum=0,n=0;
-    for(let b=-2;b<=2;b++){
-     for(let a=-2;a<=2;a++){
-      const ii=i+a,jj=j+b;
-      if(ii<0||jj<0||ii>=T||jj>=T)continue;
-      sum+=baseAtTexel(ii,jj)+deltaData[jj*T+ii];
-      n++;
-     }
-    }
-    blur[(j-j0)*W+(i-i0)]=sum/n;
+    blur[(j-j0)*W+(i-i0)]=sampleSmoothHeight(i,j,T,T,readHeight);
    }
   }
  }
@@ -708,20 +692,20 @@ function stamp(x,z,dt,reverse){
    const d=Math.hypot(px-x,pz-z);
    if(d>=r)continue;
 
-   const edge=Math.min(1,Math.min(i,j,T-1-i,T-1-j)/12);
+   const edge=brushEdgeFactor(i,j,T);
    const f=smoothFalloff(d,r,brushSoft)*edge;
    if(f<=0)continue;
 
    const k=j*T+i;
    const cur=baseAtTexel(i,j)+deltaData[k];
-   let nd=deltaData[k];
+   let targetHeight=cur,noiseSample=0;
 
-   if(tool==="raise")nd+=dir*rate*f;
-   else if(tool==="lower")nd-=dir*rate*f;
-   else if(tool==="flatten")nd+=(flattenTarget-cur)*w0*f;
-   else if(tool==="smooth")nd+=(blur[(j-j0)*W+(i-i0)]-cur)*w0*f;
-   else if(tool==="slope")nd+=(strokeAnchor.h+(px-strokeAnchor.x)*sx+(pz-strokeAnchor.z)*sz-cur)*w0*f;
-   else if(tool==="noise")nd+=dir*noise2(px*1.3,pz*1.3)*rate*f*.6;
+   if(tool==="flatten")targetHeight=flattenTarget;
+   else if(tool==="smooth")targetHeight=blur[(j-j0)*W+(i-i0)];
+   else if(tool==="slope")targetHeight=strokeAnchor.h+(px-strokeAnchor.x)*sx+(pz-strokeAnchor.z)*sz;
+   else if(tool==="noise")noiseSample=noise2(px*1.3,pz*1.3);
+
+   const nd=calculateBrushDelta(tool,deltaData[k],cur,f,dir,rate,w0,targetHeight,noiseSample);
 
    strokeJournal.capture(k,deltaData[k]);
 
