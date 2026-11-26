@@ -17,6 +17,7 @@
     "src/engine/physics/selfTest.ts",
     "src/engine/legacy/StrokeHistory.selfTest.ts",
     "src/engine/legacy/StrokeJournal.selfTest.ts",
-    "src/engine/legacy/brushMath.selfTest.ts"
+    "src/engine/legacy/brushMath.selfTest.ts",
+    "src/ui/EditorTelemetry.ts"
   ]
 }

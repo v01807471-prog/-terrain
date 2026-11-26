@@ -3,3 +3,21 @@
 body>canvas{position:fixed;inset:0;z-index:0;width:100%;height:100%;max-width:none;max-height:none}.inspector-control input{max-width:none;background:transparent;border:0;padding:0;box-shadow:none}
 
 #devToggle{display:none!important}
+
+/* Палитра рабочего пространства: графит и приглушённое золото. */
+:root{color-scheme:dark;color:#e5e0d5;background:#11100e;--panel:#191815;--line:#ffffff20;--mut:#a69b84;--acc:#c5a46b;--acc2:#d9bd83}
+.topbar,.tool-rail,.inspector,.statusbar{background:rgba(24,23,20,.96);border-color:#c5a46b2b}
+.topbar{box-shadow:0 8px 28px #0005}
+.tool-rail{box-shadow:8px 0 24px #0003}
+.inspector{box-shadow:-10px 0 28px #0004}
+.brand-mark{color:#c5a46b}
+.live-dot,.status-green{background:#c5a46b;box-shadow:0 0 10px #c5a46b66}
+.top-actions button:hover,.wide-button:hover{background:#302a20;border-color:#c5a46b55}
+.top-actions .primary-action{background:linear-gradient(180deg,#c5a46b,#a98950);border-color:#dfc58f;color:#17130b}
+.tool-button.selected{background:#3a3020;border-color:#9b7d4c;color:#ead7ad}
+.inspector-tabs button.active{color:#e5ce9b;border-bottom-color:#c5a46b}
+.inspector-control input{accent-color:#c5a46b}
+.wide-button.accent{background:#3a3020;border-color:#9b7d4c;color:#ead7ad}
+.viewport-label,.viewport-help,.viewport-coordinates{background:rgba(20,19,16,.9);border-color:#c5a46b35;color:#d0c6b2;box-shadow:0 5px 18px #0004}
+.viewport-coordinates b,.statusbar b{color:#ead7ad}
+.panel-heading b{color:#ead7ad}

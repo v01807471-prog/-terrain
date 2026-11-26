@@ -3460,6 +3460,26 @@ function updatePanel(now,dt){
 
  set("wEdits",undoStack.length);
 
+ // Передаём только фактические значения legacy runtime в React-интерфейс.
+ window.dispatchEvent(new CustomEvent("terrain:telemetry",{
+  detail:{
+   fps:Math.round(1/Math.max(dt,.0001)),
+   frameMs:stages.total,
+   triangles:renderer.info.render.triangles,
+   cameraPosition:[camera.position.x,camera.position.y,camera.position.z],
+   lodLevels:clipmaps.length,
+   visibleTiles:clipVisible,
+   totalTiles:clipmaps.length*TILES*TILES,
+   activeTool:selectedTool,
+   brushRadius,
+   brushStrength,
+   brushSoftness:brushSoft,
+   brushSlope,
+   undoEntries:undoStack.length,
+   redoEntries:redoStack.length
+  }
+ }));
+
  if(
   panel.classList.contains("open")&&
   document.getElementById("tab-performance").classList.contains("active")

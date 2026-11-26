@@ -3,12 +3,14 @@ import { runTerrainPhysicsSelfTests } from '../.test-dist/engine/physics/selfTes
 import { runStrokeHistorySelfTests } from '../.test-dist/engine/legacy/StrokeHistory.selfTest.js';
 import { runStrokeJournalSelfTests } from '../.test-dist/engine/legacy/StrokeJournal.selfTest.js';
 import { runBrushMathSelfTests } from '../.test-dist/engine/legacy/brushMath.selfTest.js';
+import { runEditorTelemetrySelfTests } from '../.test-dist/ui/EditorTelemetry.js';
 
 const suites = [
   ['Terrain и TerrainEditStore', runTerrainSelfTests()],
   ['История мазков', runStrokeHistorySelfTests()],
   ['Журнал мазков', runStrokeJournalSelfTests()],
   ['Математика кистей', runBrushMathSelfTests()],
+  ['Телеметрия редактора', runEditorTelemetrySelfTests()],
   ['Физический прототип', runTerrainPhysicsSelfTests()]
 ];
 let total = 0;
