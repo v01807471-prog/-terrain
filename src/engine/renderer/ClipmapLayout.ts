@@ -100,7 +100,7 @@ export class ClipmapLayout {
    * Сетка центра каждого уровня привязана к шагу 2 * step, как в legacy renderer.
    */
   update(cameraX: number, cameraY: number, cameraZ: number, groundHeight: number): void {
-    if (![cameraX, cameraY, cameraZ, groundHeight].every(Number.isFinite)) {
+    if (!Number.isFinite(cameraX) || !Number.isFinite(cameraY) || !Number.isFinite(cameraZ) || !Number.isFinite(groundHeight)) {
       throw new RangeError('Положение камеры и высота Terrain должны быть конечными числами');
     }
 
