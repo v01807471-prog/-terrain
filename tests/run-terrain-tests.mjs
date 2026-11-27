@@ -4,6 +4,7 @@ import { runStrokeHistorySelfTests } from '../.test-dist/engine/legacy/StrokeHis
 import { runStrokeJournalSelfTests } from '../.test-dist/engine/legacy/StrokeJournal.selfTest.js';
 import { runBrushMathSelfTests } from '../.test-dist/engine/legacy/brushMath.selfTest.js';
 import { runEditorTelemetrySelfTests } from '../.test-dist/ui/EditorTelemetry.js';
+import { runClipmapLayoutSelfTests } from '../.test-dist/engine/renderer/ClipmapLayout.selfTest.js';
 
 const suites = [
   ['Terrain и TerrainEditStore', runTerrainSelfTests()],
@@ -11,6 +12,7 @@ const suites = [
   ['Журнал мазков', runStrokeJournalSelfTests()],
   ['Математика кистей', runBrushMathSelfTests()],
   ['Телеметрия редактора', runEditorTelemetrySelfTests()],
+  ['Размещение основного Clipmap', runClipmapLayoutSelfTests()],
   ['Физический прототип', runTerrainPhysicsSelfTests()]
 ];
 let total = 0;
