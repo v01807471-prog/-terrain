@@ -11,6 +11,7 @@ import { PRESET_GRAPHS, defaultGraph, ensureEnv } from "./legacy/graphPresets.js
 import { StrokeHistory } from "./legacy/StrokeHistory.js";
 import { StrokeJournal } from "./legacy/StrokeJournal.js";
 import { brushEdgeFactor, calculateBrushDelta, sampleSmoothHeight, smoothFalloff } from "./legacy/brushMath.js";
+import { ClipmapLayout } from "./renderer/ClipmapLayout.js";
 
 (async()=>{
 try{
@@ -429,6 +430,7 @@ markGoodLater();
 // не рисуется), а тайлы целиком внутри "дырки" под более детальным уровнем пропускаются.
 
 const clipmaps=[];
+let clipmapLayout=null;
 
 function createTileGeometry(tx,tz){
 
@@ -554,6 +556,15 @@ function buildClipmap(){
   clipmaps.push({level,step,cut,outer,tiles,material,wireMaterial});
  }
 
+ // Описания LOD и смещения тайлов фиксируются при перестройке качества, а не каждый кадр.
+ clipmapLayout = new ClipmapLayout(clipmaps.map(clip=>({
+  level:clip.level,
+  step:clip.step,
+  cut:clip.cut,
+  outer:clip.outer,
+  tiles:clip.tiles.map(tile=>({ox:tile.ox,oz:tile.oz}))
+ })),CLIP_TILE);
+
  // Туман полностью скрывает край террейна на заданной дальности.
  applyFog();
  waterMesh.scale.set(Q.dist*1.3,1,Q.dist*1.3);
@@ -572,43 +583,30 @@ function updateClipmaps(){
  const cx=camera.position.x;
  const cz=camera.position.z;
 
- const alt=Math.max(0,camera.position.y-groundHeight(cx,cz)-4);
- uniforms.uAlt.value=alt;
+ clipmapLayout.update(cx,camera.position.y,cz,groundHeight(cx,cz));
+ uniforms.uAlt.value=clipmapLayout.altitude;
  waterMesh.position.set(cx,waterU.uSea.value,cz);
 
- let visible=0;
+ // Позиции и видимость берутся из переиспользуемого буфера ClipmapLayout.
+ let tileIndex=0;
+ const placements=clipmapLayout.placements;
 
  for(const clip of clipmaps){
-
-  const step=clip.step;
-  const g=2*step;
-  const x=Math.round(cx/g)*g;
-  const z=Math.round(cz/g)*g;
-  const size=CLIP_TILE*step;
-  const last=clip.level===CLIP_LEVELS-1;
-
   for(const t of clip.tiles){
+   const offset=tileIndex*3;
+   const x=placements[offset];
+   const z=placements[offset+1];
+   const show=placements[offset+2]===1;
 
    t.mesh.position.set(x,0,z);
    t.wireMesh.position.set(x,0,z);
-
-   const x0=x+t.ox*step,x1=x0+size;
-   const z0=z+t.oz*step,z1=z0+size;
-
-   const minD=Math.max(Math.max(x0-cx,0,cx-x1),Math.max(z0-cz,0,cz-z1),alt);
-   const maxD=Math.max(Math.abs(x0-cx),Math.abs(x1-cx),Math.abs(z0-cz),Math.abs(z1-cz),alt);
-
-   // Скрыт, если целиком под более детальным уровнем или целиком за зоной слияния.
-   const show=maxD>=clip.cut&&(last||minD<clip.outer);
-
    t.mesh.visible=show;
    t.wireMesh.visible=show&&showTriangles;
-
-   if(show)visible++;
+   tileIndex++;
   }
  }
 
- clipVisible=visible;
+ clipVisible=clipmapLayout.visibleTiles;
 }
 
 // EDIT LAYER
