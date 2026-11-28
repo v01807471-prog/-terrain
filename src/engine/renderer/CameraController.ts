@@ -35,6 +35,13 @@ class ScratchVector3 {
     return this;
   }
 
+  negate(): this {
+    this.x = -this.x;
+    this.y = -this.y;
+    this.z = -this.z;
+    return this;
+  }
+
   crossVectors(a: VectorLike, b: VectorLike): this {
     const ax = a.x, ay = a.y, az = a.z;
     const bx = b.x, by = b.y, bz = b.z;
