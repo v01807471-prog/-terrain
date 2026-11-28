@@ -1850,7 +1850,7 @@ function setRangeValue(id,label,v){
 // Колесо: радиус, Shift+колесо: сила.
 document.addEventListener("wheel",e=>{
 
- if(!pointerLocked)return;
+ if(!cameraController.pointerLocked)return;
  e.preventDefault();
 
  const k=(e.deltaY||e.deltaX)<0?1.12:1/1.12;
