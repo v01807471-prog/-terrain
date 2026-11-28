@@ -12,6 +12,7 @@ import { StrokeHistory } from "./legacy/StrokeHistory.js";
 import { StrokeJournal } from "./legacy/StrokeJournal.js";
 import { brushEdgeFactor, calculateBrushDelta, sampleSmoothHeight, smoothFalloff } from "./legacy/brushMath.js";
 import { ClipmapLayout } from "./renderer/ClipmapLayout.js";
+import { CameraController } from "./renderer/CameraController.js";
 
 (async()=>{
 try{
@@ -73,7 +74,6 @@ let GROUND_CELL=Q.cell;
 let brushSlope=.35;
 let flattenMode="stroke";
 let pinHeight=10;
-let skipMouse=0;
 
 // CPU HEIGHT FIELD
 
@@ -716,7 +716,7 @@ function stamp(x,z,dt,reverse){
 
 function updateBrush(dt){
 
- const hit=(pointerLocked&&!detachedCamera&&!graphOpen)?findTerrainHit():null;
+ const hit=(cameraController.pointerLocked&&!cameraController.detached&&!graphOpen)?findTerrainHit():null;
 
  updateGizmo(hit);
 
@@ -724,7 +724,7 @@ function updateBrush(dt){
 
  if(!strokeAnchor){
   strokeAnchor={x:hit.x,z:hit.z,h:heightAt(hit.x,hit.z)};
-  strokeDir=[-Math.sin(yaw),-Math.cos(yaw)];
+  strokeDir=[-Math.sin(cameraController.yaw),-Math.cos(cameraController.yaw)];
   if(Math.abs(hit.x)>deltaArea/2||Math.abs(hit.z)>deltaArea/2){
    console.warn("Вне области правок (±"+deltaArea/2+" м от центра мира)");
   }
@@ -857,7 +857,7 @@ function updateGizmo(hit){
 
  }else if(selectedTool==="slope"){
 
-  const fwd=strokeAnchor?strokeDir:[-Math.sin(yaw),-Math.cos(yaw)];
+  const fwd=strokeAnchor?strokeDir:[-Math.sin(cameraController.yaw),-Math.cos(cameraController.yaw)];
   const sgn=brushButton===2?-1:1;
   const sx=fwd[0]*brushSlope*sgn,sz=fwd[1]*brushSlope*sgn;
   const ax=strokeAnchor?strokeAnchor.x:hit.x,az=strokeAnchor?strokeAnchor.z:hit.z,ah=strokeAnchor?strokeAnchor.h:h;
@@ -888,43 +888,28 @@ function updateGizmo(hit){
 
 const EYE_HEIGHT=1.72;
 
-let yaw=0;
-let pitch=-.19;
-let verticalVelocity=0;
-let grounded=false;
-let detachedCamera=false;
-
-const savedPlayerPosition=new THREE.Vector3();
-
 camera.position.set(
  0,
  heightAt(0,18)+EYE_HEIGHT,
  18
 );
 
-camera.rotation.order="YXZ";
-camera.rotation.set(pitch,yaw,0);
-
-const keys=Object.create(null);
-
-let pointerLocked=false;
+const cameraController=new CameraController(camera,{eyeHeight:EYE_HEIGHT});
 
 renderer.domElement.addEventListener("click",()=>{
 
- if(!pointerLocked){
+ if(!cameraController.pointerLocked){
   renderer.domElement.requestPointerLock();
  }
 });
 
 document.addEventListener("pointerlockchange",()=>{
 
- pointerLocked=
-  document.pointerLockElement===renderer.domElement;
+ cameraController.setPointerLocked(
+  document.pointerLockElement===renderer.domElement
+ );
 
- // Браузер присылает "скачок" мыши сразу после повторного захвата — пропускаем его.
- skipMouse=3;
-
- if(!pointerLocked){
+ if(!cameraController.pointerLocked){
   brushButton=-1;
   endStroke();
  }
@@ -932,34 +917,15 @@ document.addEventListener("pointerlockchange",()=>{
 
 document.addEventListener("mousemove",e=>{
 
- if(!pointerLocked)return;
-
- if(skipMouse>0){
-  skipMouse--;
-  return;
- }
-
- const mx=THREE.MathUtils.clamp(e.movementX,-120,120);
- const my=THREE.MathUtils.clamp(e.movementY,-120,120);
-
- yaw-=mx*.0022;
- pitch-=my*.0022;
-
- pitch=THREE.MathUtils.clamp(pitch,-1.5,1.5);
-
- camera.rotation.set(pitch,yaw,0,"YXZ");
+ cameraController.handleMouseMove(e.movementX,e.movementY);
 });
 
 function toggleFreeCamera(){
 
- detachedCamera=!detachedCamera;
-
+ const detached=cameraController.toggleFreeCamera();
  const info=document.getElementById("modeInfo");
 
- if(detachedCamera){
-
-  savedPlayerPosition.copy(camera.position);
-  verticalVelocity=0;
+ if(detached){
 
   info.textContent=
    "FREE CAMERA · WASD · SPACE/CTRL · SHIFT · V — RETURN";
@@ -967,11 +933,6 @@ function toggleFreeCamera(){
   console.info("Free camera enabled");
 
  }else{
-
-  camera.position.copy(savedPlayerPosition);
-
-  verticalVelocity=0;
-  grounded=true;
 
   info.textContent="PLAYER MODE · V — FREE CAMERA";
 
@@ -990,9 +951,9 @@ document.addEventListener("keydown",e=>{
 
  if(graphOpen)return;
 
- if(e.code==="KeyF"&&!e.repeat&&pointerLocked)pickPin();
+ if(e.code==="KeyF"&&!e.repeat&&cameraController.pointerLocked)pickPin();
 
- keys[e.code]=true;
+ cameraController.setKey(e.code,true);
 
  if(e.code==="KeyV"&&!e.repeat){
   toggleFreeCamera();
@@ -1007,8 +968,6 @@ document.addEventListener("keydown",e=>{
  if(e.code==="KeyT"&&!e.repeat){
 
   showTriangles=!showTriangles;
-
-  
 
   document.getElementById("wGrid").textContent=
    showTriangles?"TRIANGLES ON":"OFF";
@@ -1027,99 +986,20 @@ document.addEventListener("keydown",e=>{
 });
 
 document.addEventListener("keyup",e=>{
- keys[e.code]=false;
+ cameraController.setKey(e.code,false);
 });
 
 window.addEventListener("blur",()=>{
- for(const k in keys)keys[k]=false;
+ cameraController.clearKeys();
 });
 
 function updateMovement(dt){
-
- if(detachedCamera){
-
-  const speed=keys.ShiftLeft?100:35;
-
-  const forward=new THREE.Vector3();
-  camera.getWorldDirection(forward);
-
-  const right=new THREE.Vector3()
-   .crossVectors(forward,camera.up)
-   .normalize();
-
-  if(keys.KeyW)camera.position.addScaledVector(forward,speed*dt);
-  if(keys.KeyS)camera.position.addScaledVector(forward,-speed*dt);
-  if(keys.KeyD)camera.position.addScaledVector(right,speed*dt);
-  if(keys.KeyA)camera.position.addScaledVector(right,-speed*dt);
-
-  if(keys.Space)camera.position.y+=speed*dt;
-
-  if(keys.ControlLeft||keys.ControlRight){
-   camera.position.y-=speed*dt;
-  }
-
-  return;
- }
-
- const inWater=(camera.position.y-EYE_HEIGHT)<seaLevel-.4;
- const speed=(keys.ShiftLeft?25:12)*(inWater?.55:1);
-
- const forward=new THREE.Vector3(
-  -Math.sin(yaw),
-  0,
-  -Math.cos(yaw)
- );
-
- const right=new THREE.Vector3(
-  Math.cos(yaw),
-  0,
-  -Math.sin(yaw)
- );
-
- if(keys.KeyW)camera.position.addScaledVector(forward,speed*dt);
- if(keys.KeyS)camera.position.addScaledVector(forward,-speed*dt);
- if(keys.KeyD)camera.position.addScaledVector(right,speed*dt);
- if(keys.KeyA)camera.position.addScaledVector(right,-speed*dt);
-
- const ground=groundHeight(camera.position.x,camera.position.z);
- const feet=camera.position.y-EYE_HEIGHT;
- const snap=Math.max(.7,speed*dt*2);
-
- // Прилипание к склону при спуске, иначе игрок "падает" шагами.
- if(grounded&&!keys.Space&&feet-ground<=snap){
-
-  camera.position.y=ground+EYE_HEIGHT;
-  verticalVelocity=0;
-
- }else{
-
-  if(inWater){
-   verticalVelocity-=5*dt;
-   verticalVelocity*=Math.exp(-2.5*dt);
-   if(keys.Space)verticalVelocity=Math.max(verticalVelocity,3.2);
-  }else verticalVelocity-=24*dt;
-
-  if(keys.Space&&grounded&&!inWater){
-   verticalVelocity=8.5;
-   grounded=false;
-  }
-
-  camera.position.y+=verticalVelocity*dt;
- }
-
- if(camera.position.y-EYE_HEIGHT<=ground+1e-4){
-
-  camera.position.y=ground+EYE_HEIGHT;
-  verticalVelocity=0;
-  grounded=true;
-
- }else{
-
-  grounded=false;
- }
+ cameraController.update(dt,seaLevel,groundHeight);
 }
 
 // TERRAIN RAYCAST
+
+
 
 const raycaster=new THREE.Raycaster();
 
@@ -1192,7 +1072,7 @@ function findTerrainHit(){
 
 document.addEventListener("mousedown",e=>{
 
- if(!pointerLocked||detachedCamera)return;
+ if(!cameraController.pointerLocked||cameraController.detached)return;
  if(e.button!==0&&e.button!==2)return;
 
  if(brushButton>=0)endStroke();
@@ -2368,6 +2248,27 @@ function updatePanel(now,dt){
  set("tRender",stages.render.toFixed(2)+" ms");
 
  set("wEdits",undoStack.length);
+ set("wEdits",undoStack.length);
+
+  // Передаём фактические показатели основного renderer в React-оболочку.
+  window.dispatchEvent(new CustomEvent("terrain:telemetry",{
+   detail:{
+    fps:Math.round(1/Math.max(dt,.0001)),
+    frameMs:stages.total,
+    triangles:renderer.info.render.triangles,
+    cameraPosition:[camera.position.x,camera.position.y,camera.position.z],
+    lodLevels:clipmaps.length,
+    visibleTiles:clipVisible,
+    totalTiles:clipmaps.length*TILES*TILES,
+    activeTool:selectedTool,
+    brushRadius,
+    brushStrength,
+    brushSoftness:brushSoft,
+    brushSlope,
+    undoEntries:undoStack.length,
+    redoEntries:redoStack.length
+   }
+  }));
 
  if(
   panel.classList.contains("open")&&
