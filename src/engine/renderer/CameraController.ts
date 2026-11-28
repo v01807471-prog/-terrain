@@ -1,9 +1,45 @@
-import { Vector3, type Camera } from 'three';
+import type { Camera, Vector3 } from 'three';
 
 export interface CameraControllerOptions {
   readonly yaw?: number;
   readonly pitch?: number;
   readonly eyeHeight?: number;
+}
+
+interface VectorLike {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+/** Небольшой вектор для временных вычислений без второй копии Three.js. */
+class ScratchVector3 {
+  x = 0;
+  y = 0;
+  z = 0;
+
+  set(x: number, y: number, z: number): this {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    return this;
+  }
+
+  normalize(): this {
+    const length = Math.hypot(this.x, this.y, this.z);
+    if (length > 0) {
+      this.x /= length;
+      this.y /= length;
+      this.z /= length;
+    }
+    return this;
+  }
+
+  crossVectors(a: VectorLike, b: VectorLike): this {
+    const ax = a.x, ay = a.y, az = a.z;
+    const bx = b.x, by = b.y, bz = b.z;
+    return this.set(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
+  }
 }
 
 /**
@@ -13,7 +49,9 @@ export interface CameraControllerOptions {
  */
 export class CameraController {
   readonly keys: Record<string, boolean> = Object.create(null) as Record<string, boolean>;
-  readonly savedPlayerPosition = new Vector3();
+  readonly savedPlayerPosition: Vector3;
+  readonly forward = new ScratchVector3();
+  readonly right = new ScratchVector3();
 
   yaw: number;
   pitch: number;
@@ -23,8 +61,6 @@ export class CameraController {
   pointerLocked = false;
 
   private readonly eyeHeight: number;
-  private readonly forward = new Vector3();
-  private readonly right = new Vector3();
   private mouseEventsToSkip = 0;
 
   constructor(
@@ -34,6 +70,7 @@ export class CameraController {
     this.yaw = options.yaw ?? 0;
     this.pitch = options.pitch ?? -0.19;
     this.eyeHeight = options.eyeHeight ?? 1.72;
+    this.savedPlayerPosition = camera.position.clone();
 
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.set(this.pitch, this.yaw, 0);
@@ -99,13 +136,13 @@ export class CameraController {
 
     if (this.detached) {
       const speed = keys.ShiftLeft ? 100 : 35;
-      this.camera.getWorldDirection(this.forward);
+      this.camera.getWorldDirection(this.forward as unknown as Vector3);
       this.right.crossVectors(this.forward, this.camera.up).normalize();
 
-      if (keys.KeyW) position.addScaledVector(this.forward, speed * dt);
-      if (keys.KeyS) position.addScaledVector(this.forward, -speed * dt);
-      if (keys.KeyD) position.addScaledVector(this.right, speed * dt);
-      if (keys.KeyA) position.addScaledVector(this.right, -speed * dt);
+      if (keys.KeyW) position.addScaledVector(this.forward as unknown as Vector3, speed * dt);
+      if (keys.KeyS) position.addScaledVector(this.forward as unknown as Vector3, -speed * dt);
+      if (keys.KeyD) position.addScaledVector(this.right as unknown as Vector3, speed * dt);
+      if (keys.KeyA) position.addScaledVector(this.right as unknown as Vector3, -speed * dt);
 
       if (keys.Space) position.y += speed * dt;
       if (keys.ControlLeft || keys.ControlRight) position.y -= speed * dt;
